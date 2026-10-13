@@ -1,0 +1,1496 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#1d58d6"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ИИ Тренер"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png" type="image/png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style><script>window.AI_TRAINER_STANDALONE=true</script></head><body><title>ИИ Тренер</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: viewfinder first. A dark measuring stage with the live HUD sits on the left (top on phones); coaching instruments, the rep log and the set report stack beside it. */
+:root{
+  --bg:#edf0f3; --surface:#ffffff; --surface-2:#f4f6f8; --ink:#131a22; --muted:#5b6673; --line:#d8dee5;
+  --accent:#1d58d6; --accent-ink:#ffffff; --accent-soft:#e2eafc;
+  --good:#16834a; --good-soft:#dff3e7; --warn:#a96400; --warn-soft:#fbeed6; --bad:#c3352a; --bad-soft:#fbe4e1;
+  --stage:#0c1117; --stage-2:#121a22; --stage-ink:#e9eef3; --stage-dim:#8d99a6; --stage-glass:rgba(10,15,21,.72); --stage-edge:rgba(233,238,243,.14);
+  --stage-accent:#7aa2ff; --stage-good:#3fd28e; --stage-warn:#ffb648; --stage-bad:#ff5f52;
+  --f-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0a0e12; --surface:#121920; --surface-2:#18212a; --ink:#e5eaef; --muted:#95a1ae; --line:#25303b;
+    --accent:#77a0ff; --accent-ink:#0a1222; --accent-soft:#18253d;
+    --good:#43c983; --good-soft:#11301f; --warn:#f0aa3c; --warn-soft:#33260f; --bad:#ff6c60; --bad-soft:#3a1714;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a0e12; --surface:#121920; --surface-2:#18212a; --ink:#e5eaef; --muted:#95a1ae; --line:#25303b;
+  --accent:#77a0ff; --accent-ink:#0a1222; --accent-soft:#18253d;
+  --good:#43c983; --good-soft:#11301f; --warn:#f0aa3c; --warn-soft:#33260f; --bad:#ff6c60; --bad-soft:#3a1714;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--f-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;opacity:0}
+
+.app{max-width:1220px;margin:0 auto;padding-inline:16px;padding-block:14px 48px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.brand svg{width:36px;height:36px;flex:none}
+.brand h1{margin:0;font:700 20px/1.1 var(--f-display);letter-spacing:-.01em;text-wrap:balance}
+.brand p{margin:3px 0 0;color:var(--muted);font-size:12.5px}
+.top-actions{display:flex;gap:8px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 13px;font-weight:600;font-size:13.5px}
+.pill svg{width:16px;height:16px}
+.pill[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+.tabs{display:inline-flex;gap:4px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;max-width:100%}
+.tab{appearance:none;border:0;background:transparent;color:var(--muted);font-weight:600;font-size:14.5px;padding:8px 18px;border-radius:9px}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+
+.left{min-width:0}
+.right{min-width:0;display:grid;gap:14px;align-content:start}
+@media (min-width:960px){
+  .app{grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);column-gap:22px}
+  .top,.tabs-row{grid-column:1/-1}
+  .left{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);align-self:start}
+}
+
+/* Stage */
+.viewer{background:var(--stage);border-radius:var(--r);overflow:hidden;border:1px solid var(--line)}
+.stage{position:relative;width:100%;aspect-ratio:var(--ar,4/5);max-height:min(66vh,740px);background:var(--stage);overflow:hidden;isolation:isolate}
+.stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage video{object-fit:contain;background:var(--stage)}
+.stage video.mirror{transform:scaleX(-1)}
+.hud-tl{position:absolute;left:12px;top:12px;display:flex;gap:6px;flex-wrap:wrap;z-index:2;max-width:62%}
+.badge{font:600 10.5px/1 var(--f-mono);letter-spacing:.07em;text-transform:uppercase;color:var(--stage-ink);background:var(--stage-glass);border:1px solid var(--stage-edge);padding:6px 8px;border-radius:6px}
+.badge.live{color:var(--stage-bad)}
+.hud-tr{position:absolute;right:12px;top:12px;z-index:2;text-align:right;color:var(--stage-ink);background:var(--stage-glass);border:1px solid var(--stage-edge);border-radius:12px;padding:8px 12px 7px;min-width:72px}
+.repnum{font:700 40px/1 var(--f-display);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.replabel{font:600 10.5px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--stage-dim);margin-top:4px}
+.cue{display:flex;align-items:center;gap:11px;padding:13px 16px;border-top:1px solid var(--stage-edge);background:var(--stage);color:var(--stage-ink);font-weight:600;font-size:17px;line-height:1.3;min-height:62px}
+.cue i{width:11px;height:11px;border-radius:50%;background:var(--stage-dim);flex:none}
+.cue.good i{background:var(--stage-good)} .cue.good{color:var(--stage-good)}
+.cue.warn i{background:var(--stage-warn)} .cue.warn{color:var(--stage-warn)}
+.cue.bad i{background:var(--stage-bad)} .cue.bad{color:var(--stage-bad)}
+.cue.info i{background:var(--stage-accent)}
+.stage-msg{position:absolute;inset:0;z-index:3;display:grid;place-items:center;padding:18px;background:rgba(8,12,16,.6)}
+.msg-card{max-width:400px;background:var(--stage-2);border:1px solid var(--stage-edge);border-radius:14px;padding:18px;color:var(--stage-ink)}
+.msg-card h3{margin:0 0 6px;font:600 16px/1.3 var(--f-body)}
+.msg-card p{margin:0;color:var(--stage-dim);font-size:13.5px}
+.msg-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.msg-actions button{border:1px solid var(--stage-edge);background:transparent;color:var(--stage-ink);border-radius:10px;padding:8px 12px;font-weight:600;font-size:13.5px}
+.msg-actions button.primary{background:var(--stage-accent);border-color:var(--stage-accent);color:#0a1222}
+.spin{width:22px;height:22px;border-radius:50%;border:2.5px solid var(--stage-edge);border-top-color:var(--stage-accent);animation:spin .9s linear infinite;margin-bottom:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.sources{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+@media (max-width:560px){.sources{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.src{display:flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:8px 10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;font-weight:600;font-size:14px;line-height:1.2;text-align:center;position:relative;cursor:pointer;user-select:none}
+.src svg{width:18px;height:18px;flex:none}
+.src.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.src:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.subbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center;min-height:36px}
+.mini{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:6px 11px;font-weight:600;font-size:13px}
+.mini[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.subnote{color:var(--muted);font-size:12.5px}
+
+/* Panels */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}
+h2{margin:0;font:600 12px/1.2 var(--f-body);text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+.muted{color:var(--muted);font-size:13px}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.tile{background:var(--surface-2);border-radius:10px;padding:11px 12px;min-width:0}
+.tile .lab{font:600 10.5px/1.2 var(--f-mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px}
+.tile .lab i{width:7px;height:7px;border-radius:50%;background:var(--line);flex:none}
+.tile .val{font:600 21px/1.15 var(--f-mono);font-variant-numeric:tabular-nums;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .note{font-size:12px;line-height:1.35;color:var(--muted);margin-top:3px}
+.tile.ok .val{color:var(--good)} .tile.ok .lab i{background:var(--good)}
+.tile.warn .val{color:var(--warn)} .tile.warn .lab i{background:var(--warn)}
+.tile.bad .val{color:var(--bad)} .tile.bad .lab i{background:var(--bad)}
+.tile.live .val{color:var(--accent)} .tile.live .lab i{background:var(--accent)}
+.tile.idle .val{color:var(--muted)}
+
+.reps{display:flex;flex-wrap:wrap;gap:6px}
+.rep{width:40px;height:40px;border-radius:10px;border:1px solid transparent;font:600 14px/1 var(--f-mono);display:grid;place-items:center;font-variant-numeric:tabular-nums}
+.rep.good{background:var(--good-soft);color:var(--good)}
+.rep.fair{background:var(--warn-soft);color:var(--warn)}
+.rep.bad{background:var(--bad-soft);color:var(--bad)}
+.rep[aria-pressed="true"]{border-color:var(--ink)}
+.empty{color:var(--muted);font-size:13.5px;margin:0}
+.rep-detail{margin-top:12px;border-top:1px solid var(--line);padding-top:12px;font-size:13.5px}
+.rep-detail h3{margin:0 0 6px;font-size:14px}
+.rep-detail ul{margin:6px 0 0;padding-left:18px}
+.rep-detail li{margin:3px 0}
+.kv{display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--muted);font-size:12.5px;font-family:var(--f-mono)}
+
+.sum-head{display:flex;align-items:center;gap:14px}
+.sum-big{font:700 40px/1 var(--f-display);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.sum-big span{font-size:22px;color:var(--muted)}
+.sum-head b{display:block;font-size:14.5px}
+.sum-head p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.sum-bar{display:flex;gap:3px;margin:14px 0 4px}
+.sum-bar span{flex:1;height:8px;border-radius:3px}
+.sum-bar .good{background:var(--good)} .sum-bar .fair{background:var(--warn)} .sum-bar .bad{background:var(--bad)}
+.faults{margin-top:12px;border-top:1px solid var(--line)}
+.faults details{border-bottom:1px solid var(--line)}
+.faults summary{list-style:none;display:flex;align-items:center;gap:10px;padding:11px 0;cursor:pointer;font-weight:600;font-size:14px}
+.faults summary::-webkit-details-marker{display:none}
+.faults summary .sev{width:8px;height:8px;border-radius:50%;flex:none}
+.sev.major{background:var(--bad)} .sev.minor{background:var(--warn)}
+.faults summary .cnt{margin-left:auto;color:var(--muted);font:500 12.5px var(--f-mono);white-space:nowrap}
+.faults summary .chev{width:14px;height:14px;color:var(--muted);transition:transform .15s}
+.faults details[open] .chev{transform:rotate(90deg)}
+.faults .body{padding:0 0 12px 18px;font-size:13.5px}
+.faults .body p{margin:0 0 6px}
+.faults .body b{font-weight:600}
+.next{margin-top:14px;background:var(--surface-2);border-radius:10px;padding:12px}
+.next h3{margin:0 0 6px;font-size:13.5px}
+.next p{margin:0;font-size:13.5px}
+.next .small{margin-top:6px;color:var(--muted);font-size:12.5px}
+.tg-box{margin-top:12px}
+.tg-send{width:100%;border:0;border-radius:12px;padding:13px 16px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:15px}
+.tg-box p{margin:0;color:var(--muted);font-size:13px}
+.wrow{display:flex;align-items:center;gap:8px;margin:0 0 10px;flex-wrap:wrap}
+.wrow label{font-size:13px;color:var(--muted)}
+.wrow input{width:96px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 9px;font-family:var(--f-mono);font-size:14px}
+
+.set-group{display:grid;gap:6px;margin-bottom:12px}
+.set-group:last-child{margin-bottom:0}
+.set-group .lab{font-size:13px;color:var(--muted)}
+.seg{display:flex;background:var(--surface-2);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;border-radius:8px;padding:7px 6px;font-weight:600;font-size:13px;color:var(--muted);min-width:0}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08),0 0 0 1px var(--line)}
+.guide{margin:0;padding-left:18px;font-size:13.5px}
+.guide li{margin:5px 0}
+.guide b{font-weight:600}
+.foot{grid-column:1/-1;color:var(--muted);font-size:12px;line-height:1.5;max-width:75ch}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16.5" fill="var(--accent)"/><circle cx="18" cy="18" r="11" fill="none" stroke="var(--accent-ink)" stroke-opacity=".45" stroke-width="1.5"/><circle cx="18" cy="18" r="3.4" fill="var(--bg)"/></svg>
+      <div><h1>ИИ Тренер</h1><p>Прототип · разбор техники в реальном времени</p></div>
+    </div>
+    <div class="top-actions">
+      <button class="pill" id="voiceBtn" aria-pressed="false" type="button">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8v4h3l4 3.5v-11L6 8H3z"/><path d="M13.5 7.5a3.5 3.5 0 0 1 0 5M15.8 5.2a6.8 6.8 0 0 1 0 9.6"/></svg>
+        <span id="voiceLabel">Голос выкл.</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="tabs-row">
+    <div class="tabs" role="tablist" aria-label="Упражнение">
+      <button class="tab" role="tab" data-ex="squat" aria-selected="true" type="button">Присед</button>
+      <button class="tab" role="tab" data-ex="pushup" aria-selected="false" type="button">Отжимания</button>
+    </div>
+  </div>
+
+  <section class="left" aria-label="Камера и разбор">
+    <div class="viewer">
+    <div class="stage" id="stage">
+      <video id="vid" playsinline muted preload="auto"></video>
+      <canvas id="cv"></canvas>
+      <div class="hud-tl"><span class="badge" id="srcBadge">Демо</span><span class="badge" id="viewBadge">Вид сбоку</span></div>
+      <div class="hud-tr"><div class="repnum" id="repNum">0</div><div class="replabel" id="repLabel">повторов</div></div>
+      <div class="stage-msg" id="stageMsg" hidden><div class="msg-card"><div class="spin" id="msgSpin" hidden></div><h3 id="msgTitle"></h3><p id="msgText"></p><div class="msg-actions" id="msgActions"></div></div></div>
+    </div>
+    <div class="cue" id="cue" role="status" aria-live="polite"><i></i><span id="cueText">Запускаю демо</span></div>
+    </div>
+
+    <div class="sources" role="group" aria-label="Источник видео">
+      <button class="src on" data-src="demo" type="button">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M6 4.5v11l9-5.5-9-5.5z"/></svg>Демо</button>
+      <button class="src" data-src="camera" type="button">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="11" height="9" rx="2"/><path d="M13.5 9l4-2.5v7l-4-2.5"/></svg>Камера</button>
+      <label class="src" for="recInput" data-src="rec">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="3" fill="currentColor"/></svg>Снять подход
+        <input class="vh" id="recInput" type="file" accept="video/*" capture="environment"></label>
+      <label class="src" for="fileInput" data-src="file">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13V3.5M6 7l4-3.5L14 7"/><path d="M3.5 12.5v3a1.5 1.5 0 0 0 1.5 1.5h10a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg>Из галереи
+        <input class="vh" id="fileInput" type="file" accept="video/*"></label>
+    </div>
+    <div class="subbar" id="subbar"></div>
+  </section>
+
+  <section class="right">
+    <div class="card">
+      <div class="card-h"><h2>Сейчас</h2><span class="muted" id="phaseLabel">калибровка</span></div>
+      <div class="tiles" id="tiles"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Повторы</h2><span class="muted" id="repsMeta"></span></div>
+      <div class="reps" id="reps"><p class="empty">Здесь появится каждый повтор: зелёный — чисто, жёлтый — мелкая ошибка, красный — серьёзная. Нажми на номер, чтобы увидеть разбор.</p></div>
+      <div class="rep-detail" id="repDetail" hidden></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Итог подхода</h2><span class="muted" id="sumMeta"></span></div>
+      <div id="summary"><p class="empty">Разбор подхода появится после первого повтора: какие ошибки повторяются, почему они возникают и какое упражнение их исправит.</p></div>
+      <div class="next" id="nextBox">
+        <h3>Следующий подход</h3>
+        <div class="wrow" id="weightRow"><label for="weight">Рабочий вес</label><input id="weight" inputmode="decimal" autocomplete="off" placeholder="без веса"><span class="muted">кг</span></div>
+        <p id="nextText">Сделай подход — рекомендация по весу и повторам появится здесь.</p>
+        <p class="small" id="nextSmall"></p>
+      </div>
+      <div class="tg-box" id="tgBox" hidden></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Под клиента</h2></div>
+      <div class="set-group"><span class="lab" id="depthLab">Цель по глубине</span><div class="seg" id="segDepth"></div></div>
+      <div class="set-group"><span class="lab">Уровень подготовки — строгость проверки</span><div class="seg" id="segLevel"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Как поставить телефон</h2></div>
+      <ol class="guide" id="setupList"></ol>
+    </div>
+  </section>
+
+  <p class="foot">Прототип оценивает технику по 33 точкам тела (модель BlazePose, Google, Apache 2.0) прямо на устройстве: видео никуда не отправляется. С одной камеры пока не видно округление поясницы, разведение локтей в отжиманиях и траекторию грифа. Подсказки не заменяют врача и очного тренера: при боли прекращай упражнение.</p>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const DEG = 180 / Math.PI;
+const RAD = Math.PI / 180;
+const fmt1 = v => (Math.round(v * 10) / 10).toFixed(1).replace('.', ',');
+const kg = v => { const r = Math.round(v * 10) / 10; return (Number.isInteger(r) ? String(r) : r.toFixed(1)).replace('.', ','); };
+const roundTo = (v, step) => Math.round(v / step) * step;
+const plural = (n, one, few, many) => { const a = n % 10, b = n % 100; if (a === 1 && b !== 11) return one; if (a >= 2 && a <= 4 && (b < 10 || b >= 20)) return few; return many; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- Geometry over BlazePose's 33 landmarks ---------- */
+const SIDE = {
+  l: { ear: 7, sh: 11, el: 13, wr: 15, hip: 23, kn: 25, an: 27, heel: 29, toe: 31 },
+  r: { ear: 8, sh: 12, el: 14, wr: 16, hip: 24, kn: 26, an: 28, heel: 30, toe: 32 }
+};
+const V = {
+  dist: (a, b) => Math.hypot(a.x - b.x, a.y - b.y),
+  mid: (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, score: Math.min(a.score, b.score) }),
+  angle(a, b, c) {
+    const ux = a.x - b.x, uy = a.y - b.y, vx = c.x - b.x, vy = c.y - b.y;
+    const d = Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1;
+    return Math.acos(clamp((ux * vx + uy * vy) / d, -1, 1)) * DEG;
+  },
+  // angle of segment lower→upper from the vertical, degrees (0 = upright)
+  fromVertical: (lower, upper) => Math.atan2(Math.abs(upper.x - lower.x), Math.max(1e-6, lower.y - upper.y)) * DEG
+};
+
+/* ---------- Fault catalogue: what the coach says, why, and what to drill ---------- */
+const FAULTS = {
+  shallow: { title: 'Недостаточная глубина', cue: 'Садись глубже', say: 'Садись глубже', pen: 30,
+    why: 'Таз не опустился до заданной глубины, бедро осталось выше параллели. Ягодичные и задняя поверхность бедра получают меньше работы.',
+    fix: 'Опускайся, пока тазобедренный сустав не окажется на уровне колена. Если мешает подвижность или вес — облегчи снаряд.',
+    drill: 'Присед на бокс или скамью нужной высоты, 3×8 с паузой 1–2 с внизу.' },
+  lean: { title: 'Корпус падает вперёд', cue: 'Грудь выше', say: 'Грудь выше', pen: 20,
+    why: 'Корпус наклонён заметно сильнее голени. Нагрузка смещается на поясницу, вес уходит на носки.',
+    fix: 'Держи грудь выше и корпус примерно параллельно голени. Пусть колени уходят вперёд, пятки остаются на полу.',
+    drill: 'Гоблет-присед с гантелью у груди 3×8–10, вес ниже рабочего.' },
+  heels: { title: 'Пятки отрываются', cue: 'Пятки на пол', say: 'Пятки на пол', pen: 20,
+    why: 'Пятки поднимаются от пола — чаще всего не хватает подвижности голеностопа.',
+    fix: 'Дави всей стопой, вес на середину стопы. Временно можно подложить 1–2 см под пятки или надеть штангетки.',
+    drill: 'Мобилизация голеностопа «колено к стене», 2×10 на ногу перед тренировкой.' },
+  valgus: { title: 'Колени сводятся внутрь', cue: 'Колени наружу', say: 'Колени наружу', pen: 30,
+    why: 'Колени уходят внутрь относительно стоп. Обычно связано со слабостью средней ягодичной мышцы и повышает нагрузку на колено.',
+    fix: 'Направляй колени по линии второго-третьего пальца стопы, носки слегка развёрнуты наружу (15–30°).',
+    drill: 'Присед с мини-бэндом над коленями 2×12 и «ракушка» лёжа на боку 2×15 на сторону.' },
+  shift: { title: 'Перекос на одну ногу', cue: 'Вес на обе ноги', say: 'Вес на обе ноги', pen: 15,
+    why: 'Таз смещается в сторону — одна нога берёт на себя больше нагрузки.',
+    fix: 'Поставь стопы симметрично и дави в пол обеими ногами одинаково.',
+    drill: 'Болгарские сплит-приседания 2×8 на ногу, начинай со слабой стороны.' },
+  fast: { title: 'Слишком быстрый спуск', cue: 'Опускайся медленнее', say: 'Опускайся медленнее', pen: 10,
+    why: 'Спуск занимает меньше 0,6 с — это падение, а не контролируемое опускание.',
+    fix: 'Опускайся 2–3 секунды, без рывка в нижней точке.',
+    drill: 'Темповые приседания 3-1-1: три секунды вниз, пауза, подъём.' },
+  lockout: { title: 'Неполное выпрямление', cue: 'Выпрямись до конца', say: 'Выпрямись до конца', pen: 10,
+    why: 'Наверху колени и таз не выпрямились полностью — повтор неполный.',
+    fix: 'Вставай до прямых коленей и таза, сожми ягодицы в верхней точке.',
+    drill: 'Ягодичный мост 3×12 с паузой 2 с наверху.' },
+  sag: { title: 'Провис таза', cue: 'Подними таз', say: 'Подними таз', pen: 30,
+    why: 'Таз опускается ниже линии плечи–стопы: пресс и ягодицы не держат корпус, нагружается поясница.',
+    fix: 'Напряги пресс и ягодицы, тело — одна прямая от головы до пяток.',
+    drill: 'Планка 3×30–45 с; отжимания от скамьи с идеальной линией тела.' },
+  pike: { title: 'Таз задран вверх', cue: 'Опусти таз', say: 'Опусти таз', pen: 15,
+    why: 'Таз поднят выше линии тела, амплитуда в плечах уменьшается.',
+    fix: 'Опусти таз до прямой линии от плеч до стоп.',
+    drill: 'Планка с контролем положения таза 3×30 с, отжимания с паузой у пола.' },
+  pu_shallow: { title: 'Неполная амплитуда', cue: 'Опустись ниже', say: 'Опустись ниже', pen: 30,
+    why: 'Локти не сгибаются до нужного угла, грудь не доходит вниз — грудные мышцы работают меньше.',
+    fix: 'Опускайся, пока локоть не согнётся до 90° и грудь не окажется в 5–10 см от пола.',
+    drill: 'Негативные отжимания 3×5 со спуском 3–4 с или отжимания от возвышения на полную амплитуду.' },
+  head: { title: 'Голова опущена', cue: 'Голову ровно', say: 'Голову ровно', pen: 10,
+    why: 'Голова провисает ниже линии корпуса, шея выходит из нейтрального положения.',
+    fix: 'Смотри в пол на 20–30 см перед ладонями, затылок в одну линию со спиной.',
+    drill: 'Отжимания с записью сбоку или у зеркала, 2×8 в медленном темпе.' },
+  pu_lockout: { title: 'Руки не выпрямлены', cue: 'Выпрями руки', say: 'Выпрями руки', pen: 10,
+    why: 'Наверху локти остаются согнутыми — повтор неполный.',
+    fix: 'Выжимай себя до прямых рук, без резкого замыкания локтей.',
+    drill: 'Удержание упора на прямых руках 3×20 с.' },
+  pu_fast: { title: 'Слишком быстрый спуск', cue: 'Медленнее вниз', say: 'Медленнее вниз', pen: 10,
+    why: 'Спуск короче 0,45 с — тело падает, а не опускается.',
+    fix: 'Опускайся 1,5–2 секунды.',
+    drill: 'Отжимания в темпе 3-0-1.' }
+};
+const LEVEL_TOL = { novice: 1.25, normal: 1, pro: 0.8 };
+const SQUAT_DEPTH = { half: -0.45, parallel: -0.06, deep: 0.12 };   // (hip.y - knee.y) / thigh at the bottom
+const PUSH_DEPTH = { half: 118, parallel: 98, deep: 86 };            // elbow angle at the bottom, degrees
+const DEPTH_LABEL = {
+  squat: { half: 'Полуприсед', parallel: 'Параллель', deep: 'Ниже параллели' },
+  pushup: { half: 'Частичная', parallel: 'Локоть 90°', deep: 'Грудь к полу' }
+};
+const LEVEL_LABEL = { novice: 'Новичок', normal: 'Средний', pro: 'Опытный' };
+
+/* ---------- Analyzers ---------- */
+class BaseAnalyzer {
+  constructor(opts) { this.opts = opts; this.reset(); }
+  get tol() { return LEVEL_TOL[this.opts.level] || 1; }
+  reset() {
+    this.reps = []; this.phase = 'setup'; this.status = 'calib'; this.view = null; this.viewRatio = null;
+    this.side = 'l'; this.sideScore = { l: 0.5, r: 0.5 }; this.zDiff = 0; this.cal = null; this.standSince = null;
+    this.rep = null; this.lock = null; this.hold = {}; this.live = new Set(); this.pulses = {}; this.events = [];
+    this.prevT = null; this.velS = null; this.lostSince = null; this.lastRepEnd = null; this.setEnded = false;
+    this.now = 0; this.kp = null; this.m = null;
+  }
+  emit(e) { this.events.push(e); }
+  drain() { const e = this.events; this.events = []; return e; }
+  tick(t) { const dt = this.prevT == null ? 1 / 30 : clamp(t - this.prevT, 1 / 240, 0.5); this.prevT = t; this.now = t; return dt; }
+  updateView(kp) {
+    const ls = kp[11], rs = kp[12], lh = kp[23], rh = kp[24];
+    const torso = V.dist(V.mid(ls, rs), V.mid(lh, rh)) || 1;
+    const span = Math.max(Math.abs(ls.x - rs.x), Math.abs(lh.x - rh.x) * 1.3);
+    const r = span / torso;
+    this.viewRatio = this.viewRatio == null ? r : lerp(this.viewRatio, r, 0.15);
+    const before = this.view;
+    if (this.view == null) this.view = this.viewRatio > 0.43 ? 'front' : 'side';
+    else if (this.view === 'side' && this.viewRatio > 0.5) this.view = 'front';
+    else if (this.view === 'front' && this.viewRatio < 0.36) this.view = 'side';
+    return before != null && before !== this.view;
+  }
+  updateSide(kp, keys) {
+    const mean = (s, f) => keys.reduce((a, k) => a + f(kp[SIDE[s][k]]), 0) / keys.length;
+    for (const s of ['l', 'r']) this.sideScore[s] = lerp(this.sideScore[s], mean(s, p => p.score || 0), 0.2);
+    const hasZ = typeof kp[SIDE.l.hip].z === 'number' && typeof kp[SIDE.r.hip].z === 'number';
+    if (hasZ) this.zDiff = lerp(this.zDiff, mean('l', p => p.z || 0) - mean('r', p => p.z || 0), 0.2);
+    const scoreGap = this.sideScore.l - this.sideScore.r;
+    if (Math.abs(scoreGap) > 0.06) this.side = scoreGap > 0 ? 'l' : 'r';
+    else if (hasZ && Math.abs(this.zDiff) > 4) this.side = this.zDiff < 0 ? 'l' : 'r';   // smaller z = closer to the camera
+  }
+  flag(id, on) {
+    if (on) {
+      this.hold[id] = (this.hold[id] || 0) + 1;
+      if (this.hold[id] >= 3) {
+        if (!this.live.has(id)) { this.live.add(id); this.emit({ type: 'cue', id }); }
+        if (this.rep) this.rep.faults[id] = true;
+      }
+    } else { this.hold[id] = 0; this.live.delete(id); }
+  }
+  pulse(id) { this.pulses[id] = this.now + 1.3; this.emit({ type: 'cue', id }); }
+  clearLive() { this.live.clear(); this.hold = {}; }
+  liveList() { const s = new Set(this.live); for (const id in this.pulses) if (this.pulses[id] > this.now) s.add(id); return [...s]; }
+  score(rep) {
+    rep.faultList = Object.keys(rep.faults).sort((a, b) => FAULTS[b].pen - FAULTS[a].pen);
+    const pen = rep.faultList.reduce((a, id) => a + FAULTS[id].pen, 0);
+    rep.score = Math.max(0, 100 - pen);
+    rep.grade = !rep.faultList.length ? 'good' : rep.faultList.some(id => FAULTS[id].pen >= 25) ? 'bad' : 'fair';
+  }
+  finishRep(rep) { this.score(rep); this.reps.push(rep); this.lastRepEnd = rep.t1; this.emit({ type: 'rep', rep }); }
+  addLate(rep, id) { if (rep.faults[id]) return; rep.faults[id] = true; this.score(rep); this.emit({ type: 'repUpdate', rep }); this.pulse(id); }
+  startRep(t, extra) {
+    if (this.lock) this.closeLock();
+    if (this.setEnded) { this.reps = []; this.setEnded = false; this.emit({ type: 'newSet' }); }
+    this.rep = Object.assign({ n: this.reps.length + 1, t0: t, tBottom: t, faults: {} }, extra);
+    this.phase = 'down';
+  }
+  endSet() { if (this.reps.length && !this.setEnded) { this.setEnded = true; this.emit({ type: 'setEnd' }); } }
+  idleCheck(t) { if (this.lastRepEnd != null && !this.setEnded && !this.rep && t - this.lastRepEnd > 7) { if (this.lock) this.closeLock(); this.endSet(); } }
+  lost(t) {
+    if (this.lostSince == null) this.lostSince = t;
+    if (t - this.lostSince > 0.7) {
+      this.status = 'nobody';
+      if (this.rep) { this.rep = null; this.phase = this.cal ? 'top' : 'setup'; }
+      this.clearLive();
+    }
+    this.idleCheck(t);
+    this.m = null;
+    return this.snapshot();
+  }
+  snapshot() {
+    return { status: this.status, phase: this.phase, view: this.view, side: this.side, reps: this.reps.length,
+      live: this.liveList(), tiles: this.tiles(this.m), guides: this.m ? this.guides(this.m) : [], kneeMode: !!(this.m && this.m.kneeMode), setEnded: this.setEnded };
+  }
+}
+
+class SquatAnalyzer extends BaseAnalyzer {
+  visible(kp) {
+    const ok = s => ['sh', 'hip', 'kn', 'an'].every(k => kp[SIDE[s][k]] && kp[SIDE[s][k]].score > 0.5);
+    return ok('l') || ok('r');
+  }
+  update(kp, t) {
+    const dt = this.tick(t);
+    if (!kp || !this.visible(kp)) return this.lost(t);
+    this.lostSince = null; this.kp = kp;
+    if (this.updateView(kp) && this.cal) { this.cal = null; this.phase = 'setup'; this.rep = null; this.lock = null; this.clearLive(); }
+    this.updateSide(kp, ['sh', 'hip', 'kn', 'an']);
+    const front = this.view === 'front', S = SIDE[this.side];
+    if (front && ![23, 24, 25, 26, 27, 28].every(i => kp[i].score > 0.5)) return this.lost(t);
+    let hip, kn, an, sh, heel = null, toe = null, thighNow;
+    if (front) {
+      hip = V.mid(kp[23], kp[24]); kn = V.mid(kp[25], kp[26]); an = V.mid(kp[27], kp[28]); sh = V.mid(kp[11], kp[12]);
+      thighNow = (V.dist(kp[23], kp[25]) + V.dist(kp[24], kp[26])) / 2;
+    } else {
+      hip = kp[S.hip]; kn = kp[S.kn]; an = kp[S.an]; sh = kp[S.sh]; heel = kp[S.heel]; toe = kp[S.toe];
+      thighNow = V.dist(hip, kn);
+    }
+    const thighVert = (kn.y - hip.y) / Math.max(1, thighNow);
+    const kneeAng = front ? null : V.angle(hip, kn, an);
+    const straight = front ? thighVert > 0.93 : kneeAng > 160;
+    const ref = this.cal ? this.cal.thigh : thighNow;
+    const vel = this.prevHipY == null ? 0 : Math.abs(hip.y - this.prevHipY) / (dt * Math.max(1, ref));
+    this.prevHipY = hip.y;
+    this.velS = this.velS == null ? vel : lerp(this.velS, vel, 0.3);
+    const stable = this.velS < 0.35;
+    const footOk = !front && heel && toe && heel.score > 0.5 && toe.score > 0.5;
+    const kneeSpan = front ? Math.abs(kp[25].x - kp[26].x) : 0;
+    const ankleSpan = front ? Math.max(1, Math.abs(kp[27].x - kp[28].x)) : 1;
+
+    if (!this.cal) {
+      this.status = 'calib'; this.phase = 'setup';
+      if (straight && stable) {
+        if (this.standSince == null) this.standSince = t;
+        if (t - this.standSince > 0.5) {
+          this.cal = { hipY: hip.y, thigh: thighNow,
+            heelY: footOk ? heel.y : null, toeY: footOk ? toe.y : null, footLen: footOk ? V.dist(heel, toe) : null,
+            kneeRatio: front ? kneeSpan / ankleSpan : null, shift0: front ? (hip.x - an.x) / ankleSpan : null };
+          this.phase = 'top'; this.standSince = null;
+          this.emit({ type: 'status', id: 'ready' });
+        }
+      } else this.standSince = null;
+      this.m = { hip, kn, an, sh, kneeAng, front, d: null };
+      return this.snapshot();
+    }
+    this.status = 'track';
+    const c = this.cal, tol = this.tol;
+    const p = (hip.y - c.hipY) / c.thigh;
+    if (this.phase === 'top' && straight && stable && p < 0.08) {
+      c.hipY = lerp(c.hipY, hip.y, 0.08); c.thigh = lerp(c.thigh, thighNow, 0.05);
+      if (footOk) {
+        const fl = V.dist(heel, toe);
+        c.heelY = c.heelY == null ? heel.y : lerp(c.heelY, heel.y, 0.08);
+        c.toeY = c.toeY == null ? toe.y : lerp(c.toeY, toe.y, 0.08);
+        c.footLen = c.footLen == null ? fl : lerp(c.footLen, fl, 0.05);
+      }
+      if (front) { c.kneeRatio = lerp(c.kneeRatio, kneeSpan / ankleSpan, 0.08); c.shift0 = lerp(c.shift0, (hip.x - an.x) / ankleSpan, 0.08); }
+    }
+    const d = (hip.y - kn.y) / c.thigh;
+    const lean = front ? null : V.fromVertical(hip, sh);
+    const shin = front ? null : V.fromVertical(an, kn);
+    const diff = front ? null : lean - shin;
+    const heelLift = footOk && c.heelY != null && c.footLen ? (c.heelY - heel.y) / c.footLen : null;
+    const toeMove = footOk && c.toeY != null && c.footLen ? Math.abs(toe.y - c.toeY) / c.footLen : null;
+    const kneeR = front ? (kneeSpan / ankleSpan) / c.kneeRatio : null;
+    const shift = front ? (hip.x - an.x) / ankleSpan - c.shift0 : null;
+    this.m = { hip, kn, an, sh, front, d, p, lean, shin, diff, heelLift, kneeR, shift, kneeAng };
+
+    if (this.lock) {
+      this.lock.minP = Math.min(this.lock.minP, p);
+      if (kneeAng != null) this.lock.best = Math.max(this.lock.best, kneeAng);
+      if (t > this.lock.until) this.closeLock();
+    }
+    switch (this.phase) {
+      case 'top':
+        if (p > 0.14) this.startRep(t, { maxP: p, bottom: { d, lean, shin, diff }, maxLift: 0, minKneeR: 9, maxShift: 0, maxDiff: -99 });
+        break;
+      case 'down':
+        if (p >= this.rep.maxP) { this.rep.maxP = p; this.rep.tBottom = t; this.rep.bottom = { d, lean, shin, diff }; }
+        if (p < this.rep.maxP - 0.07) {
+          if (this.rep.maxP < 0.28) { this.rep = null; this.phase = 'top'; this.clearLive(); }
+          else { this.phase = 'up'; this.atBottom(); }
+        }
+        break;
+      case 'up':
+        if (p < 0.1) this.complete(t, p, kneeAng);
+        break;
+    }
+    if (this.rep && p > 0.3) {
+      const R = this.rep;
+      if (!front) {
+        R.maxDiff = Math.max(R.maxDiff, diff);
+        this.flag('lean', diff > 22 * tol || lean > 60 * tol);
+        if (heelLift != null) { R.maxLift = Math.max(R.maxLift, heelLift); this.flag('heels', heelLift > 0.13 * tol && (toeMove == null || toeMove < 0.15)); }
+      } else {
+        R.minKneeR = Math.min(R.minKneeR, kneeR); R.maxShift = Math.max(R.maxShift, Math.abs(shift));
+        this.flag('valgus', p > 0.35 && kneeR < 1 - 0.17 * tol);
+        this.flag('shift', Math.abs(shift) > 0.16 * tol);
+      }
+    } else for (const id of ['lean', 'heels', 'valgus', 'shift']) this.flag(id, false);
+    this.idleCheck(t);
+    return this.snapshot();
+  }
+  atBottom() {
+    if (this.rep.bottom.d < SQUAT_DEPTH[this.opts.depth]) { this.rep.faults.shallow = true; this.pulse('shallow'); }
+  }
+  complete(t, p, kneeAng) {
+    const R = this.rep;
+    R.t1 = t; R.down = R.tBottom - R.t0; R.up = t - R.tBottom;
+    if (R.down < 0.6) { R.faults.fast = true; this.pulse('fast'); }
+    this.rep = null; this.phase = 'top'; this.clearLive();
+    this.finishRep(R);
+    this.lock = { rep: R, until: t + 0.8, minP: p, best: kneeAng ?? 0 };
+  }
+  closeLock() {
+    const L = this.lock; this.lock = null;
+    const locked = L.minP < 0.07 * this.tol || (this.view === 'side' && L.best >= 160);
+    if (!locked) this.addLate(L.rep, 'lockout');
+  }
+  tiles(m) {
+    const last = this.reps[this.reps.length - 1];
+    const tol = this.tol, target = SQUAT_DEPTH[this.opts.depth];
+    const active = !!this.rep;
+    const tiles = [];
+    const dv = active ? m && m.d : last && last.bottom.d;
+    const deg = dv == null ? null : Math.asin(clamp(dv, -1, 1)) * DEG;
+    tiles.push({ lab: 'Глубина', val: deg == null ? '—' : (deg >= 0.5 ? '+' : deg <= -0.5 ? '−' : '') + Math.round(Math.abs(deg)) + '°',
+      note: (deg == null ? 'бедро относительно параллели' : deg >= 0.5 ? 'бедро ниже параллели' : deg <= -0.5 ? 'бедро выше параллели' : 'бедро в параллель') + ' · цель: ' + DEPTH_LABEL.squat[this.opts.depth].toLowerCase(),
+      st: dv == null ? 'idle' : active ? 'live' : dv >= target ? 'ok' : dv >= target - 0.15 ? 'warn' : 'bad' });
+    if (this.view !== 'front') {
+      const L = active ? m : last && last.bottom;
+      const has = L && L.lean != null;
+      tiles.push({ lab: 'Корпус / голень', val: has ? Math.round(L.lean) + '° / ' + Math.round(L.shin) + '°' : '—',
+        note: has ? 'разница ' + Math.round(L.diff) + '° · норма до ' + Math.round(22 * tol) + '°' : 'наклон от вертикали в нижней точке',
+        st: !has ? 'idle' : active ? 'live' : (L.diff > 22 * tol || L.lean > 60 * tol) ? 'bad' : L.diff > 15 * tol ? 'warn' : 'ok' });
+      const lift = active ? m && m.heelLift : last ? last.maxLift : null;
+      const liftBad = lift != null && lift > 0.13 * tol;
+      tiles.push({ lab: 'Пятки', val: lift == null ? '—' : liftBad ? 'Отрыв' : 'На полу',
+        note: lift == null ? 'нужны видимые стопы' : 'подъём ' + Math.max(0, Math.round(lift * 100)) + '% длины стопы',
+        st: lift == null ? 'idle' : liftBad ? 'bad' : 'ok' });
+    } else {
+      const kr = active ? m && m.kneeR : last ? last.minKneeR : null;
+      const thr = 1 - 0.17 * tol;
+      tiles.push({ lab: 'Колени', val: kr == null || kr > 5 ? '—' : Math.round(kr * 100) + '%',
+        note: 'ширина коленей к стойке · норма от ' + Math.round(thr * 100) + '%',
+        st: kr == null || kr > 5 ? 'idle' : active ? 'live' : kr < thr ? 'bad' : kr < thr + 0.08 ? 'warn' : 'ok' });
+      const sf = active ? m && m.shift : last ? last.maxShift : null;
+      const sfa = sf == null ? null : Math.abs(sf);
+      tiles.push({ lab: 'Баланс', val: sfa == null ? '—' : sfa < 0.08 ? 'По центру' : 'Смещение',
+        note: sfa == null ? 'положение таза над стопами' : 'таз смещён на ' + Math.round(sfa * 100) + '% ширины стойки',
+        st: sfa == null ? 'idle' : sfa > 0.16 * tol ? 'bad' : sfa > 0.08 ? 'warn' : 'ok' });
+    }
+    tiles.push({ lab: 'Темп', val: last ? fmt1(last.down) + ' / ' + fmt1(last.up) + ' с' : '—',
+      note: 'спуск / подъём · спуск от 0,6 с', st: !last ? 'idle' : last.down < 0.6 ? 'bad' : last.down < 0.8 ? 'warn' : 'ok' });
+    return tiles;
+  }
+  guides(m) {
+    const g = [];
+    if (!this.cal || !m || m.d == null) return g;
+    const T = this.cal.thigh;
+    if (!m.front) {
+      g.push({ t: 'h', y: m.kn.y, x1: Math.min(m.hip.x, m.kn.x) - 0.35 * T, x2: Math.max(m.hip.x, m.kn.x) + 0.3 * T, label: 'параллель', bad: this.liveList().includes('shallow') });
+      if (this.rep) {
+        g.push({ t: 'seg', a: m.hip, b: m.sh, label: Math.round(m.lean) + '°', bad: this.live.has('lean') });
+        g.push({ t: 'seg', a: m.an, b: m.kn, label: Math.round(m.shin) + '°' });
+      }
+    } else {
+      const k = this.kp;
+      for (const [a, b] of [[27, 25], [28, 26]]) g.push({ t: 'v', x: k[a].x, y1: k[a].y, y2: k[b].y - 0.25 * T, bad: this.live.has('valgus') });
+    }
+    return g;
+  }
+}
+
+class PushupAnalyzer extends BaseAnalyzer {
+  visible(kp) {
+    const ok = s => ['sh', 'el', 'wr', 'hip'].every(k => kp[SIDE[s][k]] && kp[SIDE[s][k]].score > 0.5) && (kp[SIDE[s].an].score > 0.5 || kp[SIDE[s].kn].score > 0.5);
+    return ok('l') || ok('r');
+  }
+  update(kp, t) {
+    const dt = this.tick(t);
+    if (!kp || !this.visible(kp)) return this.lost(t);
+    this.lostSince = null; this.kp = kp;
+    this.updateView(kp);
+    this.updateSide(kp, ['sh', 'el', 'wr', 'hip']);
+    if (this.view === 'front') {
+      this.status = 'turn'; if (this.rep) this.rep = null; this.phase = this.cal ? 'top' : 'setup'; this.clearLive(); this.m = null; this.idleCheck(t);
+      return this.snapshot();
+    }
+    const S = SIDE[this.side];
+    const sh = kp[S.sh], el = kp[S.el], wr = kp[S.wr], hip = kp[S.hip], kn = kp[S.kn], an = kp[S.an], ear = kp[S.ear];
+    const anOk = an.score > 0.5, knOk = kn.score > 0.5;
+        const kneeMode = knOk && (!anOk || V.angle(hip, kn, an) < 145);
+    const base = kneeMode ? kn : an;
+    const plank = Math.atan2(Math.abs(sh.y - hip.y), Math.abs(sh.x - hip.x) + 1e-6) * DEG < 40;
+    const e = V.angle(sh, el, wr);
+    const dx = (sh.x - base.x) || 1e-6;
+    const lineAt = x => base.y + (sh.y - base.y) * ((x - base.x) / dx);
+    const devDeg = Math.atan2(hip.y - lineAt(hip.x), V.dist(base, hip)) * DEG;   // + sag, − pike
+    const headDrop = ear && ear.score > 0.5 ? (ear.y - lineAt(ear.x)) / Math.max(1, V.dist(sh, ear)) : null;
+    const vel = this.prevE == null ? 0 : Math.abs(e - this.prevE) / dt; this.prevE = e;
+    this.velS = this.velS == null ? vel : lerp(this.velS, vel, 0.3);
+    const stable = this.velS < 45;
+    this.m = { sh, el, wr, hip, base, ear, e, devDeg, headDrop, kneeMode };
+    if (!plank) {
+      this.status = 'plank'; if (this.rep) this.rep = null; this.phase = this.cal ? 'top' : 'setup'; this.clearLive(); this.idleCheck(t);
+      return this.snapshot();
+    }
+    if (!this.cal) {
+      this.status = 'calib'; this.phase = 'setup';
+      if (e > 150 && stable) {
+        if (this.standSince == null) this.standSince = t;
+        if (t - this.standSince > 0.4) { this.cal = { ok: true }; this.phase = 'top'; this.standSince = null; this.emit({ type: 'status', id: 'ready' }); }
+      } else this.standSince = null;
+      return this.snapshot();
+    }
+    this.status = 'track';
+    const tol = this.tol;
+    if (this.lock) { this.lock.best = Math.max(this.lock.best, e); if (t > this.lock.until) this.closeLock(); }
+    switch (this.phase) {
+      case 'top':
+        if (e < 140) this.startRep(t, { minE: e, maxDev: devDeg, minDev: devDeg, maxHead: headDrop ?? -9 });
+        break;
+      case 'down':
+        if (e <= this.rep.minE) { this.rep.minE = e; this.rep.tBottom = t; }
+        if (e > this.rep.minE + 12) {
+          if (this.rep.minE > 135) { this.rep = null; this.phase = 'top'; this.clearLive(); }
+          else { this.phase = 'up'; if (this.rep.minE > PUSH_DEPTH[this.opts.depth]) { this.rep.faults.pu_shallow = true; this.pulse('pu_shallow'); } }
+        }
+        break;
+      case 'up':
+        if (e > 150) {
+          const R = this.rep; R.t1 = t; R.down = R.tBottom - R.t0; R.up = t - R.tBottom;
+          if (R.down < 0.45) { R.faults.pu_fast = true; this.pulse('pu_fast'); }
+          this.rep = null; this.phase = 'top'; this.clearLive(); this.finishRep(R);
+          this.lock = { rep: R, until: t + 0.7, best: e };
+        }
+        break;
+    }
+    if (this.rep) {
+      const R = this.rep;
+      R.maxDev = Math.max(R.maxDev, devDeg); R.minDev = Math.min(R.minDev, devDeg);
+      if (headDrop != null) R.maxHead = Math.max(R.maxHead, headDrop);
+    }
+    this.flag('sag', devDeg > 8 * tol);
+    this.flag('pike', devDeg < -12 * tol);
+    this.flag('head', headDrop != null && headDrop > 0.55 * tol);
+    this.idleCheck(t);
+    return this.snapshot();
+  }
+  closeLock() {
+    const L = this.lock; this.lock = null;
+    if (L.best < 155 - (this.tol - 1) * 20) this.addLate(L.rep, 'pu_lockout');
+  }
+  tiles(m) {
+    const last = this.reps[this.reps.length - 1], tol = this.tol, active = !!this.rep;
+    const target = PUSH_DEPTH[this.opts.depth];
+    const e = active ? this.rep.minE : last ? last.minE : null;
+    const tiles = [{ lab: 'Локоть внизу', val: e == null ? '—' : Math.round(e) + '°', note: 'угол в нижней точке · цель до ' + target + '°',
+      st: e == null ? 'idle' : active ? 'live' : e <= target ? 'ok' : e <= target + 12 ? 'warn' : 'bad' }];
+    const dev = active || !last ? m && m.devDeg : (Math.abs(last.maxDev) > Math.abs(last.minDev) ? last.maxDev : last.minDev);
+    const lineName = m && m.kneeMode ? 'плечи–колени' : 'плечи–стопы';
+    tiles.push({ lab: 'Линия тела', val: dev == null ? '—' : Math.abs(dev) < 4 ? 'Ровно' : (dev > 0 ? 'Провис ' : 'Таз вверх ') + Math.round(Math.abs(dev)) + '°',
+      note: 'таз относительно линии ' + lineName, st: dev == null ? 'idle' : dev > 8 * tol || dev < -12 * tol ? 'bad' : Math.abs(dev) > 5 ? 'warn' : 'ok' });
+    const hd = active || !last ? m && m.headDrop : last.maxHead;
+    tiles.push({ lab: 'Голова', val: hd == null || hd < -5 ? '—' : hd > 0.55 * tol ? 'Опущена' : 'Нейтрально', note: 'ухо относительно линии корпуса',
+      st: hd == null || hd < -5 ? 'idle' : hd > 0.55 * tol ? 'warn' : 'ok' });
+    tiles.push({ lab: 'Темп', val: last ? fmt1(last.down) + ' / ' + fmt1(last.up) + ' с' : '—', note: 'спуск / подъём · спуск от 0,45 с',
+      st: !last ? 'idle' : last.down < 0.45 ? 'bad' : last.down < 0.8 ? 'warn' : 'ok' });
+    return tiles;
+  }
+  guides(m) {
+    const g = [];
+    if (!m) return g;
+    const ux = m.sh.x - m.base.x, uy = m.sh.y - m.base.y;
+    const ext = { x: m.sh.x + ux * 0.18, y: m.sh.y + uy * 0.18 };
+    g.push({ t: 'seg', a: m.base, b: ext, label: 'линия тела', dashed: true, bad: this.live.has('sag') || this.live.has('pike') });
+    g.push({ t: 'ang', at: m.el, label: Math.round(m.e) + '°', bad: this.liveList().includes('pu_shallow') });
+    return g;
+  }
+}
+
+/* ---------- Demo athlete: scripted reps with real faults, rendered from the same 33 landmarks ---------- */
+const ease = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+const DEMO_SCRIPTS = {
+  'squat-side': ['ok', 'ok', 'shallow', 'lean', 'heels', 'fast', 'ok'],
+  'squat-front': ['ok', 'valgus', 'ok', 'shift', 'shallow', 'ok'],
+  'pushup-side': ['ok', 'sag', 'ok', 'pu_shallow', 'pike', 'head', 'ok']
+};
+function emptyKp() { return Array.from({ length: 33 }, () => ({ x: 0, y: 0, score: 0.2 })); }
+function put(kp, i, p, sc) { kp[i] = { x: p.x, y: p.y, score: sc }; }
+function fillFace(kp, ear, nose, sc) {
+  put(kp, 0, nose, sc);
+  for (const i of [1, 2, 3]) put(kp, i, { x: lerp(ear.x, nose.x, 0.7), y: nose.y - 8 }, sc * 0.9);
+  for (const i of [4, 5, 6]) put(kp, i, { x: lerp(ear.x, nose.x, 0.7) - 4, y: nose.y - 8 }, sc * 0.8);
+  put(kp, 9, { x: nose.x - 4, y: nose.y + 10 }, sc); put(kp, 10, { x: nose.x - 6, y: nose.y + 10 }, sc);
+}
+function squatPose(s, f, view, W, H) {
+  const Hb = 780, G = 950;
+  const shank = 0.246 * Hb, thigh = 0.245 * Hb, trunk = 0.288 * Hb, ua = 0.186 * Hb, fa = 0.146 * Hb;
+  const th = s * (f === 'shallow' ? 60 : 102);
+  const al = th * (f === 'heels' ? 0.45 : 0.37);
+  const be = th * (f === 'lean' ? 0.70 : 0.42);
+  const lift = f === 'heels' ? s * 0.065 * Hb : 0;
+  // sagittal plane: z = forward, y = down
+  const an = { z: 0, y: G - 0.039 * Hb - lift * 0.7 };
+  const heel = { z: -0.05 * Hb, y: G - 6 - lift }, toe = { z: 0.12 * Hb, y: G - 5 };
+  const kn = { z: an.z + shank * Math.sin(al * RAD), y: an.y - shank * Math.cos(al * RAD) };
+  const hip = { z: kn.z - thigh * Math.sin(th * RAD), y: kn.y - thigh * Math.cos(th * RAD) };
+  const sh = { z: hip.z + trunk * Math.sin(be * RAD), y: hip.y - trunk * Math.cos(be * RAD) };
+  const hb = be * 0.8;
+  const ear = { z: sh.z + 0.1 * Hb * Math.sin(hb * RAD) + 0.01 * Hb, y: sh.y - 0.1 * Hb * Math.cos(hb * RAD) };
+  const nose = { z: ear.z + 0.05 * Hb, y: ear.y + 0.012 * Hb };
+  const ph = 20 + 68 * s;
+  const el = { z: sh.z + ua * Math.sin(ph * RAD), y: sh.y + ua * Math.cos(ph * RAD) };
+  const wr = { z: el.z + fa * Math.sin((ph + 6) * RAD), y: el.y + fa * Math.cos((ph + 6) * RAD) };
+  const kp = emptyKp();
+  const pts = { ear, sh, el, wr, hip, kn, an, heel, toe };
+  if (view === 'side') {
+    const cx = W * 0.47;
+    for (const k in pts) {
+      put(kp, SIDE.l[k], { x: cx + pts[k].z, y: pts[k].y }, 0.95);
+      put(kp, SIDE.r[k], { x: cx + pts[k].z - 9, y: pts[k].y - 3 }, 0.7);
+    }
+    fillFace(kp, { x: cx + ear.z, y: ear.y }, { x: cx + nose.z, y: nose.y }, 0.95);
+  } else {
+    const cx = W / 2, sft = f === 'shift' ? s * 0.065 * Hb : 0;
+    const kw = f === 'valgus' ? 64 - 32 * s : 64 + 22 * s;
+    const lat = { an: [72, 0], heel: [64, 0], toe: [92, 0], kn: [kw, 0.35], hip: [66, 1], sh: [96, 0.95], el: [100, 1], wr: [74, 1], ear: [30, 1] };
+    for (const k in lat) {
+      const [w, sk] = lat[k];
+      put(kp, SIDE.l[k], { x: cx + w + sft * sk, y: pts[k].y }, 0.92);
+      put(kp, SIDE.r[k], { x: cx - w + sft * sk, y: pts[k].y }, 0.92);
+    }
+    put(kp, 0, { x: cx + sft, y: nose.y }, 0.95);
+    for (const i of [1, 2, 3]) put(kp, i, { x: cx + sft + 8 + (i - 1) * 6, y: nose.y - 12 }, 0.9);
+    for (const i of [4, 5, 6]) put(kp, i, { x: cx + sft - 8 - (i - 4) * 6, y: nose.y - 12 }, 0.9);
+    put(kp, 9, { x: cx + sft + 9, y: nose.y + 14 }, 0.9); put(kp, 10, { x: cx + sft - 9, y: nose.y + 14 }, 0.9);
+  }
+  return kp;
+}
+function pushupPose(s, f) {
+  const Hb = 860, F = 640;
+  const ua = 0.186 * Hb, fa = 0.146 * Hb;
+  const eTop = 168, eBot = f === 'pu_shallow' ? 124 : 80;
+  const e = eTop - (eTop - eBot) * s;
+  const d = Math.sqrt(ua * ua + fa * fa - 2 * ua * fa * Math.cos(e * RAD));
+  const Wr = { x: 770, y: F - 8 };
+  const psi = (-5 + 16 * s) * RAD;
+  const Sh = { x: Wr.x + d * Math.sin(psi), y: Wr.y - d * Math.cos(psi) };
+  const gam = Math.acos(clamp((fa * fa + d * d - ua * ua) / (2 * fa * d), -1, 1));
+  const ux = (Sh.x - Wr.x) / d, uy = (Sh.y - Wr.y) / d, c = Math.cos(-gam), sn = Math.sin(-gam);
+  const El = { x: Wr.x + fa * (ux * c - uy * sn), y: Wr.y + fa * (ux * sn + uy * c) };
+  const An = { x: 150, y: F - 0.05 * Hb };
+  const bx = Sh.x - An.x, by = Sh.y - An.y, bl = Math.hypot(bx, by), tx = bx / bl, ty = by / bl;
+  let nx = -ty, ny = tx; if (ny < 0) { nx = -nx; ny = -ny; }
+  const sm = 0.45 + 0.55 * s;
+  const off = f === 'sag' ? 0.1 * Hb * sm : f === 'pike' ? -0.145 * Hb * sm : 0;
+  const Hp = { x: An.x + bx * 0.63 + nx * off, y: An.y + by * 0.63 + ny * off };
+  const Kn = { x: (An.x + Hp.x) / 2 + nx * off * 0.2, y: (An.y + Hp.y) / 2 + ny * off * 0.2 };
+  const hd = f === 'head' ? 0.11 * Hb * (0.5 + 0.5 * s) : 0.01 * Hb;
+  const Ear = { x: Sh.x + tx * 0.1 * Hb + nx * hd, y: Sh.y + ty * 0.1 * Hb + ny * hd };
+  const Nose = { x: Ear.x + tx * 0.045 * Hb + nx * 0.03 * Hb, y: Ear.y + ty * 0.045 * Hb + ny * 0.03 * Hb };
+  const Toe = { x: An.x + 0.03 * Hb, y: F - 3 }, Heel = { x: An.x - 0.035 * Hb, y: An.y - 0.035 * Hb };
+  const kp = emptyKp();
+  const pts = { ear: Ear, sh: Sh, el: El, wr: Wr, hip: Hp, kn: Kn, an: An, heel: Heel, toe: Toe };
+  for (const k in pts) { put(kp, SIDE.l[k], pts[k], 0.95); put(kp, SIDE.r[k], { x: pts[k].x - 7, y: pts[k].y - 5 }, 0.68); }
+  fillFace(kp, Ear, Nose, 0.95);
+  return kp;
+}
+class Demo {
+  constructor(ex, view) {
+    this.ex = ex; this.view = ex === 'pushup' ? 'side' : view;
+    this.script = DEMO_SCRIPTS[this.ex + '-' + this.view];
+    this.W = ex === 'pushup' ? 1000 : 800; this.H = ex === 'pushup' ? 700 : 1000;
+    this.ground = ex === 'pushup' ? 640 : 950; this.Hb = ex === 'pushup' ? 860 : 780;
+    this.t = 0; this.done = false; this.timeline = [];
+    let t = 1.4;
+    for (const f of this.script) {
+      const down = f === 'fast' ? 0.42 : ex === 'pushup' ? 1.15 : 1.4, hold = ex === 'pushup' ? 0.12 : 0.2, up = ex === 'pushup' ? 0.8 : 1.0, rest = 0.75;
+      this.timeline.push({ f, t0: t, t1: t + down, t2: t + down + hold, t3: t + down + hold + up });
+      t += down + hold + up + rest;
+    }
+    this.end = t + 0.4;
+  }
+  at(t) {
+    for (const r of this.timeline) if (t >= r.t0 && t < r.t3) {
+      const s = t < r.t1 ? ease((t - r.t0) / (r.t1 - r.t0)) : t < r.t2 ? 1 : 1 - ease((t - r.t2) / (r.t3 - r.t2));
+      return { s, f: r.f };
+    }
+    return { s: 0, f: 'ok' };
+  }
+  step(dt) { if (this.done) return; this.t = Math.min(this.end, this.t + dt); if (this.t >= this.end) this.done = true; }
+  frame() { const { s, f } = this.at(this.t); return this.ex === 'pushup' ? pushupPose(s, f) : squatPose(s, f, this.view, this.W, this.H); }
+}
+
+/* ---------- Voice coach ---------- */
+const Voice = {
+  on: false, last: 0, lastId: {},
+  say(text, id, force, low) {
+    if (!this.on || !('speechSynthesis' in window)) return;
+    const now = performance.now();
+    if (low && speechSynthesis.speaking) return;
+    if (!force && now - this.last < 1600) return;
+    if (!force && id && this.lastId[id] && now - this.lastId[id] < 4500) return;
+    try {
+      if (!low) speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text); u.lang = 'ru-RU'; u.rate = 1.1;
+      speechSynthesis.speak(u);
+      this.last = now; if (id) this.lastId[id] = now;
+    } catch (e) { /* speech unavailable */ }
+  }
+};
+
+/* ---------- App state ---------- */
+const store = {
+  get() { try { return JSON.parse(localStorage.getItem('aitrainer.v1') || '{}'); } catch (e) { return {}; } },
+  set(v) { try { localStorage.setItem('aitrainer.v1', JSON.stringify(v)); } catch (e) { /* storage blocked */ } }
+};
+const saved = store.get();
+const state = {
+  ex: 'squat', demoView: 'side', source: 'demo',
+  opts: { depth: ['half', 'parallel', 'deep'].includes(saved.depth) ? saved.depth : 'parallel', level: ['novice', 'normal', 'pro'].includes(saved.level) ? saved.level : 'normal' },
+  analyzer: null, demo: null, frame: null, snap: null, flash: null, selectedRep: null,
+  vid: null, detector: null, detectorLoading: null, stream: null, facing: 'user', videoURL: null, videoOrigin: 'rec', busy: false, demoEnded: false
+};
+const el = {
+  stage: $('#stage'), cv: $('#cv'), vid: $('#vid'), cue: $('#cue'), cueText: $('#cueText'), repNum: $('#repNum'), repLabel: $('#repLabel'),
+  srcBadge: $('#srcBadge'), viewBadge: $('#viewBadge'), msg: $('#stageMsg'), msgTitle: $('#msgTitle'), msgText: $('#msgText'), msgActions: $('#msgActions'), msgSpin: $('#msgSpin'),
+  subbar: $('#subbar'), tiles: $('#tiles'), phaseLabel: $('#phaseLabel'), reps: $('#reps'), repsMeta: $('#repsMeta'), repDetail: $('#repDetail'),
+  summary: $('#summary'), sumMeta: $('#sumMeta'), weight: $('#weight'), weightRow: $('#weightRow'), nextText: $('#nextText'), nextSmall: $('#nextSmall'),
+  segDepth: $('#segDepth'), segLevel: $('#segLevel'), setupList: $('#setupList'), voiceBtn: $('#voiceBtn'), voiceLabel: $('#voiceLabel'), depthLab: $('#depthLab')
+};
+const ctx = el.cv.getContext('2d');
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let C = {};
+function readColors() {
+  C = { stage: cssv('--stage'), stage2: cssv('--stage-2'), ink: cssv('--stage-ink'), dim: cssv('--stage-dim'), accent: cssv('--stage-accent'),
+    good: cssv('--stage-good'), warn: cssv('--stage-warn'), bad: cssv('--stage-bad'), glass: cssv('--stage-glass'), mono: cssv('--f-mono') };
+}
+readColors();
+
+function newAnalyzer() {
+  state.analyzer = state.ex === 'pushup' ? new PushupAnalyzer(state.opts) : new SquatAnalyzer(state.opts);
+  state.selectedRep = null; state.flash = null;
+  renderReps(); renderSummary();
+}
+
+/* ---------- Canvas ---------- */
+let viewW = 0, viewH = 0;
+function resize() {
+  const r = el.stage.getBoundingClientRect(), dpr = Math.min(2.5, window.devicePixelRatio || 1);
+  viewW = r.width; viewH = r.height;
+  el.cv.width = Math.round(r.width * dpr); el.cv.height = Math.round(r.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+new ResizeObserver(resize).observe(el.stage);
+function setAspect(w, h) {
+  const ar = clamp(w / h, 9 / 16, 16 / 9);
+  el.stage.style.setProperty('--ar', ar.toFixed(4));
+}
+const BONES = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28], [27, 29], [29, 31], [27, 31], [28, 30], [30, 32], [28, 32]];
+const BODY_W = { thigh: 0.058, shank: 0.044, ua: 0.036, fa: 0.029, foot: 0.02, torso: 0.1, head: 0.06 };
+function faultJoints(id, view, side) {
+  const S = SIDE[side];
+  switch (id) {
+    case 'shallow': return view === 'front' ? [23, 24, 25, 26] : [S.hip, S.kn];
+    case 'lean': return [S.sh, S.hip];
+    case 'heels': return [S.heel, S.an];
+    case 'valgus': return [25, 26];
+    case 'shift': return [23, 24];
+    case 'lockout': return view === 'front' ? [25, 26] : [S.kn, S.hip];
+    case 'sag': case 'pike': return [S.hip];
+    case 'pu_shallow': case 'pu_lockout': return [S.el];
+    case 'head': return [S.ear, 0];
+    default: return [];
+  }
+}
+function draw() {
+  ctx.clearRect(0, 0, viewW, viewH);
+  const f = state.frame; if (!f) return;
+  const s = Math.min(viewW / f.W, viewH / f.H), ox = (viewW - f.W * s) / 2, oy = (viewH - f.H * s) / 2;
+  const mirror = state.source === 'camera' && state.facing === 'user';
+  const X = p => ox + (mirror ? f.W - p.x : p.x) * s, Y = p => oy + p.y * s;
+  const snap = state.snap || { view: 'side', side: 'l', live: [], guides: [] };
+  if (f.demo) drawDemoScene(f, s, ox, oy, X, Y, snap);
+  if (!f.kp) return;
+  const kp = f.kp;
+  const bad = new Set(); for (const id of snap.live) for (const j of faultJoints(id, snap.view, snap.side)) bad.add(j);
+  drawGuides(snap.guides || [], X, Y, s);
+  const far = snap.view === 'side' ? new Set(Object.values(SIDE[snap.side === 'l' ? 'r' : 'l'])) : new Set();
+  ctx.lineCap = 'round';
+  for (const pass of [0, 1]) {
+    for (const [a, b] of BONES) {
+      const A = kp[a], B = kp[b];
+      if (!A || !B || A.score < 0.35 || B.score < 0.35) continue;
+      const isFar = far.has(a) || far.has(b);
+      if ((pass === 0) !== isFar) continue;
+      if (!f.demo) { ctx.strokeStyle = 'rgba(8,12,16,.55)'; ctx.globalAlpha = isFar ? 0.3 : 0.8; ctx.lineWidth = isFar ? 4.5 : 6; ctx.beginPath(); ctx.moveTo(X(A), Y(A)); ctx.lineTo(X(B), Y(B)); ctx.stroke(); }
+      ctx.strokeStyle = C.ink; ctx.globalAlpha = isFar ? 0.32 : 0.9; ctx.lineWidth = isFar ? 2 : 3;
+      ctx.beginPath(); ctx.moveTo(X(A), Y(A)); ctx.lineTo(X(B), Y(B)); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+  for (const i of [7, 8, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]) {
+    const p = kp[i]; if (!p || p.score < 0.35) continue;
+    const isFar = far.has(i), isBad = bad.has(i);
+    if (isBad) {
+      ctx.fillStyle = C.bad; ctx.globalAlpha = 0.25; ctx.beginPath(); ctx.arc(X(p), Y(p), 15, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(X(p), Y(p), 6.5, 0, 7); ctx.fill();
+    } else {
+      if (!f.demo) { ctx.fillStyle = 'rgba(8,12,16,.6)'; ctx.globalAlpha = isFar ? 0.4 : 0.9; ctx.beginPath(); ctx.arc(X(p), Y(p), isFar ? 4.5 : 6.5, 0, 7); ctx.fill(); }
+      ctx.fillStyle = isFar ? C.dim : C.ink; ctx.globalAlpha = isFar ? 0.5 : 1;
+      ctx.beginPath(); ctx.arc(X(p), Y(p), isFar ? 3 : 4.5, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+function drawDemoScene(f, s, ox, oy, X, Y, snap) {
+  ctx.fillStyle = C.stage2; ctx.fillRect(0, 0, viewW, viewH);
+  ctx.strokeStyle = C.ink; ctx.globalAlpha = 0.05; ctx.lineWidth = 1;
+  const step = 50 * s, gy = oy + f.ground * s;
+  for (let x = ox % step; x <= viewW; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, gy); ctx.stroke(); }
+  for (let y = gy; y >= 0; y -= step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(viewW, y); ctx.stroke(); }
+  ctx.globalAlpha = 0.35; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(viewW, gy); ctx.stroke();
+  ctx.globalAlpha = 1;
+  const kp = f.kp, hb = f.Hb * s, near = snap.view === 'front' ? null : (snap.side || 'l');
+  const limbs = [['sh', 'el', 'ua'], ['el', 'wr', 'fa'], ['hip', 'kn', 'thigh'], ['kn', 'an', 'shank'], ['heel', 'toe', 'foot'], ['an', 'toe', 'foot']];
+  const order = near ? [near === 'l' ? 'r' : 'l', 'torso', near] : ['l', 'r', 'torso'];
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const part of order) {
+    if (part === 'torso') {
+      ctx.fillStyle = C.ink; ctx.strokeStyle = C.ink; ctx.globalAlpha = 0.13;
+      if (snap.view === 'front') {
+        const p = [kp[11], kp[12], kp[24], kp[23]];
+        ctx.lineWidth = BODY_W.ua * hb; ctx.beginPath(); ctx.moveTo(X(p[0]), Y(p[0])); for (const q of p.slice(1)) ctx.lineTo(X(q), Y(q)); ctx.closePath(); ctx.fill(); ctx.stroke();
+      } else {
+        const S = SIDE[near]; ctx.lineWidth = BODY_W.torso * hb; ctx.beginPath(); ctx.moveTo(X(kp[S.hip]), Y(kp[S.hip])); ctx.lineTo(X(kp[S.sh]), Y(kp[S.sh])); ctx.stroke();
+      }
+      const ear = snap.view === 'front' ? V.mid(kp[7], kp[8]) : kp[SIDE[near].ear];
+      const hc = V.mid(ear, kp[0]);
+      ctx.beginPath(); ctx.arc(X(hc), Y(hc), BODY_W.head * hb, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1; continue;
+    }
+    const S = SIDE[part];
+    ctx.strokeStyle = C.ink; ctx.globalAlpha = near && part !== near ? 0.07 : 0.13;
+    for (const [a, b, w] of limbs) { ctx.lineWidth = BODY_W[w] * hb; ctx.beginPath(); ctx.moveTo(X(kp[S[a]]), Y(kp[S[a]])); ctx.lineTo(X(kp[S[b]]), Y(kp[S[b]])); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+}
+function tag(text, x, y, color) {
+  ctx.font = '600 11px ' + C.mono;
+  const w = ctx.measureText(text).width + 10;
+  x = clamp(x, 4, viewW - w - 4); y = clamp(y, 12, viewH - 12);
+  ctx.fillStyle = C.glass; ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y - 9, w, 18, 5); else ctx.rect(x, y - 9, w, 18);
+  ctx.fill(); ctx.fillStyle = color; ctx.textBaseline = 'middle'; ctx.fillText(text, x + 5, y + 0.5);
+}
+function drawGuides(gs, X, Y) {
+  for (const g of gs) {
+    const col = g.bad ? C.bad : C.accent;
+    ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.globalAlpha = 0.95;
+    if (g.t === 'h') {
+      ctx.setLineDash([7, 6]); const a = { x: g.x1, y: g.y }, b = { x: g.x2, y: g.y };
+      ctx.beginPath(); ctx.moveTo(X(a), Y(a)); ctx.lineTo(X(b), Y(b)); ctx.stroke(); ctx.setLineDash([]);
+      tag(g.label, Math.max(X(a), X(b)) + 6, Y(a), col);
+    } else if (g.t === 'v') {
+      ctx.setLineDash([5, 6]); const a = { x: g.x, y: g.y1 }, b = { x: g.x, y: g.y2 };
+      ctx.beginPath(); ctx.moveTo(X(a), Y(a)); ctx.lineTo(X(b), Y(b)); ctx.stroke(); ctx.setLineDash([]);
+    } else if (g.t === 'seg') {
+      if (g.dashed) ctx.setLineDash([8, 6]);
+      ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(g.a), Y(g.a)); ctx.lineTo(X(g.b), Y(g.b)); ctx.stroke(); ctx.setLineDash([]);
+      const mx = (X(g.a) + X(g.b)) / 2, my = (Y(g.a) + Y(g.b)) / 2;
+      tag(g.label, mx + 10, my, col);
+    } else if (g.t === 'ang') {
+      tag(g.label, X(g.at) + 12, Y(g.at) - 16, col);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---------- Main loop ---------- */
+let lastNow = performance.now(), lastUi = 0;
+function loop(now) {
+  const dt = Math.min(0.05, (now - lastNow) / 1000); lastNow = now;
+  if (state.source === 'demo' && state.demo) {
+    state.demo.step(dt);
+    const kp = state.demo.frame();
+    state.frame = { kp, W: state.demo.W, H: state.demo.H, demo: true, ground: state.demo.ground, Hb: state.demo.Hb };
+    handleSnap(state.analyzer.update(kp, state.demo.t));
+    if (state.demo.done && !state.demoEnded) { state.demoEnded = true; state.analyzer.endSet(); processEvents(state.analyzer.drain()); renderSubbar(); }
+  } else if (state.source === 'camera' || (state.source === 'video' && state.vid && state.vid.live)) infer();
+  draw();
+  if (now - lastUi > 110) { lastUi = now; renderLive(); }
+  requestAnimationFrame(loop);
+}
+// The pose library reads a video's size from its width/height attributes, which are 0 unless set.
+function syncSize(v) { if (v.videoWidth && (v.width !== v.videoWidth || v.height !== v.videoHeight)) { v.width = v.videoWidth; v.height = v.videoHeight; } }
+async function infer() {
+  const v = el.vid;
+  if (state.busy || !state.detector || v.readyState < 2 || !v.videoWidth) return;
+  if (state.source === 'video' && (v.paused || v.ended)) return;
+  state.busy = true;
+  try {
+    const t = state.source === 'video' ? v.currentTime : performance.now() / 1000;
+    syncSize(v);
+    const poses = await state.detector.estimatePoses(v, { maxPoses: 1, flipHorizontal: false }, t * 1000);
+    const p = poses && poses[0];
+    const kp = p && p.keypoints && p.keypoints.length === 33 ? p.keypoints.map(k => ({ x: k.x, y: k.y, z: k.z, score: k.score ?? 0 })) : null;
+    state.frame = { kp, W: v.videoWidth, H: v.videoHeight };
+    handleSnap(state.analyzer.update(kp, t));
+  } catch (e) { console.error(e); }
+  finally { state.busy = false; }
+}
+function handleSnap(snap) { state.snap = snap; processEvents(state.analyzer.drain()); }
+function processEvents(evts) {
+  const A = state.analyzer;
+  for (const e of evts) {
+    if (e.type === 'cue') Voice.say(FAULTS[e.id].say, e.id);
+    else if (e.type === 'rep') {
+      const r = e.rep, now = performance.now();
+      state.flash = r.faultList.length
+        ? { cls: r.grade === 'bad' ? 'bad' : 'warn', text: 'Повтор ' + r.n + ': ' + FAULTS[r.faultList[0]].cue.toLowerCase(), until: now + 1700 }
+        : { cls: 'good', text: 'Повтор ' + r.n + ' — чисто', until: now + 1400 };
+      Voice.say(String(r.n), 'rep' + r.n, false, true);
+      renderReps(); renderSummary();
+    } else if (e.type === 'repUpdate' || e.type === 'newSet') { renderReps(); renderSummary(); }
+    else if (e.type === 'setEnd') {
+      const clean = A.reps.filter(r => !r.faultList.length).length;
+      state.flash = { cls: 'info', text: 'Подход окончен: чисто ' + clean + ' из ' + A.reps.length + '. Разбор — в итоге подхода', until: performance.now() + 6000 };
+      Voice.say('Подход окончен. Чисто ' + clean + ' из ' + A.reps.length, 'set', true);
+      renderSummary();
+    } else if (e.type === 'status' && e.id === 'ready') Voice.say('Поехали', 'ready');
+  }
+}
+
+/* ---------- Live UI ---------- */
+const STATUS_TEXT = {
+  nobody: 'Встань в кадр целиком — от головы до стоп',
+  turn: 'Развернись боком к камере',
+  plank: 'Прими упор лёжа боком к камере'
+};
+function cueState(snap) {
+  const now = performance.now();
+  if (!snap) return { cls: 'info', text: 'Ищу человека в кадре' };
+  if (snap.live.length) {
+    const id = snap.live.slice().sort((a, b) => FAULTS[b].pen - FAULTS[a].pen)[0];
+    return { cls: FAULTS[id].pen >= 25 ? 'bad' : 'warn', text: FAULTS[id].cue };
+  }
+  if (state.flash && state.flash.until > now) return state.flash;
+  if (state.source === 'demo' && state.demo && state.demo.done) return { cls: 'info', text: 'Демо-подход окончен — смотри итог подхода' };
+  if (STATUS_TEXT[snap.status]) return { cls: 'info', text: STATUS_TEXT[snap.status] };
+  if (snap.status === 'calib') return { cls: 'info', text: state.ex === 'pushup' ? 'Замри в упоре на прямых руках — калибрую' : 'Встань прямо и замри на секунду — калибрую' };
+  if (snap.phase === 'top') return { cls: 'info', text: snap.reps ? 'Следующий повтор' : 'Готово. Начинай подход' };
+  return { cls: 'info', text: snap.phase === 'down' ? 'Вниз под контролем' : 'Вверх' };
+}
+const PHASE_TEXT = { setup: 'калибровка', top: 'исходное положение', down: 'спуск', up: 'подъём' };
+function renderLive() {
+  const snap = state.snap;
+  const cs = cueState(snap);
+  el.cue.className = 'cue ' + cs.cls;
+  if (el.cueText.textContent !== cs.text) el.cueText.textContent = cs.text;
+  const n = snap ? snap.reps : 0;
+  el.repNum.textContent = n; el.repLabel.textContent = plural(n, 'повтор', 'повтора', 'повторов');
+  el.viewBadge.textContent = !snap || !snap.view || snap.status === 'nobody' ? 'Ищу человека' : (snap.view === 'front' ? 'Вид спереди' : 'Вид сбоку') + (snap.kneeMode ? ' · с колен' : '');
+  el.phaseLabel.textContent = snap ? (snap.status === 'nobody' ? 'нет человека в кадре' : PHASE_TEXT[snap.phase] || '') : '';
+  const vp = document.getElementById('vidProgress');
+  if (vp && state.vid) vp.textContent = state.vid.live ? 'Разбор во время воспроизведения' : state.vid.done ? 'Видео разобрано: ' + fmt1(state.vid.dur) + ' с, кадр за кадром' : 'Разбираю кадры: ' + fmt1(Math.min(state.vid.t, state.vid.dur)) + ' из ' + fmt1(state.vid.dur) + ' с';
+  if (snap) el.tiles.innerHTML = snap.tiles.map(t => '<div class="tile ' + t.st + '"><div class="lab"><i></i>' + esc(t.lab) + '</div><div class="val">' + esc(t.val) + '</div><div class="note">' + esc(t.note) + '</div></div>').join('');
+}
+function renderReps() {
+  const A = state.analyzer; if (!A) return;
+  const reps = A.reps;
+  if (!reps.length) {
+    el.reps.innerHTML = '<p class="empty">Здесь появится каждый повтор: зелёный — чисто, жёлтый — мелкая ошибка, красный — серьёзная. Нажми на номер, чтобы увидеть разбор.</p>';
+    el.repsMeta.textContent = ''; el.repDetail.hidden = true; return;
+  }
+  el.reps.innerHTML = reps.map(r => '<button class="rep ' + r.grade + '" type="button" data-n="' + r.n + '" aria-pressed="' + (state.selectedRep === r.n) + '" aria-label="Повтор ' + r.n + ', оценка ' + r.score + '">' + r.n + '</button>').join('');
+  const avg = Math.round(reps.reduce((a, r) => a + r.score, 0) / reps.length);
+  el.repsMeta.textContent = 'средняя оценка ' + avg + ' из 100';
+  renderRepDetail();
+}
+function renderRepDetail() {
+  const A = state.analyzer, r = A.reps.find(x => x.n === state.selectedRep);
+  if (!r) { el.repDetail.hidden = true; return; }
+  el.repDetail.hidden = false;
+  const kv = ['оценка ' + r.score + '/100', 'спуск ' + fmt1(r.down) + ' с', 'подъём ' + fmt1(r.up) + ' с'];
+  if (r.bottom && r.bottom.d != null) { const dg = Math.asin(clamp(r.bottom.d, -1, 1)) * DEG; kv.splice(1, 0, 'бедро ' + (dg >= 0 ? '+' : '−') + Math.round(Math.abs(dg)) + '° к параллели'); }
+  if (r.minE != null) kv.splice(1, 0, 'локоть ' + Math.round(r.minE) + '°');
+  el.repDetail.innerHTML = '<h3>Повтор ' + r.n + (r.faultList.length ? '' : ' — техника чистая') + '</h3><div class="kv">' + kv.map(esc).map(s => '<span>' + s + '</span>').join('') + '</div>' +
+    (r.faultList.length ? '<ul>' + r.faultList.map(id => '<li><b>' + esc(FAULTS[id].title) + '.</b> ' + esc(FAULTS[id].fix) + '</li>').join('') + '</ul>' : '');
+}
+el.reps.addEventListener('click', e => {
+  const b = e.target.closest('.rep'); if (!b) return;
+  const n = Number(b.dataset.n); state.selectedRep = state.selectedRep === n ? null : n;
+  for (const x of el.reps.querySelectorAll('.rep')) x.setAttribute('aria-pressed', String(Number(x.dataset.n) === state.selectedRep));
+  renderRepDetail();
+});
+const CHEV = '<svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5"/></svg>';
+function renderSummary() {
+  const A = state.analyzer; if (!A) return;
+  const reps = A.reps, N = reps.length;
+  el.weightRow.hidden = state.ex !== 'squat';
+  if (!N) {
+    el.summary.innerHTML = '<p class="empty">Разбор подхода появится после первого повтора: какие ошибки повторяются, почему они возникают и какое упражнение их исправит.</p>';
+    el.sumMeta.textContent = ''; renderNext(); return;
+  }
+  const clean = reps.filter(r => !r.faultList.length).length, q = clean / N;
+  const counts = {}; for (const r of reps) for (const id of r.faultList) counts[id] = (counts[id] || 0) + 1;
+  const ranked = Object.keys(counts).sort((a, b) => counts[b] * FAULTS[b].pen - counts[a] * FAULTS[a].pen);
+  const verdict = q >= 0.8 ? 'Техника стабильная' : q >= 0.5 ? 'Есть что поправить' : 'Техника разваливается — облегчи упражнение';
+  const downs = reps.map(r => r.down), avgDown = downs.reduce((a, b) => a + b, 0) / N;
+  el.sumMeta.textContent = A.setEnded ? 'подход завершён' : 'идёт подход';
+  el.summary.innerHTML =
+    '<div class="sum-head"><div class="sum-big">' + clean + '<span>/' + N + '</span></div><div><b>' + plural(clean, 'чистый повтор', 'чистых повтора', 'чистых повторов') + '</b><p>' + esc(verdict) + ' · средний спуск ' + fmt1(avgDown) + ' с</p></div></div>' +
+    '<div class="sum-bar" aria-hidden="true">' + reps.map(r => '<span class="' + r.grade + '"></span>').join('') + '</div>' +
+    (ranked.length ? '<div class="faults">' + ranked.map((id, i) => {
+      const F = FAULTS[id];
+      return '<details' + (i === 0 ? ' open' : '') + '><summary><span class="sev ' + (F.pen >= 25 ? 'major' : 'minor') + '"></span>' + esc(F.title) + '<span class="cnt">' + counts[id] + ' из ' + N + '</span>' + CHEV + '</summary>' +
+        '<div class="body"><p><b>Почему:</b> ' + esc(F.why) + '</p><p><b>Как исправить:</b> ' + esc(F.fix) + '</p><p><b>Упражнение:</b> ' + esc(F.drill) + '</p></div></details>';
+    }).join('') + '</div>' : '<p class="muted" style="margin:10px 0 0">Ошибок не найдено во всех повторах.</p>');
+  renderNext(ranked);
+  renderTgSend();
+}
+/* Telegram: hand the finished set back to the bot's diary (works when the app was opened from the bot's keyboard button) */
+function tgApp() { return document.documentElement.classList.contains('in-telegram') && window.Telegram && window.Telegram.WebApp; }
+function renderTgSend() {
+  const box = document.getElementById('tgBox'); if (!box) return;
+  const W = tgApp(), A = state.analyzer;
+  if (!W || !A || !A.reps.length || state.source === 'demo') { box.hidden = true; return; }
+  box.hidden = false;
+  const viaKeyboard = !(W.initDataUnsafe && W.initDataUnsafe.query_id);
+  box.innerHTML = viaKeyboard
+    ? '<button class="tg-send" type="button" id="tgSendBtn">Записать подход в дневник</button>'
+    : '<p>Чтобы подход попал в дневник бота, открой приложение кнопкой «🎥 Тренер с камерой» под полем ввода сообщения.</p>';
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest || !e.target.closest('#tgSendBtn')) return;
+  const W = tgApp(), A = state.analyzer; if (!W || !A || !A.reps.length) return;
+  const faults = {}; for (const r of A.reps) for (const id of r.faultList) faults[id] = (faults[id] || 0) + 1;
+  const payload = { v: 1, ex: state.ex, view: state.snap && state.snap.view, total: A.reps.length, clean: A.reps.filter(r => !r.faultList.length).length, faults, w: state.ex === 'squat' ? String(el.weight.value || '').replace(',', '.') : '' };
+  try { W.sendData(JSON.stringify(payload)); }
+  catch (err) { document.getElementById('tgBox').innerHTML = '<p>Не получилось отправить. Открой приложение кнопкой «🎥 Тренер с камерой» под полем ввода сообщения.</p>'; }
+});
+function renderNext(ranked) {
+  const A = state.analyzer, reps = A.reps, N = reps.length;
+  if (!N) { el.nextText.textContent = 'Сделай подход — рекомендация по весу и повторам появится здесь.'; el.nextSmall.textContent = ''; return; }
+  ranked = ranked || [];
+  const clean = reps.filter(r => !r.faultList.length).length, q = clean / N;
+  const top = ranked[0] ? FAULTS[ranked[0]] : null;
+  const w = state.ex === 'squat' ? parseFloat(String(el.weight.value).replace(',', '.')) : NaN;
+  let text, small = '';
+  if (state.ex === 'squat' && w > 0) {
+    if (q >= 0.8) { const inc = Math.max(2.5, roundTo(w * 0.05, 2.5)); text = 'Техника держится. Следующий шаг: ' + kg(w + inc) + ' кг × ' + N + ' при той же технике.'; }
+    else if (q >= 0.5) text = 'Оставь ' + kg(w) + ' кг × ' + N + ' и держи фокус на подсказке «' + top.cue + '».';
+    else text = 'Снизь вес до ' + kg(roundTo(w * 0.85, 2.5)) + ' кг (−15%) и отработай технику, пока 8 из 10 повторов не станут чистыми.';
+    small = 'Оценка 1ПМ по формуле Эпли: ≈ ' + kg(Math.round(w * (1 + N / 30) * 2) / 2) + ' кг (по ' + N + ' ' + plural(N, 'повтору', 'повторам', 'повторам') + ' с ' + kg(w) + ' кг).';
+  } else if (state.ex === 'squat') {
+    if (q >= 0.8) text = 'Без веса техника чистая: добавь 2 повтора или переходи к гоблет-приседу с гантелью 8–12 кг.';
+    else if (q >= 0.5) text = 'Повтори подход в темпе 3-1-1 и держи фокус на подсказке «' + top.cue + '».';
+    else text = 'Перейди на присед на бокс или скамью нужной высоты, пока техника не станет стабильной.';
+    small = 'Укажи рабочий вес, если приседаешь со штангой или гантелями, — посчитаю шаг прогрессии и 1ПМ.';
+  } else {
+    if (q >= 0.8) text = N >= 15 ? 'Пора усложнять: отжимания с ногами на возвышении, 3×8–10.' : 'Добавь 1–2 повтора в следующем подходе, сохраняя ровную линию тела.';
+    else if (q >= 0.5) text = 'Оставь количество повторов и держи фокус на подсказке «' + top.cue + '».';
+    else text = 'Перейди на отжимания от скамьи или с колен, пока линия тела и амплитуда не станут стабильными.';
+  }
+  el.nextText.textContent = text; el.nextSmall.textContent = small;
+}
+el.weight.value = saved.weight || '';
+el.weight.addEventListener('input', () => { persist(); renderNext(currentRanked()); });
+function currentRanked() {
+  const counts = {}; for (const r of state.analyzer.reps) for (const id of r.faultList) counts[id] = (counts[id] || 0) + 1;
+  return Object.keys(counts).sort((a, b) => counts[b] * FAULTS[b].pen - counts[a] * FAULTS[a].pen);
+}
+function persist() { store.set({ depth: state.opts.depth, level: state.opts.level, weight: el.weight.value }); }
+
+/* ---------- Settings and setup guide ---------- */
+function renderSettings() {
+  const dl = DEPTH_LABEL[state.ex];
+  el.depthLab.textContent = state.ex === 'squat' ? 'Цель по глубине (для боли в колене подойдёт полуприсед)' : 'Цель по амплитуде';
+  el.segDepth.innerHTML = Object.keys(dl).map(k => '<button type="button" data-v="' + k + '" aria-pressed="' + (state.opts.depth === k) + '">' + dl[k] + '</button>').join('');
+  el.segLevel.innerHTML = Object.keys(LEVEL_LABEL).map(k => '<button type="button" data-v="' + k + '" aria-pressed="' + (state.opts.level === k) + '">' + LEVEL_LABEL[k] + '</button>').join('');
+}
+el.segDepth.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.opts.depth = b.dataset.v; persist(); renderSettings(); });
+el.segLevel.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.opts.level = b.dataset.v; persist(); renderSettings(); });
+const SETUP = {
+  squat: [
+    '<b>Сбоку</b> — для глубины, наклона корпуса, пяток и темпа: телефон на уровне таза в 2,5–3 м, в кадре от макушки до стоп.',
+    '<b>Спереди</b> — для коленей и перекоса: та же высота, камера по центру между стопами.',
+    'Телефон неподвижен: штатив, полка или упор. Приложение само поймёт, сбоку ты или спереди.',
+    'Свет спереди, не из-за спины. Одежда, в которой видно колени и стопы.',
+    'Перед подходом встань прямо на секунду — так приложение калибруется под твой рост.'
+  ],
+  pushup: [
+    '<b>Только сбоку</b>: телефон на полу или низкой скамье в 1,5–2 м, в кадре от головы до стоп.',
+    'Руки, таз и стопы не должны перекрываться предметами.',
+    'Перед подходом замри в упоре на прямых руках на секунду — это калибровка.',
+    'Отжимания с колен определяются автоматически: линия тела тогда считается от плеч до коленей.'
+  ]
+};
+function renderSetup() { el.setupList.innerHTML = SETUP[state.ex].map(s => '<li>' + s + '</li>').join(''); }
+
+/* ---------- Sources ---------- */
+function setSource(src) {
+  state.source = src;
+  for (const b of document.querySelectorAll('.src')) b.classList.toggle('on', b.dataset.src === (src === 'video' ? state.videoOrigin : src));
+  state.frame = null; state.snap = null;
+  el.vid.classList.toggle('mirror', src === 'camera' && state.facing === 'user');
+  el.vid.hidden = src === 'demo';
+  updateSrcBadge(); renderSubbar();
+}
+function updateSrcBadge() {
+  el.srcBadge.textContent = state.source === 'demo' ? 'Демо' : state.source === 'camera' ? 'Камера' : 'Видео';
+  el.srcBadge.classList.toggle('live', state.source === 'camera');
+}
+function startDemo() {
+  stopCamera(); stopVideo(); hideMsg();
+  state.demo = new Demo(state.ex, state.demoView); state.demoEnded = false;
+  setAspect(state.demo.W, state.demo.H);
+  newAnalyzer(); setSource('demo');
+}
+function stopCamera() {
+  if (state.stream) { for (const t of state.stream.getTracks()) t.stop(); state.stream = null; }
+  if (el.vid.srcObject) el.vid.srcObject = null;
+  releaseWake();
+}
+function stopVideo() {
+  vidToken++; state.vid = null;
+  try { el.vid.pause(); } catch (e) { /* not playing */ }
+  if (state.videoURL) { el.vid.removeAttribute('src'); el.vid.load(); URL.revokeObjectURL(state.videoURL); state.videoURL = null; }
+}
+function loadScript(src) {
+  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.async = false; s.onload = res; s.onerror = () => rej(new Error('Не загрузилась библиотека: ' + src)); document.head.appendChild(s); });
+}
+async function ensureDetector() {
+  if (state.detector) return state.detector;
+  if (!state.detectorLoading) {
+    state.detectorLoading = (async () => {
+      const local = !!window.AI_TRAINER_STANDALONE;
+      if (!window.tf) await loadScript(local ? 'vendor/tf.min.js' : 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js');
+      if (!window.poseDetection) await loadScript(local ? 'vendor/pose-detection.min.js' : 'https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js');
+      try { await tf.setBackend('webgl'); } catch (e) { await tf.setBackend('cpu'); }
+      await tf.ready();
+      const det = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, {
+        runtime: 'tfjs', modelType: 'lite', enableSmoothing: true,
+        detectorModelUrl: 'models/blazepose-detector.json', landmarkModelUrl: 'models/blazepose-lite.json'
+      });
+      const wc = document.createElement('canvas'); wc.width = wc.height = 256; const wg = wc.getContext('2d'); wg.fillStyle = '#777'; wg.fillRect(0, 0, 256, 256);
+      await det.estimatePoses(wc); det.reset();
+      state.detector = det; return det;
+    })();
+  }
+  try { return await state.detectorLoading; }
+  catch (e) { state.detectorLoading = null; throw e; }
+}
+function showMsg(title, text, actions, spinning) {
+  el.msg.hidden = false; el.msgTitle.textContent = title; el.msgText.textContent = text; el.msgSpin.hidden = !spinning;
+  el.msgActions.innerHTML = '';
+  for (const a of actions || []) { const b = document.createElement('button'); b.type = 'button'; b.textContent = a.label; if (a.primary) b.className = 'primary'; b.addEventListener('click', a.run); el.msgActions.appendChild(b); }
+}
+function hideMsg() { el.msg.hidden = true; }
+const pickVideo = () => $('#recInput').click();
+async function loadModelWithUi() {
+  if (state.detector) return true;
+  showMsg('Загружаю модель позы', 'BlazePose Lite, около 9 МБ. Загрузка нужна один раз за сеанс, дальше всё считается на устройстве.', [], true);
+  try { await ensureDetector(); hideMsg(); return true; }
+  catch (e) {
+    console.error(e);
+    showMsg('Модель не загрузилась', 'Проверь интернет и попробуй ещё раз. Без модели работает только демо.', [{ label: 'Повторить', primary: true, run: () => loadModelWithUi() }, { label: 'Смотреть демо', run: startDemo }]);
+    return false;
+  }
+}
+async function startCamera() {
+  stopVideo();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return cameraBlocked();
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }); }
+  catch (e) { return cameraBlocked(e); }
+  stopCamera(); state.stream = stream;
+  el.vid.srcObject = stream; el.vid.muted = true;
+  setSource('camera');
+  try { await el.vid.play(); } catch (e) { /* autoplay with gesture */ }
+  setAspect(el.vid.videoWidth || 1280, el.vid.videoHeight || 720);
+  newAnalyzer(); requestWake();
+  if (await loadModelWithUi()) state.detector.reset();
+}
+function cameraBlocked() {
+  if (window.AI_TRAINER_STANDALONE) {
+    const tg = document.documentElement.classList.contains('in-telegram');
+    return showMsg('Нет доступа к камере', tg
+      ? 'Разреши Telegram доступ к камере в настройках телефона и нажми «Повторить». Или сними подход на видео — разбор будет тот же.'
+      : 'Разреши камеру для этого сайта: значок замка или «аА» в адресной строке → Камера → Разрешить. Потом нажми «Повторить».',
+      [{ label: 'Повторить', primary: true, run: () => { hideMsg(); startCamera(); } }, { label: 'Снять на видео', run: () => { hideMsg(); pickVideo(); } }]);
+  }
+  showMsg('Камера здесь недоступна', 'Браузер не дал доступ к камере в этом окне. Сними подход кнопкой «Снять подход» — телефон запишет видео, и разбор пройдёт так же, по кадрам. Живая камера работает в автономной версии прототипа, открытой по https.',
+    [{ label: 'Снять подход', primary: true, run: () => { hideMsg(); pickVideo(); } }, { label: 'Смотреть демо', run: startDemo }]);
+}
+async function openFile(file) {
+  if (!file) return;
+  stopCamera(); stopVideo();
+  state.videoURL = URL.createObjectURL(file);
+  el.vid.srcObject = null; el.vid.src = state.videoURL; el.vid.muted = true; el.vid.loop = false;
+  setSource('video'); newAnalyzer();
+  const ok = await new Promise(res => { if (el.vid.readyState >= 1) return res(true); el.vid.addEventListener('loadedmetadata', () => res(true), { once: true }); el.vid.addEventListener('error', () => res(false), { once: true }); });
+  if (!ok) { videoError(); return; }
+  setAspect(el.vid.videoWidth || 720, el.vid.videoHeight || 1280);
+  if (!el.vid.videoWidth) { videoError(); return; }
+  if (!(await loadModelWithUi())) return;
+  analyzeVideo();
+}
+function videoError() {
+  showMsg('Видео не открылось', 'Попробуй другой файл: MP4 или MOV, снятый на телефон.', [{ label: 'Выбрать другое', primary: true, run: () => { hideMsg(); $('#fileInput').click(); } }, { label: 'Смотреть демо', run: startDemo }]);
+}
+/* Recorded sets are read frame by frame (15 per second of video), so a slow phone never skips a rep.
+   Playback is capped at real time, so voice cues land when the movement happens. */
+const VSTEP = 1 / 15;
+let vidToken = 0;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function seekTo(v, t) {
+  return new Promise(res => {
+    let to = 0;
+    const done = () => { v.removeEventListener('seeked', done); clearTimeout(to); res(); };
+    to = setTimeout(done, 1500); v.addEventListener('seeked', done); v.currentTime = t;
+  });
+}
+function toKp(poses) {
+  const p = poses && poses[0];
+  return p && p.keypoints && p.keypoints.length === 33 ? p.keypoints.map(k => ({ x: k.x, y: k.y, z: k.z, score: k.score ?? 0 })) : null;
+}
+async function analyzeVideo() {
+  const token = ++vidToken, v = el.vid, dur = v.duration;
+  try { v.pause(); } catch (e) { /* already paused */ }
+  state.vid = { t: 0, paused: false, done: false, dur: isFinite(dur) ? dur : null };
+  state.detector.reset(); renderSubbar();
+  try { await v.play(); v.pause(); } catch (e) { /* priming only: some phones decode frames only after play() */ }
+  if (token !== vidToken) return;
+  if (!isFinite(dur)) {          // stream without a known length: analyse during normal playback
+    state.vid.live = true;
+    try { v.currentTime = 0; await v.play(); } catch (e) { videoError(); }
+    return;
+  }
+  while (token === vidToken && state.vid.t <= dur) {
+    if (state.vid.paused) { await sleep(120); continue; }
+    const w0 = performance.now(), t = state.vid.t;
+    await seekTo(v, Math.min(t, Math.max(0, dur - 0.01)));
+    if (token !== vidToken) return;
+    try {
+      syncSize(v);
+      const poses = await state.detector.estimatePoses(v, { maxPoses: 1, flipHorizontal: false }, t * 1000);
+      if (token !== vidToken) return;
+      const kp = toKp(poses);
+      state.frame = { kp, W: v.videoWidth, H: v.videoHeight };
+      handleSnap(state.analyzer.update(kp, t));
+    } catch (e) { console.error(e); }
+    const wait = VSTEP * 1000 - (performance.now() - w0);
+    if (wait > 0) await sleep(wait);
+    state.vid.t = t + VSTEP;
+  }
+  if (token === vidToken) finishVideo();
+}
+function finishVideo() {
+  if (!state.vid || state.vid.done) return;
+  state.vid.done = true; state.analyzer.endSet(); processEvents(state.analyzer.drain()); renderSubbar();
+}
+el.vid.addEventListener('resize', () => { if (el.vid.videoWidth && state.source !== 'demo') setAspect(el.vid.videoWidth, el.vid.videoHeight); });
+el.vid.addEventListener('ended', () => { if (state.source === 'video' && state.vid && state.vid.live) finishVideo(); });
+let wake = null;
+async function requestWake() { try { wake = await navigator.wakeLock.request('screen'); } catch (e) { wake = null; } }
+function releaseWake() { try { wake && wake.release(); } catch (e) { /* ignore */ } wake = null; }
+
+for (const b of document.querySelectorAll('button.src')) b.addEventListener('click', () => b.dataset.src === 'demo' ? startDemo() : startCamera());
+$('#recInput').addEventListener('change', e => { state.videoOrigin = 'rec'; openFile(e.target.files[0]); e.target.value = ''; });
+$('#fileInput').addEventListener('change', e => { state.videoOrigin = 'file'; openFile(e.target.files[0]); e.target.value = ''; });
+
+function renderSubbar() {
+  const parts = [];
+  if (state.source === 'demo') {
+    if (state.ex === 'squat') parts.push('<button class="mini" type="button" data-act="view-side" aria-pressed="' + (state.demoView === 'side') + '">Сбоку</button><button class="mini" type="button" data-act="view-front" aria-pressed="' + (state.demoView === 'front') + '">Спереди</button>');
+    parts.push('<button class="mini" type="button" data-act="restart">Сначала</button><span class="subnote">Демо-атлет делает ошибки намеренно — так видно, как работают подсказки.</span>');
+  } else if (state.source === 'camera') {
+    parts.push('<button class="mini" type="button" data-act="flip">Сменить камеру</button><button class="mini" type="button" data-act="newset">Новый подход</button><button class="mini" type="button" data-act="stop">Стоп</button>');
+  } else {
+    const vs = state.vid, done = vs && vs.done;
+    parts.push((done || !vs || vs.live ? '' : '<button class="mini" type="button" data-act="pause">' + (vs.paused ? 'Продолжить' : 'Пауза') + '</button>') +
+      '<button class="mini" type="button" data-act="replay">' + (done ? 'Разобрать ещё раз' : 'Сначала') + '</button><span class="subnote" id="vidProgress"></span>');
+  }
+  el.subbar.innerHTML = parts.join('');
+}
+el.subbar.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act, v = el.vid;
+  if (act === 'view-side' || act === 'view-front') { state.demoView = act === 'view-side' ? 'side' : 'front'; startDemo(); }
+  else if (act === 'restart') startDemo();
+  else if (act === 'flip') { state.facing = state.facing === 'user' ? 'environment' : 'user'; startCamera(); }
+  else if (act === 'newset') newAnalyzer();
+  else if (act === 'stop') startDemo();
+  else if (act === 'pause') { if (state.vid) { state.vid.paused = !state.vid.paused; renderSubbar(); } }
+  else if (act === 'replay') { if (state.detector && v.src) { newAnalyzer(); analyzeVideo(); } }
+});
+
+for (const t of document.querySelectorAll('.tab')) t.addEventListener('click', () => {
+  state.ex = t.dataset.ex;
+  for (const x of document.querySelectorAll('.tab')) x.setAttribute('aria-selected', String(x === t));
+  if (!['half', 'parallel', 'deep'].includes(state.opts.depth)) state.opts.depth = 'parallel';
+  renderSettings(); renderSetup();
+  if (state.source === 'demo') startDemo(); else if (state.source === 'video' && state.detector && el.vid.src) { newAnalyzer(); analyzeVideo(); } else { newAnalyzer(); state.detector && state.detector.reset(); }
+  renderSubbar();
+});
+el.voiceBtn.addEventListener('click', () => {
+  if (!('speechSynthesis' in window)) { el.voiceLabel.textContent = 'Голос недоступен'; el.voiceBtn.disabled = true; return; }
+  Voice.on = !Voice.on;
+  el.voiceBtn.setAttribute('aria-pressed', String(Voice.on));
+  el.voiceLabel.textContent = Voice.on ? 'Голос вкл.' : 'Голос выкл.';
+  if (Voice.on) Voice.say('Голос включён', 'on', true); else if ('speechSynthesis' in window) speechSynthesis.cancel();
+});
+const mq = window.matchMedia('(prefers-color-scheme: dark)');
+if (mq.addEventListener) mq.addEventListener('change', readColors);
+new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+try {
+  const qp = new URLSearchParams(location.search);
+  const qex = qp.get('ex'), qw = qp.get('w');
+  if (qex === 'squat' || qex === 'pushup') { state.ex = qex; for (const x of document.querySelectorAll('.tab')) x.setAttribute('aria-selected', String(x.dataset.ex === qex)); }
+  if (qw && /^\d+([.,]\d+)?$/.test(qw)) el.weight.value = qw.replace('.', ',');
+} catch (e) { /* no query */ }
+renderSettings(); renderSetup(); resize(); startDemo();
+requestAnimationFrame(loop);
+
+if (window.AI_TRAINER_STANDALONE) {
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* offline cache is optional */ }); });
+  }
+  if (/tgWebApp/.test(location.hash) || /[?&]tg=1/.test(location.search)) {
+    document.documentElement.classList.add('in-telegram');
+    const s = document.createElement('script');
+    s.src = 'https://telegram.org/js/telegram-web-app.js';
+    s.onload = () => {
+      const W = window.Telegram && window.Telegram.WebApp; if (!W) return;
+      const call = (f, ...a) => { try { if (typeof W[f] === 'function') W[f](...a); } catch (e) { /* older Telegram */ } };
+      const atLeast = v => { try { return W.isVersionAtLeast(v); } catch (e) { return false; } };
+      const theme = () => {
+        document.documentElement.setAttribute('data-theme', W.colorScheme === 'dark' ? 'dark' : 'light');
+        if (atLeast('6.9')) { const bg = cssv('--bg'); call('setHeaderColor', bg); call('setBackgroundColor', bg); }
+      };
+      call('ready'); call('expand'); renderTgSend();
+      if (atLeast('7.7')) call('disableVerticalSwipes');
+      theme();
+      try { W.onEvent('themeChanged', theme); } catch (e) { /* no theme events */ }
+    };
+    document.head.appendChild(s);
+  }
+}
+window.__aiTrainer = { Demo, SquatAnalyzer, PushupAnalyzer, FAULTS, state, ensureDetector, renderSummary };
+})();
+</script>
+</body></html>
