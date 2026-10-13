@@ -724,7 +724,16 @@ const ease = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
 const DEMO_SCRIPTS = {
   'squat-side': ['ok', 'ok', 'shallow', 'lean', 'heels', 'fast', 'ok'],
   'squat-front': ['ok', 'valgus', 'ok', 'shift', 'shallow', 'ok'],
-  'pushup-side': ['ok', 'sag', 'ok', 'pu_shallow', 'pike', 'head', 'ok']
+  'pushup-side': ['ok', 'sag', 'ok', 'pu_shallow', 'pike', 'head', 'ok'],
+  'squat-side-good': ['ok', 'ok', 'ok'],
+  'squat-front-good': ['ok', 'ok', 'ok'],
+  'pushup-side-good': ['ok', 'ok', 'ok']
+};
+/* «Как правильно»: one simple tip at a time; the green ring marks where to look. Joint keys: near side, or both sides with '2'. */
+const DEMO_TIPS = {
+  'squat-side': [['Таз назад и вниз до уровня колен', 'hip'], ['Пятки на полу', 'heel'], ['Грудь вверх, спина прямая', 'sh']],
+  'squat-front': [['Колени по линии носков', 'kn2'], ['Вес на обе ноги', 'an2'], ['Опускайся до уровня колен', 'hip2']],
+  'pushup-side': [['Тело — одна прямая линия', 'hip'], ['Локти назад под 45°', 'el'], ['Грудь почти до пола', 'sh']]
 };
 function emptyKp() { return Array.from({ length: 33 }, () => ({ x: 0, y: 0, score: 0.2 })); }
 function put(kp, i, p, sc) { kp[i] = { x: p.x, y: p.y, score: sc }; }
@@ -808,15 +817,18 @@ function pushupPose(s, f) {
   return kp;
 }
 class Demo {
-  constructor(ex, view) {
-    this.ex = ex; this.view = ex === 'pushup' ? 'side' : view;
-    this.script = DEMO_SCRIPTS[this.ex + '-' + this.view];
+  constructor(ex, view, mode) {
+    this.ex = ex; this.view = ex === 'pushup' ? 'side' : view; this.mode = mode === 'faults' ? 'faults' : 'good';
+    this.script = DEMO_SCRIPTS[this.ex + '-' + this.view + (this.mode === 'good' ? '-good' : '')];
+    this.tips = DEMO_TIPS[this.ex + '-' + this.view];
     this.W = ex === 'pushup' ? 1000 : 800; this.H = ex === 'pushup' ? 700 : 1000;
     this.ground = ex === 'pushup' ? 640 : 950; this.Hb = ex === 'pushup' ? 860 : 780;
     this.t = 0; this.done = false; this.timeline = [];
     let t = 1.4;
     for (const f of this.script) {
-      const down = f === 'fast' ? 0.42 : ex === 'pushup' ? 1.15 : 1.4, hold = ex === 'pushup' ? 0.12 : 0.2, up = ex === 'pushup' ? 0.8 : 1.0, rest = 0.75;
+      const good = this.mode === 'good';
+      const down = f === 'fast' ? 0.42 : good ? 2.0 : ex === 'pushup' ? 1.15 : 1.4, hold = good ? 0.35 : ex === 'pushup' ? 0.12 : 0.2,
+        up = good ? 1.0 : ex === 'pushup' ? 0.8 : 1.0, rest = good ? 1.0 : 0.75;
       this.timeline.push({ f, t0: t, t1: t + down, t2: t + down + hold, t3: t + down + hold + up });
       t += down + hold + up + rest;
     }
@@ -831,6 +843,11 @@ class Demo {
   }
   step(dt) { if (this.done) return; this.t = Math.min(this.end, this.t + dt); if (this.t >= this.end) this.done = true; }
   frame() { const { s, f } = this.at(this.t); return this.ex === 'pushup' ? pushupPose(s, f) : squatPose(s, f, this.view, this.W, this.H); }
+  tip() { if (this.mode !== 'good' || !this.tips) return null; return this.tips[Math.floor(this.t / 3) % this.tips.length]; }
+}
+function tipJoints(key, side) {
+  const both = key.endsWith('2'), k = both ? key.slice(0, -1) : key;
+  return both ? [SIDE.l[k], SIDE.r[k]] : [SIDE[side || 'l'][k]];
 }
 
 /* ---------- Voice coach ---------- */
@@ -858,7 +875,7 @@ const store = {
 };
 const saved = store.get();
 const state = {
-  ex: 'squat', demoView: 'side', source: 'demo',
+  ex: 'squat', demoView: 'side', demoMode: 'good', source: 'demo',
   opts: { depth: ['half', 'parallel', 'deep'].includes(saved.depth) ? saved.depth : 'parallel', level: ['novice', 'normal', 'pro'].includes(saved.level) ? saved.level : 'normal' },
   analyzer: null, demo: null, frame: null, snap: null, flash: null, selectedRep: null,
   vid: null, detector: null, detectorLoading: null, stream: null, facing: 'user', videoURL: null, videoOrigin: 'rec', busy: false, demoEnded: false
@@ -952,6 +969,16 @@ function draw() {
       ctx.fillStyle = isFar ? C.dim : C.ink; ctx.globalAlpha = isFar ? 0.5 : 1;
       ctx.beginPath(); ctx.arc(X(p), Y(p), isFar ? 3 : 4.5, 0, 7); ctx.fill();
       ctx.globalAlpha = 1;
+    }
+  }
+  const tip = f.demo && state.demo && !state.demo.done ? state.demo.tip() : null;
+  if (tip && !snap.live.length) {
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 1000 * 2 * Math.PI * 1.2);
+    for (const i of tipJoints(tip[1], snap.side)) {
+      const p = kp[i]; if (!p) continue;
+      ctx.strokeStyle = C.good; ctx.lineWidth = 3; ctx.globalAlpha = 0.6 + 0.4 * pulse;
+      ctx.beginPath(); ctx.arc(X(p), Y(p), 15 + 3 * pulse, 0, 7); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = C.good; ctx.beginPath(); ctx.arc(X(p), Y(p), 5, 0, 7); ctx.fill();
     }
   }
 }
@@ -1087,7 +1114,9 @@ function cueState(snap) {
     return { cls: FAULTS[id].pen >= 25 ? 'bad' : 'warn', text: FAULTS[id].cue };
   }
   if (state.flash && state.flash.until > now) return state.flash;
-  if (state.source === 'demo' && state.demo && state.demo.done) return { cls: 'info', text: 'Демо-подход окончен — смотри итог подхода' };
+  if (state.source === 'demo' && state.demo && state.demo.done) return state.demo.mode === 'good'
+    ? { cls: 'good', text: 'Теперь ты: нажми «Камера» и повтори' } : { cls: 'info', text: 'Демо-подход окончен — смотри итог подхода' };
+  if (state.source === 'demo' && state.demo && state.demo.tip()) return { cls: 'good', text: state.demo.tip()[0] };
   if (STATUS_TEXT[snap.status]) return { cls: 'info', text: STATUS_TEXT[snap.status] };
   if (snap.status === 'calib') return { cls: 'info', text: state.ex === 'pushup' ? 'Замри в упоре на прямых руках — калибрую' : 'Встань прямо и замри на секунду — калибрую' };
   if (snap.phase === 'top') return { cls: 'info', text: snap.reps ? 'Следующий повтор' : 'Готово. Начинай подход' };
@@ -1255,7 +1284,7 @@ function updateSrcBadge() {
 }
 function startDemo() {
   stopCamera(); stopVideo(); hideMsg();
-  state.demo = new Demo(state.ex, state.demoView); state.demoEnded = false;
+  state.demo = new Demo(state.ex, state.demoView, state.demoMode); state.demoEnded = false;
   setAspect(state.demo.W, state.demo.H);
   newAnalyzer(); setSource('demo');
 }
@@ -1415,8 +1444,12 @@ $('#fileInput').addEventListener('change', e => { state.videoOrigin = 'file'; op
 function renderSubbar() {
   const parts = [];
   if (state.source === 'demo') {
+    const good = state.demoMode === 'good';
+    parts.push('<button class="mini" type="button" data-act="mode-good" aria-pressed="' + good + '">Как правильно</button><button class="mini" type="button" data-act="mode-faults" aria-pressed="' + !good + '">С ошибками</button>');
     if (state.ex === 'squat') parts.push('<button class="mini" type="button" data-act="view-side" aria-pressed="' + (state.demoView === 'side') + '">Сбоку</button><button class="mini" type="button" data-act="view-front" aria-pressed="' + (state.demoView === 'front') + '">Спереди</button>');
-    parts.push('<button class="mini" type="button" data-act="restart">Сначала</button><span class="subnote">Демо-атлет делает ошибки намеренно — так видно, как работают подсказки.</span>');
+    parts.push('<button class="mini" type="button" data-act="restart">Сначала</button><span class="subnote">' + (good
+      ? 'Демо-атлет показывает правильную технику. Зелёный круг — на что смотреть.'
+      : 'Демо-атлет ошибается нарочно — так видно, как срабатывают подсказки.') + '</span>');
   } else if (state.source === 'camera') {
     parts.push('<button class="mini" type="button" data-act="flip">Сменить камеру</button><button class="mini" type="button" data-act="newset">Новый подход</button><button class="mini" type="button" data-act="stop">Стоп</button>');
   } else {
@@ -1431,6 +1464,7 @@ el.subbar.addEventListener('click', async e => {
   const act = b.dataset.act, v = el.vid;
   if (act === 'view-side' || act === 'view-front') { state.demoView = act === 'view-side' ? 'side' : 'front'; startDemo(); }
   else if (act === 'restart') startDemo();
+  else if (act === 'mode-good' || act === 'mode-faults') { state.demoMode = act === 'mode-good' ? 'good' : 'faults'; startDemo(); }
   else if (act === 'flip') { state.facing = state.facing === 'user' ? 'environment' : 'user'; startCamera(); }
   else if (act === 'newset') newAnalyzer();
   else if (act === 'stop') startDemo();
