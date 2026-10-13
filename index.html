@@ -51,6 +51,7 @@ button{cursor:pointer}
 .stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .stage video{object-fit:contain;background:var(--stage)}
 .stage video.mirror{transform:scaleX(-1)}
+#howto{z-index:1} .stage canvas{z-index:2}
 .hud-tr{position:absolute;right:10px;top:10px;z-index:2;text-align:right;color:var(--stage-ink);background:var(--stage-glass);border:1px solid var(--stage-edge);border-radius:12px;padding:7px 11px 6px;min-width:64px}
 .repnum{font:700 36px/1 var(--f-display);font-variant-numeric:tabular-nums}
 .replabel{font:600 10px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--stage-dim);margin-top:3px}
@@ -113,7 +114,7 @@ button{cursor:pointer}
   <section class="viewer" aria-label="Камера">
     <div class="stage" id="stage">
       <video id="howto" muted loop playsinline autoplay preload="auto"></video>
-      <video id="vid" playsinline muted hidden></video>
+      <video id="vid" playsinline muted autoplay></video>
       <canvas id="cv"></canvas>
       <button class="flip" id="flipBtn" type="button" hidden aria-label="Сменить камеру">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5A6.5 6.5 0 0 1 15 5.2L16.5 7"/><path d="M16.5 3.5V7H13"/><path d="M16.5 11.5A6.5 6.5 0 0 1 5 14.8L3.5 13"/><path d="M3.5 16.5V13H7"/></svg>
@@ -864,11 +865,35 @@ function draw() {
 
 /* ---------- live loop ---------- */
 let lastUi = 0;
+let lastHealth = 0;
 function loop(now) {
-  if (state.on && !state.file) infer();
-  draw();
-  if (now - lastUi > 110) { lastUi = now; renderLive(); }
+  try {
+    if (state.on && !state.file) infer();
+    draw();
+    if (now - lastUi > 110) { lastUi = now; renderLive(); }
+    if (now - lastHealth > 1000) { lastHealth = now; health(); }
+  } catch (e) { console.error(e); }
   requestAnimationFrame(loop);
+}
+/* The camera picture must keep moving: some phones pause a video until it is tapped. */
+const H = { lastT: -1, still: 0, errors: 0, ok: 0, lastErr: '', noPose: 0 };
+function health() {
+  if (!state.on || state.file || !state.stream || !el.msg.hidden) return;
+  const v = el.vid;
+  if (v.paused || v.ended) { try { const p = v.play(); if (p && p.catch) p.catch(() => tapToStart()); } catch (e) { tapToStart(); } }
+  if (v.currentTime === H.lastT) H.still++; else { H.still = 0; H.lastT = v.currentTime; }
+  if (H.still >= 3) return tapToStart();
+  if (state.detector && H.errors > 15 && !H.ok) {
+    showMsg('Тренер не смог прочитать кадр', 'Нажми «Перезапустить». Если не поможет — пришли мне снимок экрана. Ошибка: ' + H.lastErr.slice(0, 120),
+      [{ label: 'Перезапустить', primary: true, run: () => location.reload() }]);
+  }
+}
+function tapToStart() {
+  if (!el.msg.hidden) return;
+  showMsg('Камера на паузе', 'Нажми кнопку — и картинка пойдёт.', [{ label: 'Запустить камеру', primary: true, run: () => {
+    hideMsg(); H.still = 0; H.lastT = -1;
+    try { const p = el.vid.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* retried by the watchdog */ }
+  } }]);
 }
 function syncSize(v) { if (v.videoWidth && (v.width !== v.videoWidth || v.height !== v.videoHeight)) { v.width = v.videoWidth; v.height = v.videoHeight; } }
 const toKp = poses => { const p = poses && poses[0]; return p && p.keypoints && p.keypoints.length === 33 ? p.keypoints.map(k => ({ x: k.x, y: k.y, z: k.z, score: k.score ?? 0 })) : null; };
@@ -881,8 +906,9 @@ async function infer() {
     syncSize(v);
     const kp = toKp(await state.detector.estimatePoses(v, { maxPoses: 1, flipHorizontal: false }, t * 1000));
     state.frame = { kp, W: v.videoWidth, H: v.videoHeight };
+    H.ok++; H.noPose = kp ? 0 : H.noPose + 1;
     handleSnap(state.analyzer.update(kp, t));
-  } catch (e) { console.error(e); }
+  } catch (e) { console.error(e); H.errors++; H.lastErr = String((e && e.message) || e); }
   finally { state.busy = false; }
 }
 function handleSnap(snap) { state.snap = snap; processEvents(state.analyzer.drain()); }
@@ -1004,10 +1030,20 @@ function calibText() {
   if (isHold()) return 'Прими положение — время пойдёт само';
   return 'Замри на секунду в начальном положении';
 }
+/* Say what exactly is missing, so the person knows whether to step back, lower the phone or turn. */
+function missingHint(kp) {
+  if (!kp) return 'Не вижу человека: отойди на 2–3 м, чтобы было видно всё тело, и включи свет поярче';
+  const ok = i => kp[i] && kp[i].score > 0.5, any = (a, b) => ok(a) || ok(b);
+  if (!any(11, 12) || !any(23, 24)) return 'Вижу тебя не целиком — отойди подальше от телефона';
+  if (!any(25, 26) || !any(27, 28)) return 'Не видно ног — отойди дальше или поставь телефон ниже';
+  if (!any(13, 14) || !any(15, 16)) return 'Не видно рук — повернись к камере боком';
+  return STATUS_TEXT.nobody;
+}
 function cueState() {
   const snap = state.snap, now = performance.now(), A = state.analyzer;
   if (!state.on) return state.flash && state.flash.until > now ? state.flash : { cls: 'good', text: '💡 ' + info().tips[0] };
-  if (!snap) return { cls: 'info', text: 'Ищу человека в кадре' };
+  if (!snap) return { cls: 'info', text: state.detector ? 'Включаю камеру…' : 'Готовлю тренера…' };
+  if (snap.status === 'nobody') return { cls: 'info', text: missingHint(state.frame && state.frame.kp) };
   if (snap.live.length) { const m = A.meta(snap.live[0]); return { cls: m.pen >= 25 ? 'bad' : 'warn', text: m.cue }; }
   if (state.flash && state.flash.until > now) return state.flash;
   if (STATUS_TEXT[snap.status]) return { cls: 'info', text: STATUS_TEXT[snap.status] };
@@ -1086,8 +1122,12 @@ async function loadModelWithUi() {
 }
 function showCameraMode(on) {
   state.on = on;
-  el.howto.hidden = on; el.vid.hidden = !on; el.flip.hidden = !on || !!state.file;
-  if (on) { try { el.howto.pause(); } catch (e) { /* fine */ } }
+  el.howto.hidden = on; el.flip.hidden = !on || !!state.file;
+  if (on) {
+    try { el.howto.pause(); } catch (e) { /* fine */ }
+    H.still = 0; H.lastT = -1; H.errors = 0; H.ok = 0;
+    if (state.stream) { try { const p = el.vid.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* watchdog retries */ } }
+  }
   else { setAspect(1, 1); try { const p = el.howto.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* fine */ } }
   renderMain(); renderLive();
 }
@@ -1098,11 +1138,12 @@ async function startCamera() {
   try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }); }
   catch (e) { return cameraBlocked(); }
   stopStream(); state.stream = stream;
-  el.vid.srcObject = stream; el.vid.muted = true;
+  el.vid.muted = true; el.vid.setAttribute('playsinline', ''); el.vid.srcObject = stream;
   el.vid.classList.toggle('mirror', state.facing === 'user');
-  try { await el.vid.play(); } catch (e) { /* plays after the gesture */ }
+  newAnalyzer(); showCameraMode(true);          // the video is on screen before play(): hidden videos stay frozen on some phones
+  try { await el.vid.play(); } catch (e) { /* the watchdog asks for a tap */ }
   setAspect(el.vid.videoWidth || 720, el.vid.videoHeight || 1280);
-  newAnalyzer(); showCameraMode(true); requestWake();
+  requestWake();
   if (!(await loadModelWithUi())) { stopCamera(); return; }
   state.detector.reset();
 }
@@ -1122,6 +1163,7 @@ function cameraBlocked() {
     : 'Разреши камеру для этой страницы (значок замка или «аА» в адресной строке) и нажми «Повторить». Или выбери видео подхода.',
     [{ label: 'Повторить', primary: true, run: () => { hideMsg(); startCamera(); } }, { label: 'Видео из галереи', run: () => { hideMsg(); $('#fileInput').click(); } }]);
 }
+el.stage.addEventListener('click', () => { if (state.on && el.vid.paused) { try { el.vid.play(); } catch (e) { /* fine */ } } });
 el.flip.addEventListener('click', () => { state.facing = state.facing === 'user' ? 'environment' : 'user'; startCamera(); });
 el.vid.addEventListener('resize', () => { if (el.vid.videoWidth && state.on) setAspect(el.vid.videoWidth, el.vid.videoHeight); });
 let wake = null;
