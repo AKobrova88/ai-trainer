@@ -57,6 +57,15 @@ button{cursor:pointer}
 .replabel{font:600 10px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--stage-dim);margin-top:3px}
 .flip{position:absolute;left:10px;top:10px;z-index:2;width:40px;height:40px;border-radius:10px;border:1px solid var(--stage-edge);background:var(--stage-glass);color:var(--stage-ink);display:grid;place-items:center}
 .flip svg{width:20px;height:20px}
+.stage-note{position:absolute;inset:0;z-index:1;display:grid;place-items:center;padding:24px;text-align:center;color:var(--stage-ink)}
+.stage-note b{display:block;font:700 17px/1.3 var(--f-display);margin-bottom:8px}
+.stage-note span{color:var(--stage-dim);font-size:14px;line-height:1.45;max-width:320px;display:block}
+.camsel{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;align-items:center}
+.camsel>span{font:600 11px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-right:4px}
+.camsel button{min-height:42px;border-radius:11px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:14.5px;display:flex;align-items:center;justify-content:center;gap:7px;padding:0 8px}
+.camsel button svg{width:18px;height:18px;flex:none}
+.camsel button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.camnote{margin:-4px 2px 0;color:var(--muted);font-size:13px;line-height:1.4}
 .cue{display:flex;align-items:center;gap:10px;padding:12px 14px;border-top:1px solid var(--stage-edge);background:var(--stage);color:var(--stage-ink);font-weight:600;font-size:16.5px;line-height:1.3;min-height:58px}
 .cue i{width:10px;height:10px;border-radius:50%;background:var(--stage-dim);flex:none}
 .cue.good i{background:var(--stage-good)} .cue.good{color:var(--stage-good)}
@@ -116,6 +125,7 @@ button{cursor:pointer}
       <video id="howto" muted loop playsinline autoplay preload="auto"></video>
       <video id="vid" playsinline muted autoplay></video>
       <canvas id="cv"></canvas>
+      <div class="stage-note" id="stageNote" hidden><div><b>Считаю повторы</b><span>Для этого упражнения тренер считает повторы и следит, чтобы амплитуда и темп не проседали. Полный разбор техники — у упражнений с 🎥.</span></div></div>
       <button class="flip" id="flipBtn" type="button" hidden aria-label="Сменить камеру">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5A6.5 6.5 0 0 1 15 5.2L16.5 7"/><path d="M16.5 3.5V7H13"/><path d="M16.5 11.5A6.5 6.5 0 0 1 5 14.8L3.5 13"/><path d="M3.5 16.5V13H7"/></svg>
       </button>
@@ -125,6 +135,12 @@ button{cursor:pointer}
     <div class="cue info" id="cue" role="status" aria-live="polite"><i></i><span id="cueText"></span></div>
   </section>
   <p class="camtip" id="camTip"></p>
+  <div class="camsel" role="group" aria-label="Какой камерой снимать">
+    <span>Камера</span>
+    <button type="button" data-facing="user" aria-pressed="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2.5" width="10" height="15" rx="2.2"/><circle cx="10" cy="5.2" r=".9" fill="currentColor"/><path d="M7.6 13.2c.6-1.3 1.4-1.9 2.4-1.9s1.8.6 2.4 1.9"/><circle cx="10" cy="9.3" r="1.4"/></svg>Фронтальная</button>
+    <button type="button" data-facing="environment" aria-pressed="false"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.2A1.7 1.7 0 0 1 4.7 5.5h1.6l1.2-1.7h5l1.2 1.7h1.6A1.7 1.7 0 0 1 17 7.2v7.6a1.7 1.7 0 0 1-1.7 1.7H4.7A1.7 1.7 0 0 1 3 14.8z"/><circle cx="10" cy="11" r="2.8"/></svg>Основная</button>
+  </div>
+  <p class="camnote" id="camNote"></p>
 
   <button class="main-btn" id="mainBtn" type="button"></button>
 
@@ -692,6 +708,101 @@ class GenericAnalyzer extends BaseAnalyzer {
   }
 }
 
+/* Any other exercise (machines, own exercises): no technique rules, a rep counter. It watches the big joints,
+   takes the one that moves the most away from the starting position and counts full there-and-back cycles of it;
+   it also notices when the range gets shorter than in the first reps or a rep is rushed. Phone only. */
+const FREE_SIGS = {
+  knee_l: ['knee', 'l'], knee_r: ['knee', 'r'], hip_l: ['hip', 'l'], hip_r: ['hip', 'r'],
+  elbow_l: ['elbow', 'l'], elbow_r: ['elbow', 'r'], shoulder_l: ['shoulder', 'l'], shoulder_r: ['shoulder', 'r'],
+  ankle_l: ['ankle', 'l'], ankle_r: ['ankle', 'r'], thighs: ['thighs']
+};
+const FREE_META = {
+  short: { title: 'Амплитуда', cue: 'Полная амплитуда, как в первых повторах', pen: 15 },
+  fast: { title: 'Темп', cue: 'Медленнее, под контролем', pen: 10 }
+};
+class FreeAnalyzer extends BaseAnalyzer {
+  constructor(level = 'normal') { super('parallel', level); }
+  reset() { super.reset(); this.sm = {}; this.prevV = {}; this.vel = 0; this.active = null; this.ref = null; this.amps = []; }
+  meta(fid) { return FREE_META[fid] || { title: 'Техника', cue: '', pen: 10 }; }
+  values(kp) {
+    const out = {}, ok = i => sc(kp[i]) > 0.5;
+    for (const [name, s] of Object.entries(FREE_SIGS)) {
+      if (s[0] === 'thighs') {
+        if ([23, 24, 25, 26].every(ok)) out[name] = angle(kp[25], mid(kp[23], kp[24]), kp[26]);
+        continue;
+      }
+      const S = SIDE[s[1]], js = ANGLES[s[0]].map(j => S[j]);
+      if (js.every(ok)) out[name] = angle(kp[js[0]], kp[js[1]], kp[js[2]]);
+    }
+    return out;
+  }
+  minMove(name) { return name.startsWith('ankle') ? 12 : 20; }
+  update(kp, t) {
+    const dt = this.tick(t);
+    const raw = kp ? this.values(kp) : {};
+    if (!Object.keys(raw).length || (this.active && raw[this.active] == null)) return this.lost(t);
+    this.lostSince = null; this.kp = kp;
+    let vmax = 0;
+    for (const [k, v] of Object.entries(raw)) {
+      const s = this.sm[k] == null ? v : lerp(this.sm[k], v, 0.5);
+      if (this.prevV[k] != null) vmax = Math.max(vmax, Math.abs(s - this.prevV[k]) / dt);
+      this.prevV[k] = s; this.sm[k] = s;
+    }
+    for (const k of Object.keys(this.sm)) if (raw[k] == null) { delete this.sm[k]; delete this.prevV[k]; }
+    this.vel = lerp(this.vel, vmax, 0.3);
+    const stable = this.vel < 30;
+    if (!this.cal) {
+      this.status = 'calib'; this.phase = 'setup';
+      if (stable) {
+        if (this.standSince == null) this.standSince = t;
+        if (t - this.standSince > 0.5) { this.cal = { s0: Object.assign({}, this.sm) }; this.phase = 'top'; this.standSince = null; this.emit({ type: 'status', id: 'ready' }); }
+      } else this.standSince = null;
+      return this.snapshot();
+    }
+    this.status = 'track';
+    for (const k of Object.keys(this.sm)) if (this.cal.s0[k] == null) this.cal.s0[k] = this.sm[k];
+    const dev = k => Math.abs(this.sm[k] - this.cal.s0[k]);
+    if (this.phase === 'top') {
+      if (stable) for (const k of Object.keys(this.sm)) if (dev(k) < 8) this.cal.s0[k] = lerp(this.cal.s0[k], this.sm[k], 0.05);
+      let pick = this.active;
+      if (!pick) { let best = 0; for (const k of Object.keys(this.sm)) { const d = dev(k) * (k.startsWith('ankle') ? 0.6 : 1); if (d > best) { best = d; pick = k; } } }   // big joints first
+      if (pick && this.sm[pick] != null) {
+        const thr = this.ref ? Math.max(0.35 * this.ref, this.minMove(pick) * 0.6) : this.minMove(pick);
+        if (dev(pick) > thr) this.startRep(t, { sig: pick, ext: dev(pick), t_ext: t });
+      }
+    } else if (this.rep) {
+      const R = this.rep.extra, d = this.sm[R.sig] == null ? null : dev(R.sig);
+      if (d == null) { this.rep = null; this.phase = 'top'; }
+      else if (this.phase === 'down') {
+        if (d >= R.ext) { R.ext = d; R.t_ext = t; this.rep.tBottom = t; }
+        if (R.ext - d > 0.3 * R.ext) this.phase = 'up';
+      } else if (this.phase === 'up') {
+        if (d > R.ext * 0.85) this.phase = 'down';
+        else if (d < 0.3 * R.ext) this.complete(t);
+      }
+    }
+    this.idleCheck(t);
+    return this.snapshot();
+  }
+  complete(t) {
+    const R = this.rep, amp = R.extra.ext;
+    R.t1 = t; R.down = R.tBottom - R.t0; R.up = t - R.tBottom;
+    if (!this.active) this.active = R.extra.sig;
+    if (this.ref && amp < 0.7 * this.ref / this.tol) { R.faults.short = true; this.pulse('short'); }
+    if (t - R.t0 < 0.9 / Math.max(1.0, this.tol)) { R.faults.fast = true; this.pulse('fast'); }
+    this.amps.push(amp);
+    if (this.amps.length <= 3) { const a = this.amps.slice().sort((x, y) => x - y); this.ref = a[Math.floor(a.length / 2)]; }
+    this.rep = null; this.phase = 'top';
+    this.finishRep(R);
+  }
+  joints() {
+    const s = FREE_SIGS[this.active];
+    if (!s) return [];
+    if (s[0] === 'thighs') return [25, 26];
+    return [SIDE[s[1]][ANGLES[s[0]][1]]];
+  }
+}
+
 function analyzerFor(key, depth = 'parallel', level = 'normal') {
   if (key in D.squat) return new SquatAnalyzer(D.squat[key] === 'parallel' ? depth : 'half', level);
   if (key in D.pushup) { const a = new PushupAnalyzer(depth, level); a.incline = D.pushup[key]; return a; }
@@ -702,7 +813,7 @@ function viewOf(key) { return key in D.squat ? 'any' : key in D.pushup ? 'side' 
 function isHold(key) { return !!(D.specs[key] && D.specs[key].hold); }
 function family(key) { return key in D.squat ? 'squat' : key in D.pushup ? 'pushup' : 'generic'; }
 
-return { setData(d) { D = d; }, data: () => D, analyzerFor, viewOf, isHold, family, SIDE, BaseAnalyzer, SquatAnalyzer, PushupAnalyzer, GenericAnalyzer };
+return { setData(d) { D = d; }, data: () => D, analyzerFor, viewOf, isHold, family, SIDE, BaseAnalyzer, SquatAnalyzer, PushupAnalyzer, GenericAnalyzer, FreeAnalyzer };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = AT;
 </script>
@@ -756,19 +867,30 @@ const prefs = store.get('aitrainer.v2', {});
 const qp = new URLSearchParams(location.search);
 const pickOpt = (v, list, d) => list.includes(v) ? v : d;
 const keys = Object.keys(EX.ex).filter(k => AT.analyzerFor(k));
+/* An exercise from the bot without technique rules (a machine, an own exercise): the camera still runs and counts reps. */
+const FREE = (() => {
+  const k = qp.get('ex'), n = (qp.get('n') || '').trim();
+  if (!k || keys.includes(k) || !n) return null;
+  const inc = ({ bw: 'bw', time: 'time' })[qp.get('u')] || 'machine';
+  EX.ex[k] = { name: n.slice(0, 60), inc, tips: ['Начни из исходного положения и замри на секунду — дальше считаю сам', 'Двигайся на полную амплитуду, без рывков'] };
+  return k;
+})();
+const isFree = () => state.ex === FREE;
+const FACING = { front: 'user', back: 'environment' };
 const state = {
-  ex: keys.includes(qp.get('ex')) ? qp.get('ex') : keys.includes(prefs.ex) ? prefs.ex : 'bw_squat',
+  ex: FREE || (keys.includes(qp.get('ex')) ? qp.get('ex') : keys.includes(prefs.ex) ? prefs.ex : 'bw_squat'),
   depth: pickOpt(qp.get('d'), ['half', 'parallel', 'deep'], pickOpt(prefs.depth, ['half', 'parallel', 'deep'], 'parallel')),
   level: pickOpt(qp.get('l'), ['novice', 'normal', 'pro'], pickOpt(prefs.level, ['novice', 'normal', 'pro'], 'normal')),
   urlW: num(qp.get('w')), fromBot: qp.has('ex'),
   analyzer: null, snap: null, frame: null, flash: null, sets: [], view: null,
-  detector: null, detectorLoading: null, stream: null, facing: 'user', on: false, busy: false, file: null
+  detector: null, detectorLoading: null, stream: null, facing: FACING[qp.get('cam')] || (['user', 'environment'].includes(prefs.facing) ? prefs.facing : 'user'), on: false, busy: false, file: null
 };
 store.set('aitrainer.v2', Object.assign(prefs, { depth: state.depth, level: state.level }));
 const el = {
   sel: $('#exSel'), stage: $('#stage'), howto: $('#howto'), vid: $('#vid'), cv: $('#cv'), hud: $('#hud'), repNum: $('#repNum'), repLabel: $('#repLabel'),
   cue: $('#cue'), cueText: $('#cueText'), camTip: $('#camTip'), main: $('#mainBtn'), flip: $('#flipBtn'), voice: $('#voiceBtn'),
   setsBox: $('#setsBox'), setList: $('#setList'), sendBox: $('#sendBox'), setsTitle: $('#setsTitle'),
+  note: $('#stageNote'), camNote: $('#camNote'), camBtns: [...document.querySelectorAll('.camsel button')],
   msg: $('#stageMsg'), msgTitle: $('#msgTitle'), msgText: $('#msgText'), msgActions: $('#msgActions'), msgSpin: $('#msgSpin')
 };
 const info = () => EX.ex[state.ex];
@@ -792,22 +914,28 @@ function saveSets() {
 /* ---------- exercise ---------- */
 function fillSelect() {
   const sorted = keys.slice().sort((a, b) => EX.ex[a].name.localeCompare(EX.ex[b].name, 'ru'));
-  el.sel.innerHTML = sorted.map(k => '<option value="' + k + '">' + esc(EX.ex[k].name) + '</option>').join('');
+  if (FREE) sorted.unshift(FREE);
+  el.sel.innerHTML = sorted.map(k => '<option value="' + k + '">' + esc(EX.ex[k].name) + (k === FREE ? ' · счёт повторов' : '') + '</option>').join('');
   el.sel.value = state.ex;
 }
 function setExercise(key) {
   state.ex = key; el.sel.value = key;
-  store.set('aitrainer.v2', Object.assign(prefs, { ex: key }));
+  if (key !== FREE) store.set('aitrainer.v2', Object.assign(prefs, { ex: key }));
   const view = AT.viewOf(key);
-  el.camTip.textContent = '📱 ' + (view === 'front' ? EX.cam.front : view === 'any' ? 'Поставь телефон сбоку или спереди в 2–3 м, всё тело в кадре' : EX.cam.side);
-  el.howto.src = 'howto/' + key + '.mp4';
-  try { const p = el.howto.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* autoplay blocked */ }
+  el.camTip.textContent = '📱 ' + (isFree() ? 'Поставь телефон в 2–3 м так, чтобы работающий сустав было хорошо видно (лучше сбоку)'
+    : view === 'front' ? EX.cam.front : view === 'any' ? 'Поставь телефон сбоку или спереди в 2–3 м, всё тело в кадре' : EX.cam.side);
+  if (isFree()) { el.howto.removeAttribute('src'); try { el.howto.load(); } catch (e) { /* fine */ } }
+  else {
+    el.howto.src = 'howto/' + key + '.mp4';
+    try { const p = el.howto.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* autoplay blocked */ }
+  }
+  el.note.hidden = !isFree() || state.on;
   loadSets();
   newAnalyzer();
   renderSets(); renderMain();
 }
 function newAnalyzer() {
-  state.analyzer = AT.analyzerFor(state.ex, state.depth, state.level);
+  state.analyzer = isFree() ? new AT.FreeAnalyzer(state.level) : AT.analyzerFor(state.ex, state.depth, state.level);
   state.snap = null; state.flash = null;
   if (state.detector) try { state.detector.reset(); } catch (e) { /* fine */ }
 }
@@ -1004,7 +1132,7 @@ el.sendBox.addEventListener('click', async e => {
     const W = tg(), A = state.analyzer;
     const sets = state.sets.filter(s => s.r > 0).map(s => {
       const f = {}; Object.keys(s.f || {}).sort((a, b) => s.f[b] - s.f[a]).slice(0, 3).forEach(k => { f[k] = s.f[k]; });
-      return { w: weighted() ? s.w : null, r: s.r, n: s.n, c: s.c, f };
+      return isFree() ? { w: weighted() ? s.w : null, r: s.r, n: 0, c: 0, f: {} } : { w: weighted() ? s.w : null, r: s.r, n: s.n, c: s.c, f };
     });
     const payload = JSON.stringify({ v: 2, ex: state.ex, view: (A && A.view) || state.view, sets });
     try { W.sendData(payload); state.sets = []; saveSets(); }
@@ -1122,7 +1250,7 @@ async function loadModelWithUi() {
 }
 function showCameraMode(on) {
   state.on = on;
-  el.howto.hidden = on; el.flip.hidden = !on || !!state.file;
+  el.howto.hidden = on; el.flip.hidden = !on || !!state.file; el.note.hidden = on || !isFree();
   if (on) {
     try { el.howto.pause(); } catch (e) { /* fine */ }
     H.still = 0; H.lastT = -1; H.errors = 0; H.ok = 0;
@@ -1135,7 +1263,8 @@ async function startCamera() {
   stopFile();
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return cameraBlocked();
   let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }); }
+  stopStream();                                   // many phones cannot open the second camera while the first one is busy
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: state.facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }); }
   catch (e) { return cameraBlocked(); }
   stopStream(); state.stream = stream;
   el.vid.muted = true; el.vid.setAttribute('playsinline', ''); el.vid.srcObject = stream;
@@ -1164,7 +1293,21 @@ function cameraBlocked() {
     [{ label: 'Повторить', primary: true, run: () => { hideMsg(); startCamera(); } }, { label: 'Видео из галереи', run: () => { hideMsg(); $('#fileInput').click(); } }]);
 }
 el.stage.addEventListener('click', () => { if (state.on && el.vid.paused) { try { el.vid.play(); } catch (e) { /* fine */ } } });
-el.flip.addEventListener('click', () => { state.facing = state.facing === 'user' ? 'environment' : 'user'; startCamera(); });
+function renderFacing() {
+  for (const b of el.camBtns) b.setAttribute('aria-pressed', String(b.dataset.facing === state.facing));
+  el.camNote.textContent = state.facing === 'user'
+    ? 'Фронтальная — видишь себя и подсказки на экране.'
+    : 'Основная — картинка чётче, но экран смотрит от тебя: подсказки скажу голосом.';
+}
+function setFacing(f) {
+  if (f === state.facing) return;
+  state.facing = f; store.set('aitrainer.v2', Object.assign(prefs, { facing: f }));
+  if (f === 'environment' && !Voice.on && 'speechSynthesis' in window) { Voice.on = true; el.voice.setAttribute('aria-pressed', 'true'); Voice.say('Голос включён', 'on', true); }
+  renderFacing();
+  if (state.on && !state.file) startCamera();
+}
+for (const b of el.camBtns) b.addEventListener('click', () => setFacing(b.dataset.facing));
+el.flip.addEventListener('click', () => setFacing(state.facing === 'user' ? 'environment' : 'user'));
 el.vid.addEventListener('resize', () => { if (el.vid.videoWidth && state.on) setAspect(el.vid.videoWidth, el.vid.videoHeight); });
 let wake = null;
 async function requestWake() { try { wake = await navigator.wakeLock.request('screen'); } catch (e) { wake = null; } }
@@ -1211,7 +1354,7 @@ const mq = window.matchMedia('(prefers-color-scheme: dark)');
 if (mq.addEventListener) mq.addEventListener('change', readColors);
 new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-fillSelect(); setAspect(1, 1); resize(); setExercise(state.ex);
+fillSelect(); setAspect(1, 1); resize(); setExercise(state.ex); renderFacing();
 requestAnimationFrame(loop);
 
 if (window.AI_TRAINER_STANDALONE) {
