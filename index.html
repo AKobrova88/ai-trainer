@@ -1,32 +1,22 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#1d58d6"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ИИ Тренер"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png" type="image/png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style><script>window.AI_TRAINER_STANDALONE=true</script></head><body><title>ИИ Тренер</title>
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#12151f"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ИИ Тренер"><meta name="apple-mobile-web-app-status-bar-style" content="black"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png" type="image/png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>:root{color-scheme:dark;background:#12151f;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style><script>window.AI_TRAINER_STANDALONE=true</script></head><body><title>ИИ Тренер</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Unbounded:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@400;500;600;700&family=Sofia+Sans+Condensed:wght@600;700;800&display=swap">
 <style>
-/* One screen, one job: the exercise, a looping example, the camera with live cues, and the list of sets to save. */
+/* One screen, one job: the exercise, a looping example, the camera with live cues, and the list of sets to save.
+   The camera is always dark — the «Сумерки» theme of the app (tokens: claude/design-system-v1.md), whatever the phone or Telegram theme. */
 :root{
-  --bg:#edf0f3; --surface:#ffffff; --surface-2:#f4f6f8; --ink:#131a22; --muted:#5b6673; --line:#d8dee5;
-  --accent:#1d58d6; --accent-ink:#ffffff; --accent-soft:#e2eafc;
-  --good:#16834a; --good-soft:#dff3e7; --warn:#a96400; --warn-soft:#fbeed6; --bad:#c3352a; --bad-soft:#fbe4e1;
-  --stage:#0c1117; --stage-2:#121a22; --stage-ink:#e9eef3; --stage-dim:#8d99a6; --stage-glass:rgba(10,15,21,.72); --stage-edge:rgba(233,238,243,.14);
-  --stage-accent:#7aa2ff; --stage-good:#3fd28e; --stage-warn:#ffb648; --stage-bad:#ff5f52;
-  --f-display:"Unbounded","Golos Text",system-ui,sans-serif;
-  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
-  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  --r:14px;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#0a0e12; --surface:#121920; --surface-2:#18212a; --ink:#e5eaef; --muted:#95a1ae; --line:#25303b;
-    --accent:#77a0ff; --accent-ink:#0a1222; --accent-soft:#18253d;
-    --good:#43c983; --good-soft:#11301f; --warn:#f0aa3c; --warn-soft:#33260f; --bad:#ff6c60; --bad-soft:#3a1714;
-    color-scheme:dark;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#0a0e12; --surface:#121920; --surface-2:#18212a; --ink:#e5eaef; --muted:#95a1ae; --line:#25303b;
-  --accent:#77a0ff; --accent-ink:#0a1222; --accent-soft:#18253d;
-  --good:#43c983; --good-soft:#11301f; --warn:#f0aa3c; --warn-soft:#33260f; --bad:#ff6c60; --bad-soft:#3a1714;
+  --bg:#12151f; --surface:#1c2131; --surface-2:#252b3e; --surface-3:#2f3750; --ink:#f3efe7; --muted:#a9acbc; --line:#2a3044;
+  --accent:#c3eb6e; --accent-ink:#12151f; --accent-soft:#2b3522;
+  --blue:#9dcbf4; --blue-ink:#12151f; --lime:#c3eb6e; --pink:#f4a9c0; --beige:#e9ddca;
+  --good:#c3eb6e; --good-soft:#222a1f; --warn:#f0b45a; --warn-soft:#33270f; --bad:#f4a9c0; --bad-soft:#3a2333;
+  --stage:#0d1017; --stage-2:#1c2131; --stage-ink:#f3efe7; --stage-dim:#a9acbc; --stage-glass:rgba(18,21,31,.8); --stage-edge:rgba(243,239,231,.14);
+  --stage-accent:#9dcbf4; --stage-bone:#9dcbf4; --stage-good:#c3eb6e; --stage-warn:#f0b45a; --stage-bad:#f4a9c0;
+  --f-display:"Sofia Sans Condensed","Sofia Sans",system-ui,sans-serif;
+  --f-body:"Sofia Sans",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --f-num:"Sofia Sans Condensed","Sofia Sans",system-ui,sans-serif;
+  --f-mono:"Sofia Sans Condensed",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --r:24px;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -105,6 +95,64 @@ button{cursor:pointer}
 .send .main-btn{min-height:50px;font-size:15.5px}
 .add-set{border:1px dashed var(--line);background:transparent;border-radius:12px;padding:9px;color:var(--muted);font-weight:600;font-size:14px}
 .foot{color:var(--muted);font-size:12px;line-height:1.5;margin:4px 2px 0}
+
+/* ---------- «Сумерки»: big type for the gym, error = pink + «!» + words, never colour alone ---------- */
+body{font:400 16px/1.45 var(--f-body)}
+.app{gap:14px}
+.ex label,.camsel>span,.sets h2{font:600 12px/1.2 var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ex select{font:700 26px/1.15 var(--f-display);letter-spacing:0}
+.ex select option{background:var(--surface);color:var(--ink)}
+.icon-btn{width:48px;height:48px;border-radius:15px;border-color:var(--line);background:var(--surface);color:var(--ink)}
+.icon-btn[aria-pressed="true"]{background:var(--blue);color:var(--blue-ink);border-color:var(--blue)}
+.viewer{border-radius:28px;border-color:var(--line)}
+.hud-tr{right:12px;top:12px;border-radius:18px;padding:8px 14px;min-width:86px;text-align:center}
+.repnum{font:800 64px/.9 var(--f-num);color:var(--lime);letter-spacing:-.02em}
+.replabel{font:600 13px/1.2 var(--f-body);letter-spacing:0;text-transform:none;color:var(--beige);margin-top:4px}
+.flip{left:12px;top:12px;width:46px;height:46px;border-radius:15px}
+.stage-note b{font:700 22px/1.2 var(--f-display)}
+.stage-note span{font-size:15px}
+.cue{gap:12px;padding:14px 16px;min-height:72px;background:var(--surface);border-top:1px solid var(--line);color:var(--ink);font:700 21px/1.15 var(--f-display)}
+.cue i{width:32px;height:32px;display:grid;place-items:center;font:800 19px/1 var(--f-num);font-style:normal;color:var(--bg);background:var(--blue)}
+.cue.info i::after,.cue.tip i::after{content:"i"}
+.cue.good{background:var(--good-soft);color:var(--lime)}
+.cue.good i{background:var(--lime)}
+.cue.good i::after{content:"✓"}
+.cue.warn{background:var(--warn-soft);color:#ffffff}
+.cue.warn i{background:var(--warn)}
+.cue.warn i::after{content:"!"}
+.cue.bad{background:var(--bad-soft);color:#ffffff;box-shadow:inset 0 0 0 1.5px var(--pink)}
+.cue.bad i{background:var(--pink)}
+.cue.bad i::after{content:"!"}
+.stage-msg{background:rgba(10,12,20,.66)}
+.msg-card{border-radius:22px;background:var(--surface);border-color:var(--line)}
+.msg-card h3{font:700 21px/1.2 var(--f-display)}
+.msg-card p{color:var(--muted);font-size:15px}
+.msg-actions button{min-height:44px;border-radius:14px;padding:8px 14px;font-size:15px;font-weight:700;border-color:var(--line);color:var(--ink)}
+.msg-actions button.primary{background:var(--lime);border-color:var(--lime);color:var(--bg)}
+.spin{border-top-color:var(--lime)}
+.camtip,.camnote{font-size:14.5px}
+.camsel{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:5px;gap:4px}
+.camsel>span{padding:0 6px 0 10px}
+.camsel button{min-height:46px;border-radius:13px;border:0;background:transparent;color:var(--muted);font-weight:700;font-size:15px}
+.camsel button[aria-pressed="true"]{background:var(--surface-3);color:var(--ink);border:0}
+.main-btn{min-height:60px;border-radius:20px;background:var(--lime);color:var(--bg);font:800 19px/1.1 var(--f-display);letter-spacing:.02em;text-transform:uppercase}
+.main-btn.secondary{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.main-btn.stop{background:var(--lime);color:var(--bg)}
+.sets{border-radius:24px;padding:16px;border-color:var(--line)}
+.set{border-radius:16px;padding:12px;gap:6px 10px}
+.set-n{font:800 22px/1 var(--f-num);color:var(--muted)}
+.set-main{font-size:15.5px}
+.set-main input{width:66px;min-height:44px;border-radius:12px;background:var(--bg);border-color:var(--line);font:700 20px var(--f-num)}
+.set-main input.r{width:54px}
+.set-q{font-size:12.5px;font-weight:700;padding:2px 9px}
+.set-q.good{background:var(--good-soft);color:var(--lime)}
+.set-q.fair{background:var(--warn-soft);color:var(--warn)}
+.set-q.bad{background:var(--bad-soft);color:var(--pink)}
+.set-q.none{background:var(--bg);color:var(--muted)}
+.set-del{min-width:44px;min-height:44px}
+.send .main-btn{min-height:56px;font-size:18px}
+.send .main-btn.secondary{text-transform:none;font:700 15px/1.3 var(--f-body);letter-spacing:0}
+.add-set{min-height:48px;border-radius:16px;font-size:15px}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -945,7 +993,7 @@ el.sel.addEventListener('change', () => setExercise(el.sel.value));
 const ctx = el.cv.getContext('2d');
 const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let C = {};
-function readColors() { C = { ink: cssv('--stage-ink'), dim: cssv('--stage-dim'), good: cssv('--stage-good'), bad: cssv('--stage-bad') }; }
+function readColors() { C = { ink: cssv('--stage-ink'), bone: cssv('--stage-bone') || cssv('--stage-ink'), dim: cssv('--stage-dim'), good: cssv('--stage-good'), bad: cssv('--stage-bad') }; }
 readColors();
 let viewW = 0, viewH = 0;
 function resize() {
@@ -973,7 +1021,7 @@ function draw() {
     const isFar = far.has(a) || far.has(b);
     ctx.strokeStyle = 'rgba(8,12,16,.55)'; ctx.globalAlpha = isFar ? 0.3 : 0.8; ctx.lineWidth = isFar ? 4.5 : 6;
     ctx.beginPath(); ctx.moveTo(X(P), Y(P)); ctx.lineTo(X(Q), Y(Q)); ctx.stroke();
-    ctx.strokeStyle = C.ink; ctx.globalAlpha = isFar ? 0.32 : 0.9; ctx.lineWidth = isFar ? 2 : 3;
+    ctx.strokeStyle = C.bone; ctx.globalAlpha = isFar ? 0.32 : 0.95; ctx.lineWidth = isFar ? 2 : 3.5;
     ctx.beginPath(); ctx.moveTo(X(P), Y(P)); ctx.lineTo(X(Q), Y(Q)); ctx.stroke();
   }
   ctx.globalAlpha = 1;
@@ -1169,7 +1217,7 @@ function missingHint(kp) {
 }
 function cueState() {
   const snap = state.snap, now = performance.now(), A = state.analyzer;
-  if (!state.on) return state.flash && state.flash.until > now ? state.flash : { cls: 'good', text: '💡 ' + info().tips[0] };
+  if (!state.on) return state.flash && state.flash.until > now ? state.flash : { cls: 'tip', text: info().tips[0] };
   if (!snap) return { cls: 'info', text: state.detector ? 'Включаю камеру…' : 'Готовлю тренера…' };
   if (snap.status === 'nobody') return { cls: 'info', text: missingHint(state.frame && state.frame.kp) };
   if (snap.live.length) { const m = A.meta(snap.live[0]); return { cls: m.pen >= 25 ? 'bad' : 'warn', text: m.cue }; }
@@ -1369,9 +1417,10 @@ if (IN_TG) {
     const W = window.Telegram && window.Telegram.WebApp; if (!W) return;
     const call = (f, ...a) => { try { if (typeof W[f] === 'function') W[f](...a); } catch (e) { /* older Telegram */ } };
     const atLeast = v => { try { return W.isVersionAtLeast(v); } catch (e) { return false; } };
-    const theme = () => {
-      document.documentElement.setAttribute('data-theme', W.colorScheme === 'dark' ? 'dark' : 'light');
+    const theme = () => {   /* the camera stays dark («Сумерки») in any Telegram theme */
+      document.documentElement.setAttribute('data-theme', 'dark');
       if (atLeast('6.9')) { const bg = cssv('--bg'); call('setHeaderColor', bg); call('setBackgroundColor', bg); }
+      if (atLeast('7.10')) call('setBottomBarColor', cssv('--bg'));
     };
     call('ready'); call('expand');
     if (atLeast('7.7')) call('disableVerticalSwipes');
