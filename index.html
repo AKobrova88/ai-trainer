@@ -65,7 +65,7 @@ button{cursor:pointer}
 .stage-msg{position:absolute;inset:0;z-index:3;display:grid;place-items:center;padding:18px;background:rgba(8,12,16,.62)}
 .msg-card{max-width:380px;background:var(--stage-2);border:1px solid var(--stage-edge);border-radius:14px;padding:16px;color:var(--stage-ink)}
 .msg-card h3{margin:0 0 6px;font:600 16px/1.3 var(--f-body)}
-.msg-card p{margin:0;color:var(--stage-dim);font-size:13.5px}
+.msg-card p{margin:0;color:var(--stage-dim);font-size:13.5px;white-space:pre-line;text-align:left}
 .msg-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .msg-actions button{border:1px solid var(--stage-edge);background:transparent;color:var(--stage-ink);border-radius:10px;padding:8px 12px;font-weight:600;font-size:13.5px}
 .msg-actions button.primary{background:var(--stage-accent);border-color:var(--stage-accent);color:#0a1222}
@@ -163,12 +163,24 @@ body{font:400 16px/1.45 var(--f-body)}
 .plan-chips button[aria-pressed="true"]{background:var(--blue);color:var(--blue-ink);border-color:var(--blue)}
 .plan-chips b{font:800 15px/1 var(--f-num);background:var(--surface-3);color:var(--ink);border-radius:999px;padding:3px 8px;flex:none}
 .plan-chips button[aria-pressed="true"] b{background:rgba(18,21,31,.16);color:var(--blue-ink)}
-.alt{display:flex;align-items:center;gap:12px;min-height:54px;padding:6px 8px 6px 14px;border-radius:18px;background:var(--surface);border:1px solid var(--line);text-align:left;width:100%;color:var(--ink)}
-.alt span{flex:1;font-size:15px;line-height:1.3;font-weight:600}
-.alt i{width:52px;height:32px;border-radius:999px;background:var(--surface-3);padding:3px;display:flex;flex:none}
-.alt i::after{content:"";width:26px;height:26px;border-radius:50%;background:var(--muted);transition:transform .15s}
-.alt[aria-checked="true"] i{background:var(--lime)}
-.alt[aria-checked="true"] i::after{background:var(--bg);transform:translateX(20px)}
+.plan-chips .lb{font:800 13px/1 var(--f-num);color:var(--muted);flex:none}
+.plan-chips button[aria-pressed="true"] .lb{color:var(--blue-ink);opacity:.7}
+.plan-chips button.ss{border-color:var(--lime)}
+.plan-chips button.fin .nm{opacity:.55}
+.plan-info{font-size:14px;line-height:1.35;color:var(--muted);margin:0}
+.plan-info b{color:var(--lime);font-weight:700}
+.alt-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:-4px}
+.sub-btn{min-height:48px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:650;font-size:14px;line-height:1.25;padding:6px 10px;display:flex;align-items:center;justify-content:center;gap:7px;text-align:center}
+.sub-btn svg{width:18px;height:18px;flex:none}
+.main-btn.rec{background:#e5484d;color:#fff}
+.voicesel{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:14px;color:var(--muted)}
+.voicesel select{min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;padding:0 10px;min-width:0}
+.voicesel button{min-height:44px;min-width:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700}
+.alt-btns[hidden],.sub-btn[hidden],.voicesel[hidden]{display:none}
+.stage.msg-open{min-height:min(620px,88vh);max-height:none}
+.stage-msg{overflow-y:auto}
+.msg-actions{flex-wrap:wrap}
+.alt-btns:has(.sub-btn[hidden]){grid-template-columns:1fr}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -187,7 +199,7 @@ body{font:400 16px/1.45 var(--f-body)}
   <section class="plan" id="planBox" hidden aria-label="Упражнения тренировки">
     <div class="plan-h">Тренировка сегодня — нажми, чтобы переключить</div>
     <div class="plan-chips" id="planChips"></div>
-    <button class="alt" id="altBtn" type="button" role="switch" aria-checked="false"><span id="altText"></span><i></i></button>
+    <p class="plan-info" id="planInfo" hidden></p>
   </section>
 
   <section class="viewer" aria-label="Камера">
@@ -213,6 +225,11 @@ body{font:400 16px/1.45 var(--f-body)}
   <p class="camnote" id="camNote"></p>
 
   <button class="main-btn" id="mainBtn" type="button"></button>
+  <div class="alt-btns" id="altBtns">
+    <button class="sub-btn" id="recBtn" type="button"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="3" fill="currentColor"/></svg>Снять на видео, разбор после</button>
+    <button class="sub-btn" id="vidBtn" type="button"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M8.5 7.8v4.4l3.6-2.2z" fill="currentColor"/></svg>Разобрать видео из галереи</button>
+  </div>
+  <label class="voicesel" id="voiceRow" hidden><span>Голос</span><select id="voiceSel" aria-label="Голос тренера"></select><button type="button" id="voiceTest" aria-label="Послушать голос">▶</button></label>
 
   <section class="sets" id="setsBox" hidden aria-label="Подходы">
     <h2 id="setsTitle">Подходы</h2>
@@ -585,6 +602,11 @@ class GenericAnalyzer extends BaseAnalyzer {
       if (sc(sh) <= 0.5 || sc(hip) <= 0.5) return null;
       return Math.atan2(hip.y - sh.y, Math.abs(sh.x - hip.x) + 1e-6) * DEG;
     }
+    if (kind === 'gap') {
+      const j = J[sig[1]], a = kp[SIDE.l[j]], b = kp[SIDE.r[j]], s1 = kp[11], s2 = kp[12];
+      if (sc(a) <= 0.5 || sc(b) <= 0.5 || sc(s1) <= 0.5 || sc(s2) <= 0.5) return null;
+      return Math.abs(a.x - b.x) / Math.max(1.0, Math.abs(s1.x - s2.x));
+    }
     throw new Error(kind);
   }
   trunkLen(kp) { const S = SIDE[this.side]; return Math.max(1.0, dist(kp[S.sh], kp[S.hip])); }
@@ -764,6 +786,7 @@ class GenericAnalyzer extends BaseAnalyzer {
     if (kind === 'abd') return [13, 14];
     if (kind === 'height') return [S[J[sig[1]]]];
     if (kind === 'incline') return [S.sh, S.hip];
+    if (kind === 'gap') { const j = J[sig[1]]; return [SIDE.l[j], SIDE.r[j]]; }
     return [];
   }
   joints(fid) {
@@ -890,7 +913,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = AT;
 <script>
 (() => {
 'use strict';
-const EX = {"tone": {"praise": ["Отлично!", "Чисто сделано 👏", "Мощно 💪", "Красиво!", "Так держать!", "Ровно и под контролем — супер.", "Вот это техника!", "Хороший подход 👍"], "good": ["Отличный подход: техника держится от первого до последнего повтора.", "Чисто! Так и продолжай.", "Ровно, спокойно, под контролем — образцовый подход.", "Красиво сделано. Мышцы сказали спасибо 💪"], "ok": ["Хороший подход! Чуть подшлифуем: {cue}.", "Неплохо! В следующем подходе обрати внимание: {cue}.", "Почти идеально. Одна подсказка: {cue}."], "hard": ["Не страшно — техника приходит с повторениями. Главное сейчас: {cue}.", "Давай поправим: {cue}. Если тяжело держать технику — возьми вес полегче.", "Бывает! Сосредоточься на одном: {cue}. Остальное подтянется."], "jokes": ["Гравитация сегодня проиграла.", "Штанга тебя запомнила 😄", "Диван сегодня скучает без тебя.", "Гантели начинают тебя уважать.", "Ещё пара таких тренировок — и тренажёры будут здороваться первыми.", "Отдыхай, но не как сериал «ещё одна серия» 😉", "Где-то в мире одна гантель только что вздохнула с облегчением."], "joke_p": 0.22}, "faults": {"shallow": {"title": "Недостаточная глубина", "cue": "Садись глубже", "pen": 30, "why": "Таз не опустился до заданной глубины, бедро осталось выше параллели. Ягодичные и задняя поверхность бедра получают меньше работы.", "fix": "Опускайся, пока тазобедренный сустав не окажется на уровне колена. Если мешает подвижность или вес — облегчи снаряд.", "drill": "Присед на бокс или скамью нужной высоты, 3×8 с паузой 1–2 с внизу."}, "lean": {"title": "Корпус падает вперёд", "cue": "Грудь выше", "pen": 20, "why": "Корпус наклонён заметно сильнее голени. Нагрузка смещается на поясницу, вес уходит на носки.", "fix": "Держи грудь выше и корпус примерно параллельно голени. Пусть колени уходят вперёд, пятки остаются на полу.", "drill": "Гоблет-присед с гантелью у груди 3×8–10, вес ниже рабочего."}, "heels": {"title": "Пятки отрываются", "cue": "Пятки на пол", "pen": 20, "why": "Пятки поднимаются от пола — чаще всего не хватает подвижности голеностопа.", "fix": "Дави всей стопой, вес на середину стопы. Временно можно подложить 1–2 см под пятки или надеть штангетки.", "drill": "Мобилизация голеностопа «колено к стене», 2×10 на ногу перед тренировкой."}, "valgus": {"title": "Колени сводятся внутрь", "cue": "Колени наружу", "pen": 30, "why": "Колени уходят внутрь относительно стоп. Обычно связано со слабостью средней ягодичной мышцы и повышает нагрузку на колено.", "fix": "Направляй колени по линии второго-третьего пальца стопы, носки слегка развёрнуты наружу (15–30°).", "drill": "Присед с мини-бэндом над коленями 2×12 и «ракушка» лёжа на боку 2×15 на сторону."}, "shift": {"title": "Перекос на одну ногу", "cue": "Вес на обе ноги", "pen": 15, "why": "Таз смещается в сторону — одна нога берёт на себя больше нагрузки.", "fix": "Поставь стопы симметрично и дави в пол обеими ногами одинаково.", "drill": "Болгарские сплит-приседания 2×8 на ногу, начинай со слабой стороны."}, "fast": {"title": "Слишком быстрый спуск", "cue": "Опускайся медленнее", "pen": 10, "why": "Спуск занимает меньше 0,6 с — это падение, а не контролируемое опускание.", "fix": "Опускайся 2–3 секунды, без рывка в нижней точке.", "drill": "Темповые приседания 3-1-1: три секунды вниз, пауза, подъём."}, "lockout": {"title": "Неполное выпрямление", "cue": "Выпрямись до конца", "pen": 10, "why": "Наверху колени и таз не выпрямились полностью — повтор неполный.", "fix": "Вставай до прямых коленей и таза, сожми ягодицы в верхней точке.", "drill": "Ягодичный мост 3×12 с паузой 2 с наверху."}, "sag": {"title": "Провис таза", "cue": "Подними таз", "pen": 30, "why": "Таз опускается ниже линии плечи–стопы: пресс и ягодицы не держат корпус, нагружается поясница.", "fix": "Напряги пресс и ягодицы, тело — одна прямая от головы до пяток.", "drill": "Планка 3×30–45 с; отжимания от скамьи с идеальной линией тела."}, "pike": {"title": "Таз задран вверх", "cue": "Опусти таз", "pen": 15, "why": "Таз поднят выше линии тела, амплитуда в плечах уменьшается.", "fix": "Опусти таз до прямой линии от плеч до стоп.", "drill": "Планка с контролем положения таза 3×30 с, отжимания с паузой у пола."}, "pu_shallow": {"title": "Неполная амплитуда", "cue": "Опустись ниже", "pen": 30, "why": "Локти не сгибаются до нужного угла, грудь не доходит вниз — грудные мышцы работают меньше.", "fix": "Опускайся, пока локоть не согнётся до 90° и грудь не окажется в 5–10 см от пола.", "drill": "Негативные отжимания 3×5 со спуском 3–4 с или отжимания от возвышения на полную амплитуду."}, "head": {"title": "Голова опущена", "cue": "Голову ровно", "pen": 10, "why": "Голова провисает ниже линии корпуса, шея выходит из нейтрального положения.", "fix": "Смотри в пол на 20–30 см перед ладонями, затылок в одну линию со спиной.", "drill": "Отжимания с записью сбоку или у зеркала, 2×8 в медленном темпе."}, "pu_lockout": {"title": "Руки не выпрямлены", "cue": "Выпрями руки", "pen": 10, "why": "Наверху локти остаются согнутыми — повтор неполный.", "fix": "Выжимай себя до прямых рук, без резкого замыкания локтей.", "drill": "Удержание упора на прямых руках 3×20 с."}, "pu_fast": {"title": "Слишком быстрый спуск", "cue": "Медленнее вниз", "pen": 10, "why": "Спуск короче 0,45 с — тело падает, а не опускается.", "fix": "Опускайся 1,5–2 секунды.", "drill": "Отжимания в темпе 3-0-1."}}, "specs": {"leg_press": {"view": "side", "sig": ["angle", "knee"], "dir": -1, "amp": 55, "ecc": "first", "checks": [["rom", "<=", 105, "Опускай до угла 90° в колене"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "rdl_bb": {"view": "side", "sig": ["angle", "hip"], "dir": -1, "amp": 55, "ecc": "first", "checks": [["romrel", 0.75, "Наклонись ниже, таз назад"], ["still", ["angle", "knee"], 25, "Колени почти не сгибай"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "rdl_db": {"view": "side", "sig": ["angle", "hip"], "dir": -1, "amp": 55, "ecc": "first", "checks": [["romrel", 0.75, "Наклонись ниже, таз назад"], ["still", ["angle", "knee"], 25, "Колени почти не сгибай"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "hip_thrust": {"view": "side", "sig": ["angle", "hip"], "dir": 1, "amp": 35, "ecc": "second", "checks": [["rom", ">=", 158, "Таз выше — до прямой линии"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "glute_bridge": {"view": "side", "sig": ["angle", "hip"], "dir": 1, "amp": 25, "ecc": "second", "checks": [["rom", ">=", 158, "Таз выше — до прямой линии"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "glute_bridge_db": {"view": "side", "sig": ["angle", "hip"], "dir": 1, "amp": 25, "ecc": "second", "checks": [["rom", ">=", 158, "Таз выше — до прямой линии"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "sl_glute_bridge": {"view": "side", "sig": ["angle", "hip"], "dir": 1, "amp": 25, "ecc": "second", "checks": [["rom", ">=", 155, "Таз выше — до прямой линии"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "leg_curl": {"view": "side", "sig": ["angle", "knee"], "dir": -1, "amp": 60, "ecc": "second", "checks": [["rom", "<=", 100, "Сгибай ноги до конца"], ["tempo", 1.0, "Опускай медленнее"]]}, "calf_raise": {"view": "side", "sig": ["angle", "ankle"], "dir": 1, "amp": 25, "ecc": "second", "checks": [["romrel", 0.7, "Поднимайся выше на носки"], ["tempo", 0.8, "Медленнее, под контролем"], ["hold", 0.4, "Задержись наверху на секунду"]]}, "calf_raise_db": {"view": "side", "sig": ["angle", "ankle"], "dir": 1, "amp": 25, "ecc": "second", "checks": [["romrel", 0.7, "Поднимайся выше на носки"], ["tempo", 0.8, "Медленнее, под контролем"], ["hold", 0.4, "Задержись наверху на секунду"]]}, "calf_raise_bw": {"view": "side", "sig": ["angle", "ankle"], "dir": 1, "amp": 25, "ecc": "second", "checks": [["romrel", 0.7, "Поднимайся выше на носки"], ["tempo", 0.8, "Медленнее, под контролем"], ["hold", 0.4, "Задержись наверху на секунду"]]}, "split_squat_db": {"view": "side", "sig": ["angle2", "knee"], "dir": -1, "amp": 55, "ecc": "first", "checks": [["rom", "<=", 112, "Опускайся ниже, заднее колено к полу"], ["still", ["incline"], 15, "Корпус держи ровно"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "bulgarian": {"view": "side", "sig": ["angle2", "knee"], "dir": -1, "amp": 50, "ecc": "first", "checks": [["rom", "<=", 115, "Опускайся ниже"], ["still", ["incline"], 15, "Корпус держи ровно"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "reverse_lunge": {"view": "side", "sig": ["angle2", "knee"], "dir": -1, "amp": 50, "ecc": "first", "checks": [["rom", "<=", 115, "Заднее колено ближе к полу"], ["still", ["incline"], 18, "Корпус держи ровно"]]}, "step_up": {"view": "side", "sig": ["height", "hip"], "dir": 1, "amp": 0.6, "ecc": "second", "checks": [["still", ["incline"], 25, "Не наклоняйся сильно вперёд"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "step_up_db": {"view": "side", "sig": ["height", "hip"], "dir": 1, "amp": 0.5, "ecc": "second", "checks": [["still", ["incline"], 25, "Не наклоняйся сильно вперёд"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "step_up_bw": {"view": "side", "sig": ["height", "hip"], "dir": 1, "amp": 0.4, "ecc": "second", "checks": [["still", ["incline"], 25, "Не наклоняйся сильно вперёд"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "bench": {"view": "side", "sig": ["angle", "elbow"], "dir": -1, "amp": 60, "ecc": "first", "checks": [["rom", "<=", 100, "Опускай гриф ниже, к груди"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "db_bench_neutral": {"view": "side", "sig": ["angle", "elbow"], "dir": -1, "amp": 60, "ecc": "first", "checks": [["rom", "<=", 100, "Опускай гантели ниже"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "db_floor_press": {"view": "side", "sig": ["angle", "elbow"], "dir": -1, "amp": 55, "ecc": "first", "checks": [["rom", "<=", 105, "Опускай, пока локти не коснутся пола"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "pike_pushup": {"view": "side", "sig": ["angle", "elbow"], "dir": -1, "amp": 45, "ecc": "first", "checks": [["rom", "<=", 120, "Опускай голову ниже"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "db_ohp": {"view": "side", "sig": ["angle", "elbow"], "dir": 1, "amp": 60, "ecc": "second", "checks": [["rom", ">=", 145, "Выжимай до прямых рук"], ["still", ["incline"], 10, "Не прогибайся назад"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "landmine": {"view": "side", "sig": ["angle", "elbow"], "dir": 1, "amp": 55, "ecc": "second", "checks": [["rom", ">=", 140, "Выжимай дальше, до прямой руки"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "pushdown": {"view": "side", "sig": ["angle", "elbow"], "dir": 1, "amp": 60, "ecc": "second", "checks": [["rom", ">=", 150, "Разгибай руки до конца"], ["still", ["angle", "shoulder"], 18, "Локти неподвижно у корпуса"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "db_ext": {"view": "side", "sig": ["angle", "elbow"], "dir": -1, "amp": 70, "ecc": "first", "checks": [["rom", "<=", 90, "Опускай гантель ниже за голову"], ["still", ["angle", "shoulder"], 20, "Локти смотрят вверх, не разводи"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "cable_row": {"view": "side", "sig": ["angle", "elbow"], "dir": -1, "amp": 60, "ecc": "second", "checks": [["rom", "<=", 105, "Тяни до конца, локти назад"], ["still", ["incline"], 15, "Не раскачивай корпус"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "chest_row": {"view": "side", "sig": ["angle", "elbow"], "dir": -1, "amp": 60, "ecc": "second", "checks": [["rom", "<=", 105, "Тяни до конца, локти назад"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "bb_row": {"view": "side", "sig": ["angle", "elbow"], "dir": -1, "amp": 60, "ecc": "second", "checks": [["rom", "<=", 110, "Тяни гриф к животу"], ["still", ["incline"], 12, "Держи наклон, не выпрямляйся"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "db_row": {"view": "side", "sig": ["angle", "elbow"], "dir": -1, "amp": 60, "ecc": "second", "checks": [["rom", "<=", 110, "Тяни локоть выше, к тазу"], ["still", ["incline"], 12, "Спина ровная, без поворота"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "table_row": {"view": "side", "sig": ["angle", "elbow"], "dir": -1, "amp": 55, "ecc": "second", "checks": [["rom", "<=", 110, "Тяни грудь выше, к краю"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "towel_row": {"view": "side", "sig": ["angle", "elbow"], "dir": -1, "amp": 50, "ecc": "second", "checks": [["rom", "<=", 115, "Подтягивайся ближе к двери"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "lat_pulldown": {"view": "any", "sig": ["angle", "elbow"], "dir": -1, "amp": 65, "ecc": "second", "checks": [["rom", "<=", 95, "Тяни гриф ниже, к груди"], ["still", ["incline"], 15, "Без рывков корпусом"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "pullup": {"view": "any", "sig": ["angle", "elbow"], "dir": -1, "amp": 65, "ecc": "second", "checks": [["rom", "<=", 90, "Подтянись выше, грудь к перекладине"], ["tempo", 0.8, "Опускайся плавно"]]}, "assisted_pullup": {"view": "any", "sig": ["angle", "elbow"], "dir": -1, "amp": 65, "ecc": "second", "checks": [["rom", "<=", 90, "Подтянись выше"], ["tempo", 0.8, "Опускайся плавно"]]}, "db_pullover": {"view": "side", "sig": ["angle", "shoulder"], "dir": 1, "amp": 50, "ecc": "first", "checks": [["romrel", 0.7, "Опускай гантель дальше за голову"], ["still", ["angle", "elbow"], 25, "Руки почти прямые"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "face_pull": {"view": "side", "sig": ["angle", "elbow"], "dir": -1, "amp": 60, "ecc": "second", "checks": [["rom", "<=", 100, "Тяни канат к лицу до конца"], ["still", ["incline"], 12, "Не отклоняйся назад"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "lateral_raise": {"view": "front", "sig": ["abd"], "dir": 1, "amp": 55, "ecc": "second", "checks": [["rom", ">=", 70, "Поднимай до уровня плеч"], ["max", 110, "Не выше плеч"], ["sym", 0.18, "Поднимай руки одинаково"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "db_rear_fly": {"view": "front", "sig": ["abd"], "dir": 1, "amp": 50, "ecc": "second", "checks": [["rom", ">=", 60, "Разводи руки шире, до уровня спины"], ["sym", 0.2, "Разводи руки одинаково"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "db_curl": {"view": "side", "sig": ["angle", "elbow"], "dir": -1, "amp": 80, "ecc": "second", "checks": [["rom", "<=", 70, "Поднимай гантели выше, к плечам"], ["still", ["angle", "shoulder"], 22, "Локти прижаты к бокам"], ["still", ["incline"], 10, "Без раскачки корпусом"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "superman": {"view": "side", "sig": ["incline"], "dir": 1, "amp": 8, "ecc": "second", "checks": [["hold", 1.0, "Задержись наверху на 2 секунды"]]}, "bird_dog": {"view": "side", "sig": ["anglemax", "shoulder"], "dir": 1, "amp": 55, "ecc": "second", "checks": [["romrel", 0.75, "Тянись рукой дальше вперёд"], ["still", ["incline"], 12, "Спина ровная, таз не поворачивай"], ["hold", 1.0, "Задержись на 2 секунды"]]}, "dead_bug": {"view": "side", "sig": ["anglemax", "shoulder"], "dir": 1, "amp": 55, "ecc": "second", "checks": [["romrel", 0.75, "Опускай руку дальше за голову"], ["tempo", 0.8, "Медленнее, под контролем"]]}, "pallof": {"view": "side", "sig": ["angle", "elbow"], "dir": 1, "amp": 60, "ecc": "second", "checks": [["rom", ">=", 145, "Выжимай рукоять до прямых рук"], ["still", ["incline"], 10, "Корпус не поворачивай"], ["hold", 1.0, "Задержись с прямыми руками"]]}, "plank": {"view": "side", "hold": true, "line_ok": 163, "cue_sag": "Подними таз — тело в линию", "cue_pike": "Опусти таз — тело в линию", "target": "30–45 с"}, "side_plank": {"view": "side", "hold": true, "line_ok": 163, "cue_sag": "Подними таз выше", "cue_pike": "Таз чуть ниже — тело в линию", "target": "20–40 с"}}, "squat": {"back_squat": "parallel", "box_squat": "half", "goblet": "parallel", "bw_squat": "parallel", "goblet_box": "half", "chair_squat": "half", "squat": "parallel"}, "pushup": {"pushup": false, "pushup_incline": true}, "titles": {"rom": "Неполная амплитуда", "short": "Повтор короче", "line": "Линия тела", "still": "Лишнее движение", "range": "Положение корпуса", "max": "Слишком высоко", "sym": "Руки неодинаково", "tempo": "Слишком быстро", "hold": "Нет паузы"}, "pen": {"rom": 30, "short": 20, "line": 30, "still": 20, "range": 15, "max": 15, "sym": 15, "tempo": 10, "hold": 10}, "cam": {"side": "Поставь телефон сбоку в 2–3 м, чтобы было видно всё тело", "front": "Встань лицом к телефону в 2–3 м, всё тело в кадре"}, "ex": {"back_squat": {"name": "Приседания со штангой", "view": "any", "tips": ["Гриф на верх спины, корпус жёсткий", "Колени смотрят туда же, куда носки", "Таз до уровня колен, пятки на полу"], "inc": "bb_lower"}, "box_squat": {"name": "Приседания на бокс (до параллели)", "view": "any", "tips": ["Садись назад на бокс, не плюхайся", "Голень почти вертикально", "Вставай через пятки"], "inc": "bb_lower"}, "leg_press": {"name": "Жим ногами", "view": "side", "tips": ["Поясница прижата к спинке", "Опускай до угла 90° в колене", "Не выпрямляй колени до щелчка"], "inc": "machine"}, "rdl_bb": {"name": "Румынская тяга со штангой", "view": "side", "tips": ["Таз назад, колени чуть согнуты", "Спина прямая всё время", "Гриф скользит по ногам"], "inc": "bb_lower"}, "hip_thrust": {"name": "Ягодичный мост со штангой", "view": "side", "tips": ["Лопатки на скамье, подбородок к груди", "Толкай таз вверх пятками", "Наверху — прямая от плеч до колен"], "inc": "bb_lower"}, "bench": {"name": "Жим штанги лёжа", "view": "side", "tips": ["Лопатки сведены, ноги упёрты в пол", "Гриф опускай к низу груди", "Локти под 45° к телу"], "inc": "bb_upper"}, "db_bench_neutral": {"name": "Жим гантелей лёжа нейтральным хватом", "view": "side", "tips": ["Ладони смотрят друг на друга", "Локти ближе к корпусу", "Опускай до груди, жми вверх"], "inc": "db"}, "cable_row": {"name": "Тяга горизонтального блока", "view": "side", "tips": ["Спина прямая, грудь вперёд", "Тяни локтями к поясу", "В конце сведи лопатки"], "inc": "machine"}, "chest_row": {"name": "Тяга в тренажёре с упором грудью", "view": "side", "tips": ["Грудь прижата к упору", "Тяни локти назад", "Плечи вниз, не к ушам"], "inc": "machine"}, "bb_row": {"name": "Тяга штанги в наклоне", "view": "side", "tips": ["Наклон 30–45°, спина прямая", "Тяни гриф к низу живота", "Локти вдоль тела, назад"], "inc": "bb_upper"}, "db_ohp": {"name": "Жим гантелей сидя", "view": "side", "tips": ["Спина прижата к спинке", "Жми вверх и чуть вперёд", "Не прогибай поясницу"], "inc": "db"}, "landmine": {"name": "Жим штанги одной рукой в упоре (лэндмайн)", "view": "side", "tips": ["Ноги в шаге, корпус чуть вперёд", "Жми вверх-вперёд по дуге", "Пресс напряжён, без прогиба"], "inc": "bb_upper"}, "lat_pulldown": {"name": "Тяга верхнего блока к груди", "view": "side", "tips": ["Плечи вниз, грудь вперёд", "Тяни гриф к верху груди", "Без рывков корпусом"], "inc": "machine"}, "assisted_pullup": {"name": "Подтягивания в гравитроне", "view": "side", "tips": ["Колени на платформе — она помогает", "Тяни грудь к рукояткам", "Опускайся до прямых рук"], "inc": "machine"}, "pullup": {"name": "Подтягивания", "view": "side", "tips": ["Начни с опускания плеч", "Тяни грудь к перекладине", "Опускайся до прямых рук"], "inc": "bw"}, "bulgarian": {"name": "Болгарские сплит-приседания с гантелями", "view": "side", "tips": ["Задняя нога на скамье", "Опускайся вниз, а не вперёд", "Колено передней ноги — по носку"], "inc": "db"}, "step_up": {"name": "Зашагивания на платформу с гантелями", "view": "side", "tips": ["Вся стопа на платформе", "Вставай за счёт передней ноги", "Опускайся медленно"], "inc": "db"}, "leg_curl": {"name": "Сгибания ног в тренажёре", "view": "side", "tips": ["Таз прижат к скамье", "Сгибай ноги до упора", "Опускай медленно, 2–3 с"], "inc": "machine"}, "calf_raise": {"name": "Подъёмы на носки стоя", "view": "side", "tips": ["Носки на краю ступеньки", "Поднимись высоко, пауза 1 с", "Опускай пятки ниже края"], "inc": "machine"}, "face_pull": {"name": "Тяга каната к лицу", "view": "side", "tips": ["Трос на уровне лица", "Тяни к ушам, локти высоко", "В конце сведи лопатки"], "inc": "machine"}, "lateral_raise": {"name": "Махи гантелями в стороны", "view": "front", "tips": ["Локти чуть согнуты", "Поднимай до уровня плеч", "Плечи вниз, без раскачки"], "inc": "db"}, "db_curl": {"name": "Сгибания рук с гантелями", "view": "side", "tips": ["Локти прижаты к бокам", "Поднимай без раскачки", "Опускай до прямой руки"], "inc": "db"}, "pushdown": {"name": "Разгибания рук на блоке", "view": "side", "tips": ["Локти неподвижны у корпуса", "Разгибай руки до конца", "Вверх — медленно"], "inc": "machine"}, "pallof": {"name": "Паллоф-пресс", "view": "side", "tips": ["Трос сбоку, стой ровно", "Выжми рукоять от груди вперёд", "Не давай корпусу повернуться"], "inc": "machine"}, "goblet": {"name": "Гоблет-присед с гантелью", "view": "any", "tips": ["Гантель у груди, локти вниз", "Колени по линии носков", "Таз до параллели, спина прямая"], "inc": "db"}, "goblet_box": {"name": "Гоблет-присед на стул", "view": "any", "tips": ["Садись на край стула, не расслабляясь", "Колени по линии носков", "Вставай через пятки"], "inc": "db"}, "rdl_db": {"name": "Румынская тяга с гантелями", "view": "side", "tips": ["Таз назад, колени чуть согнуты", "Спина прямая всё время", "Гантели вдоль ног"], "inc": "db"}, "glute_bridge_db": {"name": "Ягодичный мост с гантелью", "view": "side", "tips": ["Держи гантель на тазу", "Толкай таз вверх пятками", "Наверху сожми ягодицы"], "inc": "db"}, "db_floor_press": {"name": "Жим гантелей лёжа на полу", "view": "side", "tips": ["Лопатки на полу, колени согнуты", "Опускай, пока локти не коснутся пола", "Жми вверх на выдохе"], "inc": "db"}, "db_row": {"name": "Тяга гантели одной рукой с опорой", "view": "side", "tips": ["Колено и рука на скамье, спина ровная", "Тяни локоть к тазу", "Опускай до прямой руки"], "inc": "db"}, "db_pullover": {"name": "Пуловер с гантелью лёжа", "view": "side", "tips": ["Лопатки на скамье, руки чуть согнуты", "Опускай гантель за голову по дуге", "Поднимай до уровня груди"], "inc": "db"}, "db_rear_fly": {"name": "Разведения гантелей в наклоне", "view": "front", "tips": ["Наклонись, спина ровная", "Разводи руки в стороны", "Наверху сведи лопатки"], "inc": "db"}, "split_squat_db": {"name": "Сплит-приседания с гантелями", "view": "side", "tips": ["Длинный шаг, корпус прямо", "Опускай заднее колено к полу", "Переднее колено над стопой"], "inc": "db"}, "step_up_db": {"name": "Зашагивания на ступеньку с гантелями", "view": "side", "tips": ["Вся стопа на платформе", "Вставай за счёт передней ноги", "Опускайся медленно"], "inc": "db"}, "calf_raise_db": {"name": "Подъёмы на носки с гантелями", "view": "side", "tips": ["Носки на краю ступеньки", "Поднимись высоко, пауза 1 с", "Опускай пятки ниже края"], "inc": "db"}, "db_ext": {"name": "Французский жим гантели", "view": "side", "tips": ["Локти смотрят вверх", "Опускай гантель за голову", "Разгибай руки до конца"], "inc": "db"}, "bw_squat": {"name": "Приседания", "view": "any", "tips": ["Руки вперёд для баланса", "Таз назад и вниз до параллели", "Пятки на полу, колени по носкам"], "inc": "bw"}, "chair_squat": {"name": "Приседания на стул", "view": "any", "tips": ["Коснись стула тазом и вставай", "Руки вперёд для баланса", "Пятки на полу"], "inc": "bw"}, "glute_bridge": {"name": "Ягодичный мост", "view": "side", "tips": ["Стопы ближе к тазу", "Толкай таз вверх пятками", "Наверху сожми ягодицы"], "inc": "bw"}, "sl_glute_bridge": {"name": "Ягодичный мост на одной ноге", "view": "side", "tips": ["Вторая нога прямая, в линию с телом", "Толкай таз пяткой опорной ноги", "Таз не перекашивай"], "inc": "bw"}, "pushup": {"name": "Отжимания", "view": "side", "tips": ["Тело — одна прямая линия", "Локти назад под 45°", "Грудь почти до пола"], "inc": "bw"}, "pushup_incline": {"name": "Отжимания от опоры", "view": "side", "tips": ["Руки на опоре чуть шире плеч", "Тело прямое от головы до пяток", "Грудь к краю опоры"], "inc": "bw"}, "table_row": {"name": "Тяга под столом (австралийские подтягивания)", "view": "side", "tips": ["Тело прямое, пятки на полу", "Тяни грудь к краю стола", "Наверху сведи лопатки"], "inc": "bw"}, "towel_row": {"name": "Тяга полотенца в дверном проёме", "view": "side", "tips": ["Стопы у двери, тело прямое", "Тяни грудь к двери", "Медленно отклоняйся назад"], "inc": "bw"}, "pike_pushup": {"name": "Отжимания уголком", "view": "side", "tips": ["Таз высоко, тело «домиком»", "Опускай голову между ладонями", "Локти назад, не в стороны"], "inc": "bw"}, "superman": {"name": "Супермен лёжа", "view": "side", "tips": ["Подними грудь и руки", "Ноги тоже чуть вверх", "Смотри в пол, шея ровно"], "inc": "bw"}, "reverse_lunge": {"name": "Обратные выпады", "view": "side", "tips": ["Шаг назад, корпус прямо", "Заднее колено почти до пола", "Встань через пятку передней ноги"], "inc": "bw"}, "step_up_bw": {"name": "Зашагивания на ступеньку", "view": "side", "tips": ["Вся стопа на платформе", "Вставай за счёт передней ноги", "Опускайся медленно"], "inc": "bw"}, "calf_raise_bw": {"name": "Подъёмы на носки на одной ноге", "view": "side", "tips": ["Носки на краю ступеньки", "Поднимись высоко, пауза 1 с", "Опускай пятки ниже края"], "inc": "bw"}, "plank": {"name": "Планка", "view": "side", "tips": ["Локти под плечами", "Тело — прямая, таз не провисает", "Напряги пресс и ягодицы"], "inc": "time"}, "side_plank": {"name": "Боковая планка", "view": "side", "tips": ["Локоть под плечом", "Подними таз — тело прямое", "Держи и дыши ровно"], "inc": "time"}, "dead_bug": {"name": "«Мёртвый жук»", "view": "side", "tips": ["Поясница прижата к полу", "Опускай руку и противоположную ногу", "Медленно, на выдохе"], "inc": "bw"}, "bird_dog": {"name": "«Птица-собака»", "view": "side", "tips": ["Спина ровная, как стол", "Вытяни руку и противоположную ногу", "Таз не поворачивай"], "inc": "bw"}, "deadlift": {"name": "Становая тяга", "view": "side", "tips": ["Гриф у голеней, спина прямая, вставай ногами и тазом, гриф скользит по ногам."], "inc": "bb_lower"}, "sumo_deadlift": {"name": "Становая тяга сумо", "view": "side", "tips": ["Широкая стойка, колени по линии носков, спина прямая."], "inc": "bb_lower"}, "front_squat": {"name": "Фронтальные приседания", "view": "side", "tips": ["Гриф на передней части плеч, локти высоко, корпус вертикально."], "inc": "bb_lower"}, "smith_squat": {"name": "Приседания в тренажёре Смита", "view": "side", "tips": ["Стопы чуть впереди грифа, таз до параллели."], "inc": "machine"}, "hack_squat": {"name": "Гакк-приседания в тренажёре", "view": "side", "tips": ["Спина прижата, колени по линии носков, опускайся до 90°."], "inc": "machine"}, "leg_ext": {"name": "Разгибания ног в тренажёре", "view": "side", "tips": ["Разгибай почти до прямых ног, опускай медленно."], "inc": "machine"}, "lunge_db": {"name": "Выпады с гантелями", "view": "side", "tips": ["Шаг вперёд, оба колена под 90°, корпус ровный."], "inc": "db"}, "walking_lunge": {"name": "Выпады в ходьбе", "view": "side", "tips": ["Длинный шаг, заднее колено почти касается пола."], "inc": "db"}, "hip_abd": {"name": "Отведение ног в тренажёре", "view": "side", "tips": ["Разводи ноги в стороны медленно, без рывков."], "inc": "machine"}, "hip_add": {"name": "Сведение ног в тренажёре", "view": "side", "tips": ["Своди ноги плавно, не бросай вес."], "inc": "machine"}, "glute_kickback": {"name": "Отведение ноги назад в кроссовере", "view": "side", "tips": ["Корпус неподвижен, отводи ногу назад за счёт ягодицы."], "inc": "machine"}, "hyperext": {"name": "Гиперэкстензия", "view": "side", "tips": ["Опускайся до 90° в тазу и поднимайся до прямой линии, не прогибаясь."], "inc": "bw"}, "good_morning": {"name": "Наклоны со штангой на плечах", "view": "side", "tips": ["Колени чуть согнуты, таз назад, спина прямая."], "inc": "bb_lower"}, "seated_calf": {"name": "Подъёмы на носки сидя", "view": "side", "tips": ["Пауза наверху и полное растяжение внизу."], "inc": "machine"}, "incline_bench": {"name": "Жим штанги на наклонной скамье", "view": "side", "tips": ["Наклон 30°, гриф к верху груди, лопатки сведены."], "inc": "bb_upper"}, "db_bench": {"name": "Жим гантелей лёжа", "view": "side", "tips": ["Лопатки сведены, гантели к груди, локти под 45–60°."], "inc": "db"}, "incline_db": {"name": "Жим гантелей на наклонной скамье", "view": "side", "tips": ["Наклон 30°, гантели к верху груди."], "inc": "db"}, "db_fly": {"name": "Разводка гантелей лёжа", "view": "side", "tips": ["Локти чуть согнуты, опускай руки до растяжения груди."], "inc": "db"}, "cable_cross": {"name": "Сведение рук в кроссовере", "view": "side", "tips": ["Шаг вперёд, своди руки перед собой, локти чуть согнуты."], "inc": "machine"}, "pec_deck": {"name": "Сведение рук в тренажёре «бабочка»", "view": "side", "tips": ["Своди руки, сжимая грудь, медленно возвращай."], "inc": "machine"}, "chest_press": {"name": "Жим от груди в тренажёре", "view": "side", "tips": ["Лопатки прижаты к спинке, жми без рывков."], "inc": "machine"}, "dips": {"name": "Отжимания на брусьях", "view": "side", "tips": ["Корпус слегка вперёд, опускайся до 90° в локтях."], "inc": "bw"}, "tbar_row": {"name": "Тяга Т-грифа", "view": "side", "tips": ["Спина прямая, тяни к низу груди, сводя лопатки."], "inc": "bb_upper"}, "pulldown_close": {"name": "Тяга верхнего блока узким хватом", "view": "side", "tips": ["Плечи вниз, тяни рукоять к груди."], "inc": "machine"}, "chinup": {"name": "Подтягивания обратным хватом", "view": "side", "tips": ["Ладони к себе, грудь к перекладине."], "inc": "bw"}, "cable_pullover": {"name": "Пуловер на блоке стоя", "view": "side", "tips": ["Руки почти прямые, тяни рукоять к бёдрам."], "inc": "machine"}, "shrug": {"name": "Шраги с гантелями", "view": "side", "tips": ["Поднимай плечи вверх, без вращения."], "inc": "db"}, "bb_ohp": {"name": "Жим штанги стоя", "view": "side", "tips": ["Пресс напряжён, жми гриф над головой."], "inc": "bb_upper"}, "arnold": {"name": "Жим Арнольда", "view": "side", "tips": ["Разворачивай ладони во время жима."], "inc": "db"}, "front_raise": {"name": "Подъёмы гантелей перед собой", "view": "side", "tips": ["До уровня плеч, без раскачки."], "inc": "db"}, "upright_row": {"name": "Тяга штанги к подбородку", "view": "side", "tips": ["Локти выше кистей, до уровня груди."], "inc": "bb_upper"}, "reverse_pec": {"name": "Обратная «бабочка»", "view": "side", "tips": ["Разводи руки назад, сводя лопатки."], "inc": "machine"}, "machine_ohp": {"name": "Жим вверх в тренажёре", "view": "side", "tips": ["Спина прижата, жми без рывка."], "inc": "machine"}, "cable_lateral": {"name": "Отведение руки на нижнем блоке", "view": "side", "tips": ["До уровня плеча, плавно."], "inc": "machine"}, "bb_curl": {"name": "Подъём штанги на бицепс", "view": "side", "tips": ["Локти прижаты, без раскачки корпусом."], "inc": "bb_upper"}, "hammer_curl": {"name": "Молотковые сгибания", "view": "side", "tips": ["Ладони смотрят друг на друга, локти у корпуса."], "inc": "db"}, "cable_curl": {"name": "Сгибания рук на нижнем блоке", "view": "side", "tips": ["Локти неподвижны."], "inc": "machine"}, "preacher_curl": {"name": "Сгибания на скамье Скотта", "view": "side", "tips": ["Плечо прижато к подушке, опускай медленно."], "inc": "machine"}, "skull_crusher": {"name": "Французский жим лёжа", "view": "side", "tips": ["Локти смотрят вверх, опускай гриф ко лбу."], "inc": "bb_upper"}, "overhead_cable_ext": {"name": "Разгибания из-за головы на блоке", "view": "side", "tips": ["Локти у головы, разгибай до конца."], "inc": "machine"}, "close_bench": {"name": "Жим лёжа узким хватом", "view": "side", "tips": ["Хват на ширине плеч, локти вдоль корпуса."], "inc": "bb_upper"}, "bench_dips": {"name": "Обратные отжимания от скамьи", "view": "side", "tips": ["Плечи вниз, опускайся до 90° в локтях."], "inc": "bw"}, "crunch": {"name": "Скручивания", "view": "side", "tips": ["Поясница прижата, поднимай лопатки, не тяни шею."], "inc": "bw"}, "hanging_leg_raise": {"name": "Подъёмы ног в висе", "view": "side", "tips": ["Без раскачки, подкручивай таз."], "inc": "bw"}, "lying_leg_raise": {"name": "Подъёмы ног лёжа", "view": "side", "tips": ["Поясница прижата к полу."], "inc": "bw"}, "russian_twist": {"name": "Русские скручивания", "view": "side", "tips": ["Корпус отклонён, поворачивай плечи."], "inc": "bw"}, "cable_crunch": {"name": "Скручивания на блоке", "view": "side", "tips": ["Скручивай корпус, таз неподвижен."], "inc": "machine"}, "ab_wheel": {"name": "Ролик для пресса", "view": "side", "tips": ["Спина ровная, катись настолько, насколько держишь поясницу."], "inc": "bw"}, "mountain_climber": {"name": "Скалолаз", "view": "side", "tips": ["Таз не задирай, колени к груди по очереди."], "inc": "bw"}, "hollow_hold": {"name": "Лодочка на спине", "view": "side", "tips": ["Поясница прижата, держи положение."], "inc": "time"}}};
+const EX = {"tone":{"praise":["Отлично!","Чисто сделано 👏","Мощно 💪","Красиво!","Так держать!","Ровно и под контролем — супер.","Вот это техника!","Хороший подход 👍"],"good":["Отличный подход: техника держится от первого до последнего повтора.","Чисто! Так и продолжай.","Ровно, спокойно, под контролем — образцовый подход.","Красиво сделано. Мышцы сказали спасибо 💪"],"ok":["Хороший подход! Чуть подшлифуем: {cue}.","Неплохо! В следующем подходе обрати внимание: {cue}.","Почти идеально. Одна подсказка: {cue}."],"hard":["Не страшно — техника приходит с повторениями. Главное сейчас: {cue}.","Давай поправим: {cue}. Если тяжело держать технику — возьми вес полегче.","Бывает! Сосредоточься на одном: {cue}. Остальное подтянется."],"jokes":["Гравитация сегодня проиграла.","Штанга тебя запомнила 😄","Диван сегодня скучает без тебя.","Гантели начинают тебя уважать.","Ещё пара таких тренировок — и тренажёры будут здороваться первыми.","Отдыхай, но не как сериал «ещё одна серия» 😉","Где-то в мире одна гантель только что вздохнула с облегчением."],"joke_p":0.22},"faults":{"shallow":{"title":"Недостаточная глубина","cue":"Садись глубже","pen":30,"why":"Таз не опустился до заданной глубины, бедро осталось выше параллели. Ягодичные и задняя поверхность бедра получают меньше работы.","fix":"Опускайся, пока тазобедренный сустав не окажется на уровне колена. Если мешает подвижность или вес — облегчи снаряд.","drill":"Присед на бокс или скамью нужной высоты, 3×8 с паузой 1–2 с внизу."},"lean":{"title":"Корпус падает вперёд","cue":"Грудь выше","pen":20,"why":"Корпус наклонён заметно сильнее голени. Нагрузка смещается на поясницу, вес уходит на носки.","fix":"Держи грудь выше и корпус примерно параллельно голени. Пусть колени уходят вперёд, пятки остаются на полу.","drill":"Гоблет-присед с гантелью у груди 3×8–10, вес ниже рабочего."},"heels":{"title":"Пятки отрываются","cue":"Пятки на пол","pen":20,"why":"Пятки поднимаются от пола — чаще всего не хватает подвижности голеностопа.","fix":"Дави всей стопой, вес на середину стопы. Временно можно подложить 1–2 см под пятки или надеть штангетки.","drill":"Мобилизация голеностопа «колено к стене», 2×10 на ногу перед тренировкой."},"valgus":{"title":"Колени сводятся внутрь","cue":"Колени наружу","pen":30,"why":"Колени уходят внутрь относительно стоп. Обычно связано со слабостью средней ягодичной мышцы и повышает нагрузку на колено.","fix":"Направляй колени по линии второго-третьего пальца стопы, носки слегка развёрнуты наружу (15–30°).","drill":"Присед с мини-бэндом над коленями 2×12 и «ракушка» лёжа на боку 2×15 на сторону."},"shift":{"title":"Перекос на одну ногу","cue":"Вес на обе ноги","pen":15,"why":"Таз смещается в сторону — одна нога берёт на себя больше нагрузки.","fix":"Поставь стопы симметрично и дави в пол обеими ногами одинаково.","drill":"Болгарские сплит-приседания 2×8 на ногу, начинай со слабой стороны."},"fast":{"title":"Слишком быстрый спуск","cue":"Опускайся медленнее","pen":10,"why":"Спуск занимает меньше 0,6 с — это падение, а не контролируемое опускание.","fix":"Опускайся 2–3 секунды, без рывка в нижней точке.","drill":"Темповые приседания 3-1-1: три секунды вниз, пауза, подъём."},"lockout":{"title":"Неполное выпрямление","cue":"Выпрямись до конца","pen":10,"why":"Наверху колени и таз не выпрямились полностью — повтор неполный.","fix":"Вставай до прямых коленей и таза, сожми ягодицы в верхней точке.","drill":"Ягодичный мост 3×12 с паузой 2 с наверху."},"sag":{"title":"Провис таза","cue":"Подними таз","pen":30,"why":"Таз опускается ниже линии плечи–стопы: пресс и ягодицы не держат корпус, нагружается поясница.","fix":"Напряги пресс и ягодицы, тело — одна прямая от головы до пяток.","drill":"Планка 3×30–45 с; отжимания от скамьи с идеальной линией тела."},"pike":{"title":"Таз задран вверх","cue":"Опусти таз","pen":15,"why":"Таз поднят выше линии тела, амплитуда в плечах уменьшается.","fix":"Опусти таз до прямой линии от плеч до стоп.","drill":"Планка с контролем положения таза 3×30 с, отжимания с паузой у пола."},"pu_shallow":{"title":"Неполная амплитуда","cue":"Опустись ниже","pen":30,"why":"Локти не сгибаются до нужного угла, грудь не доходит вниз — грудные мышцы работают меньше.","fix":"Опускайся, пока локоть не согнётся до 90° и грудь не окажется в 5–10 см от пола.","drill":"Негативные отжимания 3×5 со спуском 3–4 с или отжимания от возвышения на полную амплитуду."},"head":{"title":"Голова опущена","cue":"Голову ровно","pen":10,"why":"Голова провисает ниже линии корпуса, шея выходит из нейтрального положения.","fix":"Смотри в пол на 20–30 см перед ладонями, затылок в одну линию со спиной.","drill":"Отжимания с записью сбоку или у зеркала, 2×8 в медленном темпе."},"pu_lockout":{"title":"Руки не выпрямлены","cue":"Выпрями руки","pen":10,"why":"Наверху локти остаются согнутыми — повтор неполный.","fix":"Выжимай себя до прямых рук, без резкого замыкания локтей.","drill":"Удержание упора на прямых руках 3×20 с."},"pu_fast":{"title":"Слишком быстрый спуск","cue":"Медленнее вниз","pen":10,"why":"Спуск короче 0,45 с — тело падает, а не опускается.","fix":"Опускайся 1,5–2 секунды.","drill":"Отжимания в темпе 3-0-1."}},"specs":{"leg_press":{"view":"side","sig":["angle","knee"],"dir":-1,"amp":55,"ecc":"first","checks":[["rom","<=",105,"Опускай до угла 90° в колене"],["tempo",0.8,"Медленнее, под контролем"]]},"rdl_bb":{"view":"side","sig":["angle","hip"],"dir":-1,"amp":55,"ecc":"first","checks":[["romrel",0.75,"Наклонись ниже, таз назад"],["still",["angle","knee"],25,"Колени почти не сгибай"],["tempo",0.8,"Медленнее, под контролем"]]},"rdl_db":{"view":"side","sig":["angle","hip"],"dir":-1,"amp":55,"ecc":"first","checks":[["romrel",0.75,"Наклонись ниже, таз назад"],["still",["angle","knee"],25,"Колени почти не сгибай"],["tempo",0.8,"Медленнее, под контролем"]]},"hip_thrust":{"view":"side","sig":["angle","hip"],"dir":1,"amp":35,"ecc":"second","checks":[["rom",">=",158,"Таз выше — до прямой линии"],["tempo",0.8,"Медленнее, под контролем"]]},"glute_bridge":{"view":"side","sig":["angle","hip"],"dir":1,"amp":25,"ecc":"second","checks":[["rom",">=",158,"Таз выше — до прямой линии"],["tempo",0.8,"Медленнее, под контролем"]]},"glute_bridge_db":{"view":"side","sig":["angle","hip"],"dir":1,"amp":25,"ecc":"second","checks":[["rom",">=",158,"Таз выше — до прямой линии"],["tempo",0.8,"Медленнее, под контролем"]]},"sl_glute_bridge":{"view":"side","sig":["angle","hip"],"dir":1,"amp":25,"ecc":"second","checks":[["rom",">=",155,"Таз выше — до прямой линии"],["tempo",0.8,"Медленнее, под контролем"]]},"leg_curl":{"view":"side","sig":["angle","knee"],"dir":-1,"amp":60,"ecc":"second","checks":[["rom","<=",100,"Сгибай ноги до конца"],["tempo",1.0,"Опускай медленнее"]]},"calf_raise":{"view":"side","sig":["angle","ankle"],"dir":1,"amp":25,"ecc":"second","checks":[["romrel",0.7,"Поднимайся выше на носки"],["tempo",0.8,"Медленнее, под контролем"],["hold",0.4,"Задержись наверху на секунду"]]},"calf_raise_db":{"view":"side","sig":["angle","ankle"],"dir":1,"amp":25,"ecc":"second","checks":[["romrel",0.7,"Поднимайся выше на носки"],["tempo",0.8,"Медленнее, под контролем"],["hold",0.4,"Задержись наверху на секунду"]]},"calf_raise_bw":{"view":"side","sig":["angle","ankle"],"dir":1,"amp":25,"ecc":"second","checks":[["romrel",0.7,"Поднимайся выше на носки"],["tempo",0.8,"Медленнее, под контролем"],["hold",0.4,"Задержись наверху на секунду"]]},"split_squat_db":{"view":"side","sig":["angle2","knee"],"dir":-1,"amp":55,"ecc":"first","checks":[["rom","<=",112,"Опускайся ниже, заднее колено к полу"],["still",["incline"],15,"Корпус держи ровно"],["tempo",0.8,"Медленнее, под контролем"]]},"bulgarian":{"view":"side","sig":["angle2","knee"],"dir":-1,"amp":50,"ecc":"first","checks":[["rom","<=",115,"Опускайся ниже"],["still",["incline"],15,"Корпус держи ровно"],["tempo",0.8,"Медленнее, под контролем"]]},"reverse_lunge":{"view":"side","sig":["angle2","knee"],"dir":-1,"amp":50,"ecc":"first","checks":[["rom","<=",115,"Заднее колено ближе к полу"],["still",["incline"],18,"Корпус держи ровно"]]},"step_up":{"view":"side","sig":["height","hip"],"dir":1,"amp":0.6,"ecc":"second","checks":[["still",["incline"],25,"Не наклоняйся сильно вперёд"],["tempo",0.8,"Медленнее, под контролем"]]},"step_up_db":{"view":"side","sig":["height","hip"],"dir":1,"amp":0.5,"ecc":"second","checks":[["still",["incline"],25,"Не наклоняйся сильно вперёд"],["tempo",0.8,"Медленнее, под контролем"]]},"step_up_bw":{"view":"side","sig":["height","hip"],"dir":1,"amp":0.4,"ecc":"second","checks":[["still",["incline"],25,"Не наклоняйся сильно вперёд"],["tempo",0.8,"Медленнее, под контролем"]]},"bench":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":60,"ecc":"first","checks":[["rom","<=",100,"Опускай гриф ниже, к груди"],["tempo",0.8,"Медленнее, под контролем"]]},"db_bench_neutral":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":60,"ecc":"first","checks":[["rom","<=",100,"Опускай гантели ниже"],["tempo",0.8,"Медленнее, под контролем"]]},"db_floor_press":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":55,"ecc":"first","checks":[["rom","<=",105,"Опускай, пока локти не коснутся пола"],["tempo",0.8,"Медленнее, под контролем"]]},"pike_pushup":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":45,"ecc":"first","checks":[["rom","<=",120,"Опускай голову ниже"],["tempo",0.8,"Медленнее, под контролем"]]},"db_ohp":{"view":"side","sig":["angle","elbow"],"dir":1,"amp":60,"ecc":"second","checks":[["rom",">=",145,"Выжимай до прямых рук"],["still",["incline"],10,"Не прогибайся назад"],["tempo",0.8,"Медленнее, под контролем"]]},"landmine":{"view":"side","sig":["angle","elbow"],"dir":1,"amp":55,"ecc":"second","checks":[["rom",">=",140,"Выжимай дальше, до прямой руки"],["tempo",0.8,"Медленнее, под контролем"]]},"pushdown":{"view":"side","sig":["angle","elbow"],"dir":1,"amp":60,"ecc":"second","checks":[["rom",">=",150,"Разгибай руки до конца"],["still",["angle","shoulder"],18,"Локти неподвижно у корпуса"],["tempo",0.8,"Медленнее, под контролем"]]},"db_ext":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":70,"ecc":"first","checks":[["rom","<=",90,"Опускай гантель ниже за голову"],["still",["angle","shoulder"],20,"Локти смотрят вверх, не разводи"],["tempo",0.8,"Медленнее, под контролем"]]},"cable_row":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":60,"ecc":"second","checks":[["rom","<=",105,"Тяни до конца, локти назад"],["still",["incline"],15,"Не раскачивай корпус"],["tempo",0.8,"Медленнее, под контролем"]]},"chest_row":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":60,"ecc":"second","checks":[["rom","<=",105,"Тяни до конца, локти назад"],["tempo",0.8,"Медленнее, под контролем"]]},"bb_row":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":60,"ecc":"second","checks":[["rom","<=",110,"Тяни гриф к животу"],["still",["incline"],12,"Держи наклон, не выпрямляйся"],["tempo",0.8,"Медленнее, под контролем"]]},"db_row":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":60,"ecc":"second","checks":[["rom","<=",110,"Тяни локоть выше, к тазу"],["still",["incline"],12,"Спина ровная, без поворота"],["tempo",0.8,"Медленнее, под контролем"]]},"table_row":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":55,"ecc":"second","checks":[["rom","<=",110,"Тяни грудь выше, к краю"],["tempo",0.8,"Медленнее, под контролем"]]},"towel_row":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":50,"ecc":"second","checks":[["rom","<=",115,"Подтягивайся ближе к двери"],["tempo",0.8,"Медленнее, под контролем"]]},"lat_pulldown":{"view":"any","sig":["angle","elbow"],"dir":-1,"amp":65,"ecc":"second","checks":[["rom","<=",95,"Тяни гриф ниже, к груди"],["still",["incline"],15,"Без рывков корпусом"],["tempo",0.8,"Медленнее, под контролем"]]},"pullup":{"view":"any","sig":["angle","elbow"],"dir":-1,"amp":65,"ecc":"second","checks":[["rom","<=",90,"Подтянись выше, грудь к перекладине"],["tempo",0.8,"Опускайся плавно"]]},"assisted_pullup":{"view":"any","sig":["angle","elbow"],"dir":-1,"amp":65,"ecc":"second","checks":[["rom","<=",90,"Подтянись выше"],["tempo",0.8,"Опускайся плавно"]]},"db_pullover":{"view":"side","sig":["angle","shoulder"],"dir":1,"amp":50,"ecc":"first","checks":[["romrel",0.7,"Опускай гантель дальше за голову"],["still",["angle","elbow"],25,"Руки почти прямые"],["tempo",0.8,"Медленнее, под контролем"]]},"face_pull":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":60,"ecc":"second","checks":[["rom","<=",100,"Тяни канат к лицу до конца"],["still",["incline"],12,"Не отклоняйся назад"],["tempo",0.8,"Медленнее, под контролем"]]},"lateral_raise":{"view":"front","sig":["abd"],"dir":1,"amp":55,"ecc":"second","checks":[["rom",">=",70,"Поднимай до уровня плеч"],["max",110,"Не выше плеч"],["sym",0.18,"Поднимай руки одинаково"],["tempo",0.8,"Медленнее, под контролем"]]},"db_rear_fly":{"view":"front","sig":["abd"],"dir":1,"amp":50,"ecc":"second","checks":[["rom",">=",60,"Разводи руки шире, до уровня спины"],["sym",0.2,"Разводи руки одинаково"],["tempo",0.8,"Медленнее, под контролем"]]},"db_curl":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":80,"ecc":"second","checks":[["rom","<=",70,"Поднимай гантели выше, к плечам"],["still",["angle","shoulder"],22,"Локти прижаты к бокам"],["still",["incline"],10,"Без раскачки корпусом"],["tempo",0.8,"Медленнее, под контролем"]]},"superman":{"view":"side","sig":["incline"],"dir":1,"amp":8,"ecc":"second","checks":[["hold",1.0,"Задержись наверху на 2 секунды"]]},"bird_dog":{"view":"side","sig":["anglemax","shoulder"],"dir":1,"amp":55,"ecc":"second","checks":[["romrel",0.75,"Тянись рукой дальше вперёд"],["still",["incline"],12,"Спина ровная, таз не поворачивай"],["hold",1.0,"Задержись на 2 секунды"]]},"dead_bug":{"view":"side","sig":["anglemax","shoulder"],"dir":1,"amp":55,"ecc":"second","checks":[["romrel",0.75,"Опускай руку дальше за голову"],["tempo",0.8,"Медленнее, под контролем"]]},"pallof":{"view":"side","sig":["angle","elbow"],"dir":1,"amp":60,"ecc":"second","checks":[["rom",">=",145,"Выжимай рукоять до прямых рук"],["still",["incline"],10,"Корпус не поворачивай"],["hold",1.0,"Задержись с прямыми руками"]]},"plank":{"view":"side","hold":true,"line_ok":163,"cue_sag":"Подними таз — тело в линию","cue_pike":"Опусти таз — тело в линию","target":"30–45 с"},"side_plank":{"view":"side","hold":true,"line_ok":163,"cue_sag":"Подними таз выше","cue_pike":"Таз чуть ниже — тело в линию","target":"20–40 с"},"deadlift":{"view":"side","sig":["angle","hip"],"dir":1,"amp":60,"ecc":"second","checks":[["rom",">=",160,"Выпрямись наверху полностью"],["tempo",0.6,"Опускай штангу под контролем"]]},"sumo_deadlift":{"view":"side","sig":["angle","hip"],"dir":1,"amp":50,"ecc":"second","checks":[["rom",">=",160,"Выпрямись наверху полностью"],["tempo",0.6,"Опускай штангу под контролем"]]},"hack_squat":{"view":"side","sig":["angle","knee"],"dir":-1,"amp":55,"ecc":"first","checks":[["rom","<=",100,"Опускайся ниже, до 90° в колене"],["tempo",0.8,"Медленнее, под контролем"]]},"leg_ext":{"view":"side","sig":["angle","knee"],"dir":1,"amp":55,"ecc":"second","checks":[["rom",">=",155,"Разгибай ноги до конца"],["tempo",1.0,"Опускай медленнее"]]},"lunge_db":{"view":"side","sig":["angle2","knee"],"dir":-1,"amp":50,"ecc":"first","checks":[["rom","<=",115,"Опускайся ниже, заднее колено к полу"],["still",["incline"],18,"Корпус держи ровно"],["tempo",0.8,"Медленнее, под контролем"]]},"walking_lunge":{"view":"side","sig":["angle2","knee"],"dir":-1,"amp":50,"ecc":"first","checks":[["rom","<=",115,"Опускайся ниже, заднее колено к полу"],["still",["incline"],18,"Корпус держи ровно"]]},"hip_abd":{"view":"front","sig":["gap","knee"],"dir":1,"amp":0.8,"ecc":"second","checks":[["romrel",0.7,"Разводи ноги шире"],["tempo",0.6,"Своди ноги медленнее"]]},"hip_add":{"view":"front","sig":["gap","knee"],"dir":-1,"amp":0.8,"ecc":"second","checks":[["romrel",0.7,"Своди ноги до конца"],["tempo",0.6,"Разводи ноги медленнее"]]},"hyperext":{"view":"side","sig":["angle","hip"],"dir":-1,"amp":45,"ecc":"first","checks":[["romrel",0.7,"Опускайся ниже, спина прямая"],["tempo",0.8,"Медленнее, под контролем"]]},"good_morning":{"view":"side","sig":["angle","hip"],"dir":-1,"amp":50,"ecc":"first","checks":[["romrel",0.7,"Наклонись ниже, таз назад"],["still",["angle","knee"],25,"Колени почти не сгибай"],["tempo",0.8,"Медленнее, под контролем"]]},"seated_calf":{"view":"side","sig":["angle","ankle"],"dir":1,"amp":20,"ecc":"second","checks":[["romrel",0.7,"Поднимай пятки выше"],["hold",0.4,"Задержись наверху на секунду"],["tempo",0.8,"Медленнее, под контролем"]]},"incline_bench":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":60,"ecc":"first","checks":[["rom","<=",100,"Опускай гриф ниже, к верху груди"],["tempo",0.8,"Медленнее, под контролем"]]},"db_bench":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":60,"ecc":"first","checks":[["rom","<=",100,"Опускай гантели ниже, к груди"],["tempo",0.8,"Медленнее, под контролем"]]},"incline_db":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":60,"ecc":"first","checks":[["rom","<=",100,"Опускай гантели ниже"],["tempo",0.8,"Медленнее, под контролем"]]},"close_bench":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":60,"ecc":"first","checks":[["rom","<=",100,"Опускай гриф к низу груди"],["tempo",0.8,"Медленнее, под контролем"]]},"cable_cross":{"view":"front","sig":["gap","wrist"],"dir":-1,"amp":1.0,"ecc":"second","checks":[["romrel",0.7,"Своди руки до конца"],["tempo",0.6,"Разводи руки медленнее"]]},"pec_deck":{"view":"front","sig":["gap","wrist"],"dir":-1,"amp":1.0,"ecc":"second","checks":[["romrel",0.7,"Своди руки до конца"],["tempo",0.6,"Разводи руки медленнее"]]},"db_fly":{"view":"front","sig":["gap","wrist"],"dir":1,"amp":1.2,"ecc":"first","checks":[["romrel",0.7,"Разводи руки шире, до растяжения груди"],["tempo",0.6,"Медленнее, под контролем"]]},"reverse_pec":{"view":"front","sig":["gap","wrist"],"dir":1,"amp":1.0,"ecc":"second","checks":[["romrel",0.7,"Разводи руки шире, сводя лопатки"],["tempo",0.6,"Медленнее, под контролем"]]},"chest_press":{"view":"side","sig":["angle","elbow"],"dir":1,"amp":55,"ecc":"second","checks":[["rom",">=",145,"Выжимай до почти прямых рук"],["tempo",0.8,"Медленнее, под контролем"]]},"dips":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":55,"ecc":"first","checks":[["rom","<=",100,"Опускайся до 90° в локтях"],["tempo",0.8,"Медленнее, под контролем"]]},"bench_dips":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":50,"ecc":"first","checks":[["rom","<=",105,"Опускайся ниже, до 90° в локтях"],["tempo",0.8,"Медленнее, под контролем"]]},"tbar_row":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":60,"ecc":"second","checks":[["rom","<=",110,"Тяни гриф выше, к низу груди"],["still",["incline"],12,"Держи наклон, не выпрямляйся"],["tempo",0.8,"Медленнее, под контролем"]]},"pulldown_close":{"view":"any","sig":["angle","elbow"],"dir":-1,"amp":65,"ecc":"second","checks":[["rom","<=",95,"Тяни рукоять ниже, к груди"],["still",["incline"],15,"Без рывков корпусом"],["tempo",0.8,"Медленнее, под контролем"]]},"chinup":{"view":"any","sig":["angle","elbow"],"dir":-1,"amp":65,"ecc":"second","checks":[["rom","<=",90,"Подтянись выше, грудь к перекладине"],["tempo",0.8,"Опускайся плавно"]]},"cable_pullover":{"view":"side","sig":["angle","shoulder"],"dir":-1,"amp":60,"ecc":"second","checks":[["romrel",0.75,"Тяни рукоять до бёдер"],["still",["angle","elbow"],25,"Руки почти прямые"],["still",["incline"],15,"Корпус неподвижен"],["tempo",0.8,"Медленнее, под контролем"]]},"bb_ohp":{"view":"side","sig":["angle","elbow"],"dir":1,"amp":60,"ecc":"second","checks":[["rom",">=",145,"Выжимай до прямых рук"],["still",["incline"],10,"Не прогибайся назад"],["tempo",0.8,"Медленнее, под контролем"]]},"arnold":{"view":"side","sig":["angle","elbow"],"dir":1,"amp":60,"ecc":"second","checks":[["rom",">=",145,"Выжимай до прямых рук"],["still",["incline"],10,"Не прогибайся назад"],["tempo",0.8,"Медленнее, под контролем"]]},"machine_ohp":{"view":"side","sig":["angle","elbow"],"dir":1,"amp":55,"ecc":"second","checks":[["rom",">=",140,"Выжимай до почти прямых рук"],["tempo",0.8,"Медленнее, под контролем"]]},"front_raise":{"view":"side","sig":["angle","shoulder"],"dir":1,"amp":60,"ecc":"second","checks":[["rom",">=",75,"Поднимай до уровня плеч"],["max",115,"Не выше плеч"],["still",["incline"],10,"Без раскачки корпусом"],["tempo",0.8,"Медленнее, под контролем"]]},"upright_row":{"view":"front","sig":["abd"],"dir":1,"amp":45,"ecc":"second","checks":[["rom",">=",65,"Тяни выше, локти до уровня плеч"],["sym",0.2,"Поднимай руки одинаково"],["tempo",0.8,"Медленнее, под контролем"]]},"cable_lateral":{"view":"front","sig":["anglemax","shoulder"],"dir":1,"amp":55,"ecc":"second","checks":[["rom",">=",70,"Поднимай до уровня плеча"],["max",110,"Не выше плеча"],["tempo",0.8,"Медленнее, под контролем"]]},"bb_curl":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":80,"ecc":"second","checks":[["rom","<=",70,"Поднимай гриф выше, к плечам"],["still",["angle","shoulder"],22,"Локти прижаты к бокам"],["still",["incline"],10,"Без раскачки корпусом"],["tempo",0.8,"Медленнее, под контролем"]]},"hammer_curl":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":80,"ecc":"second","checks":[["rom","<=",70,"Поднимай гантели выше, к плечам"],["still",["angle","shoulder"],22,"Локти прижаты к бокам"],["still",["incline"],10,"Без раскачки корпусом"],["tempo",0.8,"Медленнее, под контролем"]]},"cable_curl":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":80,"ecc":"second","checks":[["rom","<=",70,"Сгибай руки до конца"],["still",["angle","shoulder"],22,"Локти неподвижны"],["tempo",0.8,"Медленнее, под контролем"]]},"preacher_curl":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":70,"ecc":"second","checks":[["rom","<=",70,"Сгибай выше, к плечам"],["tempo",1.0,"Опускай медленнее"]]},"skull_crusher":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":60,"ecc":"first","checks":[["rom","<=",95,"Опускай гриф ниже, ко лбу"],["still",["angle","shoulder"],20,"Плечи неподвижны — работают локти"],["tempo",0.8,"Медленнее, под контролем"]]},"overhead_cable_ext":{"view":"side","sig":["angle","elbow"],"dir":-1,"amp":70,"ecc":"first","checks":[["rom","<=",90,"Опускай руки ниже за голову"],["still",["angle","shoulder"],20,"Локти у головы, не разводи"],["tempo",0.8,"Медленнее, под контролем"]]},"crunch":{"view":"side","sig":["incline"],"dir":1,"amp":18,"ecc":"second","checks":[["romrel",0.6,"Поднимай лопатки выше"],["tempo",0.6,"Опускайся медленнее"]]},"cable_crunch":{"view":"side","sig":["angle","hip"],"dir":-1,"amp":35,"ecc":"second","checks":[["romrel",0.7,"Скручивайся ниже, локти к коленям"],["tempo",0.8,"Медленнее, под контролем"]]},"hanging_leg_raise":{"view":"side","sig":["angle","hip"],"dir":-1,"amp":60,"ecc":"second","checks":[["rom","<=",100,"Поднимай ноги выше, до прямого угла"],["tempo",0.8,"Опускай ноги медленнее"]]},"lying_leg_raise":{"view":"side","sig":["angle","hip"],"dir":-1,"amp":55,"ecc":"second","checks":[["rom","<=",105,"Поднимай ноги выше, до прямого угла"],["tempo",0.8,"Опускай ноги медленнее"]]},"ab_wheel":{"view":"side","sig":["angle","hip"],"dir":1,"amp":30,"ecc":"first","checks":[["romrel",0.7,"Выкатывайся дальше, спина ровная"],["tempo",0.8,"Медленнее, под контролем"]]}},"squat":{"back_squat":"parallel","box_squat":"half","goblet":"parallel","bw_squat":"parallel","goblet_box":"half","chair_squat":"half","squat":"parallel","front_squat":"parallel","smith_squat":"parallel"},"pushup":{"pushup":false,"pushup_incline":true},"titles":{"rom":"Неполная амплитуда","short":"Повтор короче","line":"Линия тела","still":"Лишнее движение","range":"Положение корпуса","max":"Слишком высоко","sym":"Руки неодинаково","tempo":"Слишком быстро","hold":"Нет паузы"},"pen":{"rom":30,"short":20,"line":30,"still":20,"range":15,"max":15,"sym":15,"tempo":10,"hold":10},"cam":{"side":"Поставь телефон сбоку в 2–3 м, чтобы было видно всё тело","front":"Встань лицом к телефону в 2–3 м, всё тело в кадре"},"ex":{"back_squat":{"name":"Приседания со штангой","view":"any","tips":["Гриф на верх спины, корпус жёсткий","Колени смотрят туда же, куда носки","Таз до уровня колен, пятки на полу"],"inc":"bb_lower"},"box_squat":{"name":"Приседания на бокс (до параллели)","view":"any","tips":["Садись назад на бокс, не плюхайся","Голень почти вертикально","Вставай через пятки"],"inc":"bb_lower"},"leg_press":{"name":"Жим ногами","view":"side","tips":["Поясница прижата к спинке","Опускай до угла 90° в колене","Не выпрямляй колени до щелчка"],"inc":"machine"},"rdl_bb":{"name":"Румынская тяга со штангой","view":"side","tips":["Таз назад, колени чуть согнуты","Спина прямая всё время","Гриф скользит по ногам"],"inc":"bb_lower"},"hip_thrust":{"name":"Ягодичный мост со штангой","view":"side","tips":["Лопатки на скамье, подбородок к груди","Толкай таз вверх пятками","Наверху — прямая от плеч до колен"],"inc":"bb_lower"},"bench":{"name":"Жим штанги лёжа","view":"side","tips":["Лопатки сведены, ноги упёрты в пол","Гриф опускай к низу груди","Локти под 45° к телу"],"inc":"bb_upper"},"db_bench_neutral":{"name":"Жим гантелей лёжа нейтральным хватом","view":"side","tips":["Ладони смотрят друг на друга","Локти ближе к корпусу","Опускай до груди, жми вверх"],"inc":"db"},"cable_row":{"name":"Тяга горизонтального блока","view":"side","tips":["Спина прямая, грудь вперёд","Тяни локтями к поясу","В конце сведи лопатки"],"inc":"machine"},"chest_row":{"name":"Тяга в тренажёре с упором грудью","view":"side","tips":["Грудь прижата к упору","Тяни локти назад","Плечи вниз, не к ушам"],"inc":"machine"},"bb_row":{"name":"Тяга штанги в наклоне","view":"side","tips":["Наклон 30–45°, спина прямая","Тяни гриф к низу живота","Локти вдоль тела, назад"],"inc":"bb_upper"},"db_ohp":{"name":"Жим гантелей сидя","view":"side","tips":["Спина прижата к спинке","Жми вверх и чуть вперёд","Не прогибай поясницу"],"inc":"db"},"landmine":{"name":"Жим штанги одной рукой в упоре (лэндмайн)","view":"side","tips":["Ноги в шаге, корпус чуть вперёд","Жми вверх-вперёд по дуге","Пресс напряжён, без прогиба"],"inc":"bb_upper"},"lat_pulldown":{"name":"Тяга верхнего блока к груди","view":"side","tips":["Плечи вниз, грудь вперёд","Тяни гриф к верху груди","Без рывков корпусом"],"inc":"machine"},"assisted_pullup":{"name":"Подтягивания в гравитроне","view":"side","tips":["Колени на платформе — она помогает","Тяни грудь к рукояткам","Опускайся до прямых рук"],"inc":"machine"},"pullup":{"name":"Подтягивания","view":"side","tips":["Начни с опускания плеч","Тяни грудь к перекладине","Опускайся до прямых рук"],"inc":"bw"},"bulgarian":{"name":"Болгарские сплит-приседания с гантелями","view":"side","tips":["Задняя нога на скамье","Опускайся вниз, а не вперёд","Колено передней ноги — по носку"],"inc":"db"},"step_up":{"name":"Зашагивания на платформу с гантелями","view":"side","tips":["Вся стопа на платформе","Вставай за счёт передней ноги","Опускайся медленно"],"inc":"db"},"leg_curl":{"name":"Сгибания ног в тренажёре","view":"side","tips":["Таз прижат к скамье","Сгибай ноги до упора","Опускай медленно, 2–3 с"],"inc":"machine"},"calf_raise":{"name":"Подъёмы на носки стоя","view":"side","tips":["Носки на краю ступеньки","Поднимись высоко, пауза 1 с","Опускай пятки ниже края"],"inc":"machine"},"face_pull":{"name":"Тяга каната к лицу","view":"side","tips":["Трос на уровне лица","Тяни к ушам, локти высоко","В конце сведи лопатки"],"inc":"machine"},"lateral_raise":{"name":"Махи гантелями в стороны","view":"front","tips":["Локти чуть согнуты","Поднимай до уровня плеч","Плечи вниз, без раскачки"],"inc":"db"},"db_curl":{"name":"Сгибания рук с гантелями","view":"side","tips":["Локти прижаты к бокам","Поднимай без раскачки","Опускай до прямой руки"],"inc":"db"},"pushdown":{"name":"Разгибания рук на блоке","view":"side","tips":["Локти неподвижны у корпуса","Разгибай руки до конца","Вверх — медленно"],"inc":"machine"},"pallof":{"name":"Паллоф-пресс","view":"side","tips":["Трос сбоку, стой ровно","Выжми рукоять от груди вперёд","Не давай корпусу повернуться"],"inc":"machine"},"goblet":{"name":"Гоблет-присед с гантелью","view":"any","tips":["Гантель у груди, локти вниз","Колени по линии носков","Таз до параллели, спина прямая"],"inc":"db"},"goblet_box":{"name":"Гоблет-присед на стул","view":"any","tips":["Садись на край стула, не расслабляясь","Колени по линии носков","Вставай через пятки"],"inc":"db"},"rdl_db":{"name":"Румынская тяга с гантелями","view":"side","tips":["Таз назад, колени чуть согнуты","Спина прямая всё время","Гантели вдоль ног"],"inc":"db"},"glute_bridge_db":{"name":"Ягодичный мост с гантелью","view":"side","tips":["Держи гантель на тазу","Толкай таз вверх пятками","Наверху сожми ягодицы"],"inc":"db"},"db_floor_press":{"name":"Жим гантелей лёжа на полу","view":"side","tips":["Лопатки на полу, колени согнуты","Опускай, пока локти не коснутся пола","Жми вверх на выдохе"],"inc":"db"},"db_row":{"name":"Тяга гантели одной рукой с опорой","view":"side","tips":["Колено и рука на скамье, спина ровная","Тяни локоть к тазу","Опускай до прямой руки"],"inc":"db"},"db_pullover":{"name":"Пуловер с гантелью лёжа","view":"side","tips":["Лопатки на скамье, руки чуть согнуты","Опускай гантель за голову по дуге","Поднимай до уровня груди"],"inc":"db"},"db_rear_fly":{"name":"Разведения гантелей в наклоне","view":"front","tips":["Наклонись, спина ровная","Разводи руки в стороны","Наверху сведи лопатки"],"inc":"db"},"split_squat_db":{"name":"Сплит-приседания с гантелями","view":"side","tips":["Длинный шаг, корпус прямо","Опускай заднее колено к полу","Переднее колено над стопой"],"inc":"db"},"step_up_db":{"name":"Зашагивания на ступеньку с гантелями","view":"side","tips":["Вся стопа на платформе","Вставай за счёт передней ноги","Опускайся медленно"],"inc":"db"},"calf_raise_db":{"name":"Подъёмы на носки с гантелями","view":"side","tips":["Носки на краю ступеньки","Поднимись высоко, пауза 1 с","Опускай пятки ниже края"],"inc":"db"},"db_ext":{"name":"Французский жим гантели","view":"side","tips":["Локти смотрят вверх","Опускай гантель за голову","Разгибай руки до конца"],"inc":"db"},"bw_squat":{"name":"Приседания","view":"any","tips":["Руки вперёд для баланса","Таз назад и вниз до параллели","Пятки на полу, колени по носкам"],"inc":"bw"},"chair_squat":{"name":"Приседания на стул","view":"any","tips":["Коснись стула тазом и вставай","Руки вперёд для баланса","Пятки на полу"],"inc":"bw"},"glute_bridge":{"name":"Ягодичный мост","view":"side","tips":["Стопы ближе к тазу","Толкай таз вверх пятками","Наверху сожми ягодицы"],"inc":"bw"},"sl_glute_bridge":{"name":"Ягодичный мост на одной ноге","view":"side","tips":["Вторая нога прямая, в линию с телом","Толкай таз пяткой опорной ноги","Таз не перекашивай"],"inc":"bw"},"pushup":{"name":"Отжимания","view":"side","tips":["Тело — одна прямая линия","Локти назад под 45°","Грудь почти до пола"],"inc":"bw"},"pushup_incline":{"name":"Отжимания от опоры","view":"side","tips":["Руки на опоре чуть шире плеч","Тело прямое от головы до пяток","Грудь к краю опоры"],"inc":"bw"},"table_row":{"name":"Тяга под столом (австралийские подтягивания)","view":"side","tips":["Тело прямое, пятки на полу","Тяни грудь к краю стола","Наверху сведи лопатки"],"inc":"bw"},"towel_row":{"name":"Тяга полотенца в дверном проёме","view":"side","tips":["Стопы у двери, тело прямое","Тяни грудь к двери","Медленно отклоняйся назад"],"inc":"bw"},"pike_pushup":{"name":"Отжимания уголком","view":"side","tips":["Таз высоко, тело «домиком»","Опускай голову между ладонями","Локти назад, не в стороны"],"inc":"bw"},"superman":{"name":"Супермен лёжа","view":"side","tips":["Подними грудь и руки","Ноги тоже чуть вверх","Смотри в пол, шея ровно"],"inc":"bw"},"reverse_lunge":{"name":"Обратные выпады","view":"side","tips":["Шаг назад, корпус прямо","Заднее колено почти до пола","Встань через пятку передней ноги"],"inc":"bw"},"step_up_bw":{"name":"Зашагивания на ступеньку","view":"side","tips":["Вся стопа на платформе","Вставай за счёт передней ноги","Опускайся медленно"],"inc":"bw"},"calf_raise_bw":{"name":"Подъёмы на носки на одной ноге","view":"side","tips":["Носки на краю ступеньки","Поднимись высоко, пауза 1 с","Опускай пятки ниже края"],"inc":"bw"},"plank":{"name":"Планка","view":"side","tips":["Локти под плечами","Тело — прямая, таз не провисает","Напряги пресс и ягодицы"],"inc":"time"},"side_plank":{"name":"Боковая планка","view":"side","tips":["Локоть под плечом","Подними таз — тело прямое","Держи и дыши ровно"],"inc":"time"},"dead_bug":{"name":"«Мёртвый жук»","view":"side","tips":["Поясница прижата к полу","Опускай руку и противоположную ногу","Медленно, на выдохе"],"inc":"bw"},"bird_dog":{"name":"«Птица-собака»","view":"side","tips":["Спина ровная, как стол","Вытяни руку и противоположную ногу","Таз не поворачивай"],"inc":"bw"},"deadlift":{"name":"Становая тяга","view":"side","tips":["Гриф у голеней, спина прямая, вставай ногами и тазом, гриф скользит по ногам."],"inc":"bb_lower"},"sumo_deadlift":{"name":"Становая тяга сумо","view":"side","tips":["Широкая стойка, колени по линии носков, спина прямая."],"inc":"bb_lower"},"front_squat":{"name":"Фронтальные приседания","view":"side","tips":["Гриф на передней части плеч, локти высоко, корпус вертикально."],"inc":"bb_lower"},"smith_squat":{"name":"Приседания в тренажёре Смита","view":"side","tips":["Стопы чуть впереди грифа, таз до параллели."],"inc":"machine"},"hack_squat":{"name":"Гакк-приседания в тренажёре","view":"side","tips":["Спина прижата, колени по линии носков, опускайся до 90°."],"inc":"machine"},"leg_ext":{"name":"Разгибания ног в тренажёре","view":"side","tips":["Разгибай почти до прямых ног, опускай медленно."],"inc":"machine"},"lunge_db":{"name":"Выпады с гантелями","view":"side","tips":["Шаг вперёд, оба колена под 90°, корпус ровный."],"inc":"db"},"walking_lunge":{"name":"Выпады в ходьбе","view":"side","tips":["Длинный шаг, заднее колено почти касается пола."],"inc":"db"},"hip_abd":{"name":"Отведение ног в тренажёре","view":"front","tips":["Разводи ноги в стороны медленно, без рывков."],"inc":"machine"},"hip_add":{"name":"Сведение ног в тренажёре","view":"front","tips":["Своди ноги плавно, не бросай вес."],"inc":"machine"},"glute_kickback":{"name":"Отведение ноги назад в кроссовере","view":"side","tips":["Корпус неподвижен, отводи ногу назад за счёт ягодицы."],"inc":"machine"},"hyperext":{"name":"Гиперэкстензия","view":"side","tips":["Опускайся до 90° в тазу и поднимайся до прямой линии, не прогибаясь."],"inc":"bw"},"good_morning":{"name":"Наклоны со штангой на плечах","view":"side","tips":["Колени чуть согнуты, таз назад, спина прямая."],"inc":"bb_lower"},"seated_calf":{"name":"Подъёмы на носки сидя","view":"side","tips":["Пауза наверху и полное растяжение внизу."],"inc":"machine"},"incline_bench":{"name":"Жим штанги на наклонной скамье","view":"side","tips":["Наклон 30°, гриф к верху груди, лопатки сведены."],"inc":"bb_upper"},"db_bench":{"name":"Жим гантелей лёжа","view":"side","tips":["Лопатки сведены, гантели к груди, локти под 45–60°."],"inc":"db"},"incline_db":{"name":"Жим гантелей на наклонной скамье","view":"side","tips":["Наклон 30°, гантели к верху груди."],"inc":"db"},"db_fly":{"name":"Разводка гантелей лёжа","view":"front","tips":["Локти чуть согнуты, опускай руки до растяжения груди."],"inc":"db"},"cable_cross":{"name":"Сведение рук в кроссовере","view":"front","tips":["Шаг вперёд, своди руки перед собой, локти чуть согнуты."],"inc":"machine"},"pec_deck":{"name":"Сведение рук в тренажёре «бабочка»","view":"front","tips":["Своди руки, сжимая грудь, медленно возвращай."],"inc":"machine"},"chest_press":{"name":"Жим от груди в тренажёре","view":"side","tips":["Лопатки прижаты к спинке, жми без рывков."],"inc":"machine"},"dips":{"name":"Отжимания на брусьях","view":"side","tips":["Корпус слегка вперёд, опускайся до 90° в локтях."],"inc":"bw"},"tbar_row":{"name":"Тяга Т-грифа","view":"side","tips":["Спина прямая, тяни к низу груди, сводя лопатки."],"inc":"bb_upper"},"pulldown_close":{"name":"Тяга верхнего блока узким хватом","view":"side","tips":["Плечи вниз, тяни рукоять к груди."],"inc":"machine"},"chinup":{"name":"Подтягивания обратным хватом","view":"side","tips":["Ладони к себе, грудь к перекладине."],"inc":"bw"},"cable_pullover":{"name":"Пуловер на блоке стоя","view":"side","tips":["Руки почти прямые, тяни рукоять к бёдрам."],"inc":"machine"},"shrug":{"name":"Шраги с гантелями","view":"side","tips":["Поднимай плечи вверх, без вращения."],"inc":"db"},"bb_ohp":{"name":"Жим штанги стоя","view":"side","tips":["Пресс напряжён, жми гриф над головой."],"inc":"bb_upper"},"arnold":{"name":"Жим Арнольда","view":"side","tips":["Разворачивай ладони во время жима."],"inc":"db"},"front_raise":{"name":"Подъёмы гантелей перед собой","view":"side","tips":["До уровня плеч, без раскачки."],"inc":"db"},"upright_row":{"name":"Тяга штанги к подбородку","view":"front","tips":["Локти выше кистей, до уровня груди."],"inc":"bb_upper"},"reverse_pec":{"name":"Обратная «бабочка»","view":"front","tips":["Разводи руки назад, сводя лопатки."],"inc":"machine"},"machine_ohp":{"name":"Жим вверх в тренажёре","view":"side","tips":["Спина прижата, жми без рывка."],"inc":"machine"},"cable_lateral":{"name":"Отведение руки на нижнем блоке","view":"front","tips":["До уровня плеча, плавно."],"inc":"machine"},"bb_curl":{"name":"Подъём штанги на бицепс","view":"side","tips":["Локти прижаты, без раскачки корпусом."],"inc":"bb_upper"},"hammer_curl":{"name":"Молотковые сгибания","view":"side","tips":["Ладони смотрят друг на друга, локти у корпуса."],"inc":"db"},"cable_curl":{"name":"Сгибания рук на нижнем блоке","view":"side","tips":["Локти неподвижны."],"inc":"machine"},"preacher_curl":{"name":"Сгибания на скамье Скотта","view":"side","tips":["Плечо прижато к подушке, опускай медленно."],"inc":"machine"},"skull_crusher":{"name":"Французский жим лёжа","view":"side","tips":["Локти смотрят вверх, опускай гриф ко лбу."],"inc":"bb_upper"},"overhead_cable_ext":{"name":"Разгибания из-за головы на блоке","view":"side","tips":["Локти у головы, разгибай до конца."],"inc":"machine"},"close_bench":{"name":"Жим лёжа узким хватом","view":"side","tips":["Хват на ширине плеч, локти вдоль корпуса."],"inc":"bb_upper"},"bench_dips":{"name":"Обратные отжимания от скамьи","view":"side","tips":["Плечи вниз, опускайся до 90° в локтях."],"inc":"bw"},"crunch":{"name":"Скручивания","view":"side","tips":["Поясница прижата, поднимай лопатки, не тяни шею."],"inc":"bw"},"hanging_leg_raise":{"name":"Подъёмы ног в висе","view":"side","tips":["Без раскачки, подкручивай таз."],"inc":"bw"},"lying_leg_raise":{"name":"Подъёмы ног лёжа","view":"side","tips":["Поясница прижата к полу."],"inc":"bw"},"russian_twist":{"name":"Русские скручивания","view":"side","tips":["Корпус отклонён, поворачивай плечи."],"inc":"bw"},"cable_crunch":{"name":"Скручивания на блоке","view":"side","tips":["Скручивай корпус, таз неподвижен."],"inc":"machine"},"ab_wheel":{"name":"Ролик для пресса","view":"side","tips":["Спина ровная, катись настолько, насколько держишь поясницу."],"inc":"bw"},"mountain_climber":{"name":"Скалолаз","view":"side","tips":["Таз не задирай, колени к груди по очереди."],"inc":"bw"},"hollow_hold":{"name":"Лодочка на спине","view":"side","tips":["Поясница прижата, держи положение."],"inc":"time"}}};
 AT.setData(EX);
 const $ = s => document.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -922,7 +945,7 @@ const Voice = {
     if (!force && id && this.lastId[id] && now - this.lastId[id] < 4500) return;
     try {
       if (!low) speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text.replace(/[\u{1F300}-\u{1FAFF}☀-➿]/gu, '')); u.lang = 'ru-RU'; u.rate = 1.08;
+      const u = new SpeechSynthesisUtterance(text.replace(/[\u{1F300}-\u{1FAFF}☀-➿]/gu, '')); u.lang = 'ru-RU'; u.rate = 1.0; if (this.voice) u.voice = this.voice;
       speechSynthesis.speak(u); this.last = now; if (id) this.lastId[id] = now;
     } catch (e) { /* speech unavailable */ }
   }
@@ -943,15 +966,17 @@ const pickOpt = (v, list, d) => list.includes(v) ? v : d;
 const keys = Object.keys(EX.ex).filter(k => AT.analyzerFor(k));
 /* An exercise from the bot without technique rules (a machine, an own exercise): the camera still runs and counts reps. */
 const b64d = s => { try { return decodeURIComponent(escape(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')))); } catch (e) { return ''; } };
-/* today's workout from the app: [key, name, load type, weight, place in the workout] */
+/* today's workout from the app: [key, name, load type, weight, place in the workout, superset block, sets left, label] */
 const PLAN = (() => {
   try {
     const a = JSON.parse(b64d(qp.get('plan') || '') || 'null');
     return Array.isArray(a) ? a.filter(x => Array.isArray(x) && x[0] && x[1]).slice(0, 14)
-      .map(([k, n, u, w, pos]) => ({ k: String(k).slice(0, 40), n: String(n).slice(0, 60), u, w: num(w), pos: Number.isInteger(pos) ? pos : null })) : [];
+      .map(([k, n, u, w, pos, g, s, lab]) => ({ k: String(k).slice(0, 40), n: String(n).slice(0, 60), u, w: num(w), pos: Number.isInteger(pos) ? pos : null,
+        g: g ? String(g).slice(0, 4) : '', s: Number.isInteger(s) ? s : null, lab: lab ? String(lab).slice(0, 4) : '' })) : [];
   } catch (e) { return []; }
 })();
 const FREE_KEYS = new Set();
+const HOWTO_HAVE = new Set(["ab_wheel", "arnold", "assisted_pullup", "back_squat", "bb_curl", "bb_ohp", "bb_row", "bench", "bench_dips", "bird_dog", "box_squat", "bulgarian", "bw_squat", "cable_cross", "cable_crunch", "cable_curl", "cable_lateral", "cable_pullover", "cable_row", "calf_raise", "calf_raise_bw", "calf_raise_db", "chair_squat", "chest_press", "chest_row", "chinup", "close_bench", "crunch", "db_bench", "db_bench_neutral", "db_curl", "db_ext", "db_floor_press", "db_ohp", "db_pullover", "db_rear_fly", "db_row", "dead_bug", "deadlift", "dips", "face_pull", "front_raise", "front_squat", "glute_bridge", "glute_bridge_db", "glute_kickback", "goblet", "goblet_box", "good_morning", "hack_squat", "hammer_curl", "hanging_leg_raise", "hip_thrust", "hollow_hold", "hyperext", "incline_bench", "incline_db", "landmine", "lat_pulldown", "lateral_raise", "leg_curl", "leg_ext", "leg_press", "lunge_db", "lying_leg_raise", "machine_ohp", "mountain_climber", "overhead_cable_ext", "pallof", "pike_pushup", "plank", "preacher_curl", "pulldown_close", "pullup", "pushdown", "pushup", "pushup_incline", "rdl_bb", "rdl_db", "reverse_lunge", "reverse_pec", "seated_calf", "side_plank", "skull_crusher", "sl_glute_bridge", "smith_squat", "split_squat_db", "step_up", "step_up_bw", "step_up_db", "sumo_deadlift", "superman", "table_row", "tbar_row", "towel_row", "upright_row", "walking_lunge"]);
 function addFree(k, n, u) {
   if (!k || keys.includes(k) || !n) return null;
   const inc = ({ bw: 'bw', time: 'time' })[u] || 'machine';
@@ -984,7 +1009,26 @@ const isHold = () => AT.isHold(state.ex);
 const urlW = () => { const p = PLAN.find(x => x.k === state.ex); if (p && p.w) return p.w; return state.ex === qp.get('ex') ? state.urlW : null; };   // the weight in the link belongs to that exercise
 /* voice: on by default when the camera is opened from the app or with the back camera; the choice is remembered */
 Voice.on = 'speechSynthesis' in window && (prefs.voice != null ? !!prefs.voice : (!!RET || qp.get('src') === 'app' || state.facing === 'environment'));
-Voice.queue = function (text) { if (!this.on || !('speechSynthesis' in window)) return; try { const u = new SpeechSynthesisUtterance(text); u.lang = 'ru-RU'; u.rate = 1.08; speechSynthesis.speak(u); this.last = performance.now(); } catch (e) { /* speech unavailable */ } };
+Voice.queue = function (text) { if (!this.on || !('speechSynthesis' in window)) return; try { const u = new SpeechSynthesisUtterance(text); u.lang = 'ru-RU'; u.rate = 1.0; if (this.voice) u.voice = this.voice; speechSynthesis.speak(u); this.last = performance.now(); } catch (e) { /* speech unavailable */ } };
+/* The phone's voices differ a lot: neural and «enhanced» voices put the stress right far more often. The best one is picked, the person can change it. */
+const VOICE_KEY = 'aitrainer.voice';
+const ruVoices = () => { try { return speechSynthesis.getVoices().filter(v => /^ru([-_]|$)/i.test(v.lang || '')); } catch (e) { return []; } };
+const voiceRank = v => { const n = v.name || ''; return (/natural|neural|нейро/i.test(n) ? 60 : 0) + (/enhanced|premium|улучш|высок/i.test(n) ? 50 : 0) + (/online/i.test(n) ? 20 : 0) + (/google/i.test(n) ? 30 : 0) + (/milena|милена|svetlana|светлана|dariya|дарья|alena|алёна|алена/i.test(n) ? 10 : 0) + (/compact|eloquence|novelty|whisper/i.test(n) ? -40 : 0); };
+function pickVoice() {
+  const list = ruVoices(); if (!list.length) { Voice.voice = null; return list; }
+  const saved = store.get(VOICE_KEY, '');
+  Voice.voice = list.find(v => v.name === saved) || list.slice().sort((a, b) => voiceRank(b) - voiceRank(a))[0];
+  return list;
+}
+function renderVoices() {
+  const list = pickVoice(), row = $('#voiceRow'); if (!row) return;
+  row.hidden = list.length < 2;
+  if (list.length < 2) return;
+  const sorted = list.slice().sort((a, b) => voiceRank(b) - voiceRank(a));
+  $('#voiceSel').innerHTML = sorted.map(v => '<option value="' + esc(v.name) + '"' + (Voice.voice && v.name === Voice.voice.name ? ' selected' : '') + '>' + esc(v.name.replace(/^Microsoft |^Google /, '').replace(/ - Russian.*$| \(Russia\)/i, '')) + '</option>').join('');
+}
+if ('speechSynthesis' in window) { renderVoicesSoon(); try { speechSynthesis.addEventListener('voiceschanged', renderVoices); } catch (e) { speechSynthesis.onvoiceschanged = renderVoices; } }
+function renderVoicesSoon() { setTimeout(renderVoices, 0); setTimeout(renderVoices, 800); }
 
 /* Sets live in the browser until they are written to the diary, so a closed app never loses them. */
 function loadSets() {
@@ -1015,7 +1059,7 @@ function setExercise(key) {
     : view === 'front' ? EX.cam.front : view === 'any' ? 'Поставь телефон сбоку или спереди в 2–3 м, всё тело в кадре' : EX.cam.side);
   if (isFree()) { el.howto.removeAttribute('src'); try { el.howto.load(); } catch (e) { /* fine */ } }
   else {
-    el.howto.src = 'howto/' + key + '.mp4';
+    if (HOWTO_HAVE.has(key)) el.howto.src = 'howto/' + key + '.mp4'; else { el.howto.removeAttribute('src'); try { el.howto.load(); } catch (e) { /* fine */ } }
     if (!state.on) try { const p = el.howto.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* autoplay blocked */ }
   }
   state.fallback = false;
@@ -1027,7 +1071,7 @@ function setExercise(key) {
 function newAnalyzer() {
   state.analyzer = isFree() || state.fallback ? new AT.FreeAnalyzer(state.level) : AT.analyzerFor(state.ex, state.depth, state.level);
   state.snap = null; state.flash = null;
-  if (state.detector) try { state.detector.reset(); } catch (e) { /* fine */ }
+  resetDet();
 }
 el.sel.addEventListener('change', () => setExercise(el.sel.value));
 
@@ -1097,6 +1141,9 @@ function loop(now) {
 const H = { lastT: -1, still: 0, errors: 0, ok: 0, lastErr: '', noPose: 0 };
 function health() {
   if (!state.on || state.file || !state.stream || !el.msg.hidden) return;
+  if (state.engine === 'mp-full' && H.nInf > 60 && H.ms > 110) swapEngine('mp-lite');
+  if (Rec.secs() > 180 && !(state.analyzer && state.analyzer.reps.length)) Rec.restart();   // keep only the current attempt
+  helperCheck();
   const v = el.vid;
   if (v.paused || v.ended) { try { const p = v.play(); if (p && p.catch) p.catch(() => tapToStart()); } catch (e) { tapToStart(); } }
   if (v.currentTime === H.lastT) H.still++; else { H.still = 0; H.lastT = v.currentTime; }
@@ -1122,28 +1169,33 @@ async function infer() {
   try {
     const t = performance.now() / 1000;
     syncSize(v);
-    const kp = toKp(await state.detector.estimatePoses(v, { maxPoses: 1, flipHorizontal: false }, t * 1000));
+    const t0 = performance.now(), kp = toKp(await state.detector.estimatePoses(v, { maxPoses: 1, flipHorizontal: false }, t * 1000)), dt = performance.now() - t0;
+    H.ms = H.ms == null ? dt : H.ms + (dt - H.ms) * 0.05; H.nInf = (H.nInf || 0) + 1;
     state.frame = { kp, W: v.videoWidth, H: v.videoHeight };
     H.ok++; H.noPose = kp ? 0 : H.noPose + 1;
-    handleSnap(state.analyzer.update(kp, t));
-  } catch (e) { console.error(e); H.errors++; H.lastErr = String((e && e.message) || e); }
+    if (state.recOnly) state.snap = { status: framed(kp) ? 'rec' : 'nobody', live: [], view: 'side', side: 'l', reps: 0, phase: 'top' };
+    else handleSnap(state.analyzer.update(kp, t));
+  } catch (e) {
+    console.error(e); H.errors++; H.lastErr = String((e && e.message) || e);
+    if (state.engine && state.engine !== 'tfjs' && H.errors > 10 && !H.ok) swapEngine('tfjs');
+  }
   finally { state.busy = false; }
 }
 function handleSnap(snap) { state.snap = snap; processEvents(state.analyzer.drain()); }
 function processEvents(evts) {
   const A = state.analyzer;
   for (const e of evts) {
-    if (e.type === 'cue') Voice.say(A.meta(e.id).cue, e.id);
+    if (e.type === 'cue') { if (!state.file) Voice.say(A.meta(e.id).cue, e.id); }
     else if (e.type === 'rep') {
       const r = e.rep, now = performance.now();
       if (isHold()) continue;
       state.flash = r.faultList.length
         ? { cls: r.grade === 'bad' ? 'bad' : 'warn', text: 'Повтор ' + r.n + ': ' + A.meta(r.faultList[0]).cue.toLowerCase(), until: now + 1800 }
         : { cls: 'good', text: 'Повтор ' + r.n + ' — ' + (Math.random() < 0.3 ? pick(T.praise).toLowerCase() : 'чисто'), until: now + 1400 };
-      Voice.say(String(r.n), 'rep' + r.n, false, true);
+      if (!state.file) Voice.say(String(r.n), 'rep' + r.n, false, true);
     } else if (e.type === 'setEnd') recordSet();
     else if (e.type === 'newSet') renderMain();
-    else if (e.type === 'status' && e.id === 'ready') Voice.say('Поехали', 'ready');
+    else if (e.type === 'status' && e.id === 'ready') { if (!state.file) Voice.say('Поехали', 'ready'); }
   }
   if (evts.length) renderMain();
 }
@@ -1162,13 +1214,11 @@ function recordSet() {
   };
   set.note = setVerdict(set, set.cue);
   state.sets.push(set); state.view = A.view || state.view; saveSets();
+  if (!state.file) { Rec.restart(); attemptT0 = performance.now(); helperAt = 25000; }
   state.flash = { cls: set.c / set.n >= 0.8 ? 'good' : 'info', text: 'Подход ' + state.sets.length + ' · ' + set.note, until: performance.now() + 6000 };
   Voice.say('Подход ' + state.sets.length + '. ' + set.note, 'set', true);
   renderSets(); renderMain();
-  if (state.alt && state.altPair && state.altPair.includes(state.ex)) {
-    const other = state.altPair[0] === state.ex ? state.altPair[1] : state.altPair[0], from = state.ex;
-    setTimeout(() => { if (state.alt && state.ex === from && other) { switchTo(other, false); Voice.queue('Дальше — ' + planName(other) + '. Подход ' + (setsOf(other).length + 1)); } }, 1500);
-  }
+  afterSet();
 }
 function qClass(s) { if (!s.n) return 'none'; const q = s.c / s.n; return q >= 0.8 ? 'good' : q >= 0.5 ? 'fair' : 'bad'; }
 function renderSets() {
@@ -1184,25 +1234,45 @@ function renderSets() {
   renderSend(); renderPlan();
 }
 /* ---------- today's workout from the app ---------- */
-const ALT_KEY = 'aitrainer.alt';
-state.alt = PLAN.length > 1 && !!store.get(ALT_KEY, false);
-state.altPair = null;
+try { localStorage.removeItem('aitrainer.alt'); } catch (e) { /* old switch, not used */ }
 const planName = k => { const p = PLAN.find(x => x.k === k); return (p && p.n) || (EX.ex[k] && EX.ex[k].name) || ''; };
 const short = s => s.length > 24 ? s.slice(0, 23) + '…' : s;
 function setsOf(k) { if (k === state.ex) return state.sets; const all = store.get('aitrainer.sets', {}); return all[k] && all[k].date === today() ? all[k].sets : []; }
-function nextInPlan(k) { const i = PLAN.findIndex(p => p.k === k); return i < 0 ? (PLAN[0] || {}).k : PLAN[(i + 1) % PLAN.length].k; }
+const doneOf = k => setsOf(k).filter(s => s.r > 0).length;
+const leftOf = p => p.s == null ? Infinity : Math.max(0, p.s - doneOf(p.k));
+const groupOf = p => p && p.g ? PLAN.filter(x => x.g === p.g) : (p ? [p] : []);
+const spoken = p => (p.lab && p.g ? p.lab + ', ' : '') + p.n;
+/* supersets come only from the program (1А, 1Б…); everything else goes one by one, in order */
+function nextStep(p) {
+  const G = groupOf(p);
+  if (G.length > 1) {
+    const at = G.indexOf(p), order = [...G.slice(at + 1), ...G.slice(0, at + 1)], nx = order.find(x => leftOf(x) > 0);
+    if (nx) return nx === p ? { p: nx, rest: true } : { p: nx, rest: G.indexOf(nx) <= at, round: true };
+  } else if (leftOf(p) > 0) return null;
+  const after = PLAN.slice(PLAN.indexOf(G[G.length - 1]) + 1).concat(PLAN.slice(0, PLAN.indexOf(G[0])));
+  const nx = after.find(x => leftOf(x) > 0);
+  return nx ? { p: nx, rest: true, done: true } : { end: true };
+}
+function afterSet() {
+  const p = PLAN.find(x => x.k === state.ex); if (!p || PLAN.length < 2 && p.s == null) return;
+  const st = nextStep(p); if (!st) return;
+  const from = state.ex;
+  if (st.end) { Voice.queue('Все упражнения тренировки готовы. Запиши их в дневник'); return; }
+  if (st.p === p) return;
+  const say = st.done ? 'Готово: ' + doneOf(p.k) + ' ' + plural(doneOf(p.k), 'подход', 'подхода', 'подходов') + '. Отдыхай. Дальше — ' + spoken(st.p)
+    : st.rest ? 'Круг готов. Отдых, потом ' + spoken(st.p) : 'Дальше — ' + spoken(st.p) + ', без отдыха';
+  setTimeout(() => { if (state.ex === from) { switchTo(st.p.k, false); Voice.queue(say); } }, 1500);
+}
 function renderPlan() {
   const box = $('#planBox');
   if (!box || !PLAN.length) { if (box) box.hidden = true; return; }
   box.hidden = false;
-  $('#planChips').innerHTML = PLAN.map(p => { const c = setsOf(p.k).filter(s => s.r > 0).length; return '<button type="button" data-k="' + esc(p.k) + '" aria-pressed="' + (p.k === state.ex) + '"><span class="nm">' + esc(p.n) + '</span>' + (c ? '<b aria-label="подходов">' + c + '</b>' : '') + '</button>'; }).join('');
-  const alt = $('#altBtn');
-  alt.hidden = PLAN.length < 2;
-  if (PLAN.length > 1) {
-    if (state.alt && (!state.altPair || !state.altPair.includes(state.ex))) state.altPair = [state.ex, nextInPlan(state.ex)];
-    const pair = state.altPair || [state.ex, nextInPlan(state.ex)];
-    alt.setAttribute('aria-checked', String(!!state.alt));
-    $('#altText').textContent = state.alt ? 'По очереди: ' + short(planName(pair[0])) + ' ⇄ ' + short(planName(pair[1])) : 'Чередовать подходы с «' + short(planName(pair[1])) + '»';
+  $('#planChips').innerHTML = PLAN.map(p => { const c = doneOf(p.k), fin = p.s != null && c >= p.s; return '<button type="button" class="' + (p.g ? 'ss' : '') + (fin ? ' fin' : '') + '" data-k="' + esc(p.k) + '" aria-pressed="' + (p.k === state.ex) + '">' + (p.lab ? '<span class="lb">' + esc(p.lab) + '</span>' : '') + '<span class="nm">' + esc(p.n) + '</span>' + (c ? '<b aria-label="подходов">' + c + (p.s ? '/' + p.s : '') + '</b>' : '') + '</button>'; }).join('');
+  const info = $('#planInfo'), p = PLAN.find(x => x.k === state.ex), G = groupOf(p);
+  if (info) {
+    if (G.length > 1) { info.hidden = false; info.innerHTML = '<b>' + (G.length === 2 ? 'Суперсет' : 'Круг') + ' ' + G.map(x => esc(x.lab)).join(' + ') + '</b> — по подходу по очереди, переключу сама, отдых после круга'; }
+    else if (p && p.s) { info.hidden = false; info.textContent = 'По плану ' + p.s + ' ' + plural(p.s, 'подход', 'подхода', 'подходов') + ', потом перейду к следующему упражнению'; }
+    else info.hidden = true;
   }
   const cur = $('#planChips [aria-pressed="true"]');
   if (cur) { const row = $('#planChips'); row.scrollLeft = Math.max(0, cur.offsetLeft - row.offsetWidth / 2 + cur.offsetWidth / 2); }
@@ -1212,17 +1282,12 @@ function switchTo(k, manual) {
   const A = state.analyzer;
   if (A && A.reps.length && !A.setEnded) { A.endSet(); processEvents(A.drain()); }   // a running set belongs to the old exercise
   saveSets();
-  if (manual && state.alt) state.altPair = [k, nextInPlan(k)];
   setExercise(k);
   if (manual) Voice.say(info().name, 'ex', true);
 }
 $('#planChips').addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (b) switchTo(b.dataset.k, true); });
-$('#altBtn').addEventListener('click', () => {
-  state.alt = !state.alt; store.set(ALT_KEY, state.alt);
-  state.altPair = state.alt ? [state.ex, nextInPlan(state.ex)] : null;
-  renderPlan();
-  Voice.say(state.alt ? 'Чередую: после подхода переключу на ' + planName(state.altPair[1]) : 'Без чередования', 'alt', true);
-});
+/* automated checks only (?debug=1): a finished set without a camera */
+if (qp.get('debug') === '1') window.__camTest = { set(r) { state.sets.push({ r, n: r, c: r, f: {}, w: weighted() ? urlW() : null, cue: '', g: [], file: false, note: '' }); saveSets(); renderSets(); renderMain(); afterSet(); }, ex: () => state.ex };
 el.setList.addEventListener('input', e => {
   const li = e.target.closest('.set'); if (!li) return;
   const s = state.sets[Number(li.dataset.i)];
@@ -1338,6 +1403,9 @@ function missingHint(kp) {
 }
 function cueState() {
   const snap = state.snap, now = performance.now(), A = state.analyzer;
+  if (state.on && state.file && !state.analyzing && state.snap) return state.flash && state.flash.until > now ? state.flash : { cls: 'info', text: 'Видео разобрано. Можно снять следующий подход' };
+  if (state.on && state.file && state.analyzing) return { cls: 'info', text: 'Разбираю видео · ' + (state.prog || 0) + '%' + (snap && snap.reps ? ' · повторов: ' + snap.reps : '') };
+  if (state.on && state.recOnly) { const s = Math.round(Rec.secs()); return { cls: 'info', text: '● Запись ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' · ' + (!snap || snap.status === 'nobody' ? 'встань в кадр целиком' : 'вижу тебя целиком') }; }
   if (!state.on) return state.flash && state.flash.until > now ? state.flash : { cls: 'tip', text: info().tips[0] };
   if (!snap) return { cls: 'info', text: state.detector ? 'Включаю камеру…' : 'Готовлю тренера…' };
   if (snap.status === 'nobody') return { cls: 'info', text: missingHint(state.frame && state.frame.kp) };
@@ -1351,7 +1419,7 @@ function cueState() {
 }
 let lastStatus = '', lastStatusSay = 0, calibSaid = false, turnSince = null;
 function speakStatus() {
-  const snap = state.snap; if (!state.on || !snap) { lastStatus = ''; return; }
+  const snap = state.snap; if (!state.on || !snap || state.file) { lastStatus = ''; turnSince = null; return; }
   const now = performance.now(), s = snap.status;
   const text = s === 'nobody' ? missingHint(state.frame && state.frame.kp) : STATUS_TEXT[s] || (s === 'calib' ? calibText() : null);
   if (s !== lastStatus) {
@@ -1378,7 +1446,7 @@ function renderLive() {
   el.cue.className = 'cue ' + cs.cls;
   if (el.cueText.textContent !== cs.text) el.cueText.textContent = cs.text;
   const snap = state.snap, hold = isHold();
-  el.hud.hidden = !state.on;
+  el.hud.hidden = !state.on || !!state.recOnly;
   if (snap) {
     const n = hold ? Math.floor(snap.held || 0) : (snap.setEnded ? 0 : snap.reps);
     el.repNum.textContent = n;
@@ -1390,50 +1458,93 @@ const ICON_CHECK = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" s
 function renderMain() {
   const A = state.analyzer, inSet = state.on && A && A.reps.length && !A.setEnded;
   const b = el.main;
+  $('#altBtns').hidden = state.on;
+  if (state.on && state.recOnly) { b.className = 'main-btn rec'; b.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="2"/></svg>Стоп — разобрать видео'; return; }
   b.className = 'main-btn' + (inSet ? ' stop' : state.on ? ' secondary' : '');
   b.innerHTML = !state.on ? ICON_PLAY + (state.sets.length ? 'Следующий подход с камерой' : 'Начать подход с камерой')
-    : inSet ? ICON_CHECK + 'Подход закончен' : 'Выключить камеру';
+    : inSet ? ICON_CHECK + 'Подход закончен' : state.file ? 'Закрыть видео' : 'Выключить камеру';
 }
 el.main.addEventListener('click', () => {
   const A = state.analyzer;
-  if (!state.on) return startCamera();
+  if (!state.on) { state.recOnly = false; return startCamera(); }
+  if (state.recOnly) return finishRecording();
   if (A && A.reps.length && !A.setEnded) { A.endSet(); processEvents(A.drain()); return; }
+  if (!state.file && A && !A.reps.length && Rec.secs() >= 12 && el.msg.hidden) return showLiveHelp('Подход не посчитан', 'Я не увидела ни одного повтора.');
   stopCamera();
 });
+$('#recBtn').addEventListener('click', () => startRecordMode());
+$('#vidBtn').addEventListener('click', () => pickVideo());
+$('#voiceSel').addEventListener('change', e => { store.set(VOICE_KEY, e.target.value); pickVoice(); });
+$('#voiceTest').addEventListener('click', () => { const was = Voice.on; Voice.on = true; Voice.say('Привет! Отойди подальше, чтобы было видно всё тело. Начинаем подход.', 'test', true); Voice.on = was; });
 
 /* ---------- camera and model ---------- */
 function loadScript(src) {
   return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.async = false; s.onload = res; s.onerror = () => rej(new Error('Не загрузилась библиотека: ' + src)); document.head.appendChild(s); });
 }
+const ENGINE_KEY = 'aitrainer.engine';
+const LOCAL = !!window.AI_TRAINER_STANDALONE;
+const MP_PATH = LOCAL ? new URL('vendor/mediapipe', location.href).href : 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404';
+function engineOrder() {
+  const e = store.get(ENGINE_KEY, null), fresh = e && Date.now() - (e.at || 0) < 3 * 864e5;
+  let gl2 = false; try { gl2 = !!document.createElement('canvas').getContext('webgl2'); } catch (x) { gl2 = false; }
+  if (typeof WebAssembly !== 'object' || !gl2 || (fresh && e.e === 'tfjs')) return ['tfjs'];
+  if (fresh && e.e === 'mp-lite') return ['mp-lite', 'tfjs'];
+  return ['mp-full', 'tfjs'];
+}
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+async function createEngine(kind) {
+  if (!window.tf) await loadScript(LOCAL ? 'vendor/tf.min.js' : 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js');
+  if (!window.poseDetection) await loadScript(LOCAL ? 'vendor/pose-detection.min.js' : 'https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js');
+  let det;
+  if (kind === 'tfjs') {
+    try { await tf.setBackend('webgl'); } catch (e) { await tf.setBackend('cpu'); }
+    await tf.ready();
+    det = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, {
+      runtime: 'tfjs', modelType: 'lite', enableSmoothing: true,
+      detectorModelUrl: 'models/blazepose-detector.json', landmarkModelUrl: 'models/blazepose-lite.json'
+    });
+  } else {
+    if (!window.Pose) await loadScript(MP_PATH + '/pose.js');
+    det = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { runtime: 'mediapipe', modelType: kind === 'mp-full' ? 'full' : 'lite', enableSmoothing: true, solutionPath: MP_PATH });
+  }
+  const wc = document.createElement('canvas'); wc.width = wc.height = 256; const wg = wc.getContext('2d'); wg.fillStyle = '#777'; wg.fillRect(0, 0, 256, 256);
+  await det.estimatePoses(wc); try { det.reset && det.reset(); } catch (e) { /* fine */ }
+  return det;
+}
 async function ensureDetector() {
   if (state.detector) return state.detector;
   if (!state.detectorLoading) {
     state.detectorLoading = (async () => {
-      const local = !!window.AI_TRAINER_STANDALONE;
-      if (!window.tf) await loadScript(local ? 'vendor/tf.min.js' : 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js');
-      if (!window.poseDetection) await loadScript(local ? 'vendor/pose-detection.min.js' : 'https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js');
-      try { await tf.setBackend('webgl'); } catch (e) { await tf.setBackend('cpu'); }
-      await tf.ready();
-      const det = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, {
-        runtime: 'tfjs', modelType: 'lite', enableSmoothing: true,
-        detectorModelUrl: 'models/blazepose-detector.json', landmarkModelUrl: 'models/blazepose-lite.json'
-      });
-      const wc = document.createElement('canvas'); wc.width = wc.height = 256; const wg = wc.getContext('2d'); wg.fillStyle = '#777'; wg.fillRect(0, 0, 256, 256);
-      await det.estimatePoses(wc); det.reset();
-      state.detector = det; return det;
+      let last = null;
+      for (const kind of engineOrder()) {
+        try { const det = await withTimeout(createEngine(kind), 60000); state.detector = det; state.engine = kind; return det; }
+        catch (e) { console.error(kind, e); last = e; if (kind !== 'tfjs') store.set(ENGINE_KEY, { e: 'tfjs', at: Date.now() }); }
+      }
+      throw last || new Error('no pose model');
     })();
   }
   try { return await state.detectorLoading; } catch (e) { state.detectorLoading = null; throw e; }
 }
+const resetDet = () => { try { state.detector && state.detector.reset && state.detector.reset(); } catch (e) { /* fine */ } };
+/* A slow phone gets the lighter model; a model that cannot read frames gets the old one. */
+async function swapEngine(kind) {
+  if (state.swapping) return; state.swapping = true;
+  const old = state.detector; state.detector = null; state.detectorLoading = null;
+  try { old && old.dispose && old.dispose(); } catch (e) { /* fine */ }
+  store.set(ENGINE_KEY, { e: kind, at: Date.now() });
+  try { await ensureDetector(); resetDet(); } catch (e) { console.error(e); }
+  H.ms = null; H.nInf = 0; H.errors = 0; H.ok = 0; state.swapping = false;
+}
 function showMsg(title, text, actions, spinning) {
   el.msg.hidden = false; el.msgTitle.textContent = title; el.msgText.textContent = text; el.msgSpin.hidden = !spinning;
+  el.stage.classList.toggle('msg-open', text.length > 140 || (actions || []).length > 2);
   el.msgActions.innerHTML = '';
   for (const a of actions || []) { const b = document.createElement('button'); b.type = 'button'; b.textContent = a.label; if (a.primary) b.className = 'primary'; b.addEventListener('click', a.run); el.msgActions.appendChild(b); }
 }
-function hideMsg() { el.msg.hidden = true; }
+function hideMsg() { el.msg.hidden = true; el.stage.classList.remove('msg-open'); }
 async function loadModelWithUi() {
   if (state.detector) return true;
-  showMsg('Готовлю тренера', 'Загружаю модель позы, около 9 МБ — один раз, дальше всё считается прямо на телефоне.', [], true);
+  showMsg('Готовлю тренера', 'Загружаю модель позы, около 15 МБ — один раз, дальше всё считается прямо на телефоне.', [], true);
   try { await ensureDetector(); hideMsg(); return true; }
   catch (e) {
     console.error(e);
@@ -1468,13 +1579,17 @@ async function startCamera() {
   setAspect(el.vid.videoWidth || 720, el.vid.videoHeight || 1280);
   requestWake();
   if (!(await loadModelWithUi())) { stopCamera(); return; }
-  state.detector.reset();
+  resetDet();
+  Rec.start(state.stream); attemptT0 = performance.now(); helperAt = 25000;
+  if (state.recOnly) Voice.say('Запись пошла. Сделай подход и нажми «Стоп»', 'rec', true);
 }
 function stopStream() {
+  Rec.drop();
   if (state.stream) { for (const t of state.stream.getTracks()) t.stop(); state.stream = null; }
   if (el.vid.srcObject) el.vid.srcObject = null;
 }
 function stopCamera() {
+  state.recOnly = false;
   const A = state.analyzer;
   if (A && A.reps.length && !A.setEnded) { A.endSet(); processEvents(A.drain()); }
   stopStream(); stopFile(); releaseWake(); state.frame = null; showCameraMode(false);
@@ -1484,7 +1599,7 @@ function cameraBlocked() {
   showMsg('Нет доступа к камере', tgIn
     ? 'Разреши Telegram доступ к камере в настройках телефона и нажми «Повторить». Или выбери видео подхода из галереи.'
     : 'Разреши камеру для этой страницы (значок замка или «аА» в адресной строке) и нажми «Повторить». Или выбери видео подхода.',
-    [{ label: 'Повторить', primary: true, run: () => { hideMsg(); startCamera(); } }, { label: 'Видео из галереи', run: () => { hideMsg(); $('#fileInput').click(); } }]);
+    [{ label: 'Повторить', primary: true, run: () => { hideMsg(); startCamera(); } }, { label: 'Видео из галереи', run: () => { hideMsg(); pickVideo(); } }]);
 }
 el.stage.addEventListener('click', () => { if (state.on && el.vid.paused) { try { el.vid.play(); } catch (e) { /* fine */ } } });
 function renderFacing() {
@@ -1508,6 +1623,87 @@ async function requestWake() { try { wake = await navigator.wakeLock.request('sc
 function releaseWake() { try { wake && wake.release(); } catch (e) { /* ignore */ } wake = null; }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.on && !wake) requestWake(); });
 
+/* ---------- the current attempt is recorded in the background (it never leaves the phone) ---------- */
+const Rec = {
+  mr: null, chunks: [], t0: 0, mime: '',
+  ok() { return typeof MediaRecorder !== 'undefined'; },
+  start(stream) {
+    this.drop(); if (!this.ok() || !stream) return;
+    const types = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+    this.mime = types.find(t => { try { return MediaRecorder.isTypeSupported(t); } catch (e) { return false; } }) || '';
+    try { this.mr = new MediaRecorder(stream, Object.assign({ videoBitsPerSecond: 1500000 }, this.mime ? { mimeType: this.mime } : {})); }
+    catch (e) { this.mr = null; return; }
+    this.chunks = []; this.t0 = performance.now();
+    this.mr.ondataavailable = e => { if (e.data && e.data.size) this.chunks.push(e.data); };
+    try { this.mr.start(1000); } catch (e) { this.mr = null; }
+  },
+  secs() { return this.mr ? (performance.now() - this.t0) / 1000 : 0; },
+  restart() { if (state.stream) this.start(state.stream); },
+  drop() { const mr = this.mr; this.mr = null; this.chunks = []; if (mr && mr.state !== 'inactive') try { mr.ondataavailable = null; mr.stop(); } catch (e) { /* fine */ } },
+  take() {
+    const mr = this.mr; this.mr = null;
+    if (!mr) return Promise.resolve(null);
+    return new Promise(res => {
+      const done = () => { const b = this.chunks.length ? new Blob(this.chunks, { type: (mr.mimeType || this.mime || 'video/webm').split(';')[0] }) : null; this.chunks = []; res(b); };
+      if (mr.state === 'inactive') return done();
+      mr.onstop = () => setTimeout(done, 0);
+      try { mr.stop(); } catch (e) { done(); }
+    });
+  }
+};
+const framed = kp => { if (!kp) return false; const ok = i => kp[i] && kp[i].score > 0.5, any = (a, b) => ok(a) || ok(b); return any(11, 12) && any(23, 24) && (any(25, 26) || any(27, 28)); };
+const viewWord = () => { const v = AT.viewOf(state.ex); return v === 'front' ? 'лицом к телефону' : v === 'side' ? 'боком к телефону' : 'боком или лицом к телефону'; };
+function manualSet() {
+  renderSets(); el.setsBox.hidden = false;
+  const b = $('#addSet'); if (b) b.click();
+  try { el.setsBox.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { /* fine */ }
+}
+/* the live coach could not count: offer the recording, or the set by hand */
+let attemptT0 = 0, helperAt = 25000;
+function helperCheck() {
+  if (!state.on || state.file || state.recOnly || !el.msg.hidden) return;
+  const A = state.analyzer;
+  if (!A || A.reps.length || A.rep) { attemptT0 = performance.now(); return; }
+  if (performance.now() - attemptT0 < helperAt) return;
+  helperAt = Infinity;
+  const s = state.snap ? state.snap.status : 'nobody';
+  const why = s === 'nobody' ? missingHint(state.frame && state.frame.kp)
+    : s === 'turn' || s === 'turn_front' ? 'Ракурс не подходит: встань ' + viewWord() + ', в 2–3 м'
+    : s === 'calib' ? 'Замри на секунду в начальном положении — так я пойму, откуда считать'
+    : 'Не вижу повторов — двигайся на полную амплитуду, целиком в кадре';
+  showLiveHelp('Не получается посчитать?', why + '.', () => { attemptT0 = performance.now(); helperAt = 45000; });
+  Voice.say('Не получается посчитать. ' + why, 'helper', true);
+}
+function showLiveHelp(title, why, onContinue) {
+  const acts = [], secs = Math.round(Rec.secs());
+  if (secs >= 4) acts.push({ label: 'Разобрать запись', primary: true, run: () => { hideMsg(); analyzeLive(); } });
+  acts.push({ label: 'Записать вручную', primary: !acts.length, run: () => { hideMsg(); stopCamera(); manualSet(); } });
+  acts.push({ label: onContinue ? 'Продолжить' : 'Выключить камеру', run: () => { hideMsg(); if (onContinue) onContinue(); else stopCamera(); } });
+  showMsg(title, why + (secs >= 4 ? '\n\nЯ записала последние ' + secs + ' с — могу пройти запись кадр за кадром, это точнее. Или запиши подход вручную.' : '\n\nМожно записать подход вручную или снять на видео и разобрать после.'), acts);
+}
+async function analyzeLive() {
+  const blob = await Rec.take();
+  stopStream(); releaseWake();
+  if (!blob || blob.size < 2000) { showCameraMode(false); return showMsg('Запись не сохранилась', 'Телефон не дал записать видео. Сними подход обычной камерой телефона и выбери его здесь.', [{ label: 'Выбрать видео', primary: true, run: () => { hideMsg(); pickVideo(true); } }, { label: 'Закрыть', run: hideMsg }]); }
+  analyzeVideo(blob, 'rec');
+}
+async function startRecordMode() { state.recOnly = true; await startCamera(); if (!state.on) state.recOnly = false; renderMain(); }
+async function finishRecording() { state.recOnly = false; renderMain(); return analyzeLive(); }
+/* before a video: how to film it, so the coach can read it */
+function pickVideo(skipGuide) {
+  if (skipGuide) return $('#fileInput').click();
+  const v = AT.viewOf(state.ex), name = info().name;
+  showMsg('Как снять, чтобы я разобрала',
+    '• Встань подальше — в 2–3 м от телефона: в кадре всё тело от головы до стоп.\n' +
+    '• Встань ' + viewWord() + (v === 'side' ? ' — так видно углы в суставах' : '') + '. Для «' + name + '» это важно.\n' +
+    '• Телефон неподвижно, на уровне пояса — на полке, скамье или штативе.\n' +
+    '• Свет спереди, не против окна. Одно видео — один подход, до минуты.\n\n' +
+    'Если снято по-другому, я честно скажу, что по такому видео ничего сказать не могу.',
+    [{ label: 'Выбрать видео', primary: true, run: () => { hideMsg(); $('#fileInput').click(); } },
+     { label: 'Снять сейчас', run: () => { hideMsg(); startRecordMode(); } },
+     { label: 'Отмена', run: hideMsg }]);
+}
+
 /* A recorded video (when the live camera is blocked) is read frame by frame, 15 per second. */
 let fileToken = 0;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1516,28 +1712,86 @@ function stopFile() {
   fileToken++;
   if (state.file) { try { el.vid.pause(); } catch (e) { /* fine */ } el.vid.removeAttribute('src'); el.vid.load(); URL.revokeObjectURL(state.file); state.file = null; }
 }
-$('#fileInput').addEventListener('change', async e => {
+$('#fileInput').addEventListener('change', e => {
   const file = e.target.files[0]; e.target.value = ''; if (!file) return;
-  stopStream(); stopFile();
-  state.file = URL.createObjectURL(file); state.usedFile = true;
+  analyzeVideo(file, 'upload');
+});
+const metaOf = v => new Promise(res => { if (v.readyState >= 1) return res(true); v.addEventListener('loadedmetadata', () => res(true), { once: true }); v.addEventListener('error', () => res(false), { once: true }); });
+/* a recording from the phone (webm) knows its length only after a seek to the very end */
+function fixDuration(v) {
+  return new Promise(res => {
+    let to = 0;
+    const done = () => { v.removeEventListener('durationchange', chk); v.removeEventListener('timeupdate', chk); clearTimeout(to); const d = v.duration; v.currentTime = 0; res(isFinite(d) ? d : NaN); };
+    const chk = () => { if (isFinite(v.duration)) done(); };
+    v.addEventListener('durationchange', chk); v.addEventListener('timeupdate', chk);
+    to = setTimeout(done, 4000);
+    try { v.currentTime = 1e101; } catch (e) { done(); }
+  });
+}
+async function analyzeVideo(blob, from) {
+  stopStream(); stopFile(); state.recOnly = false; state.fallback = false; hideMsg();
+  state.file = URL.createObjectURL(blob); state.usedFile = true;
   const v = el.vid; v.srcObject = null; v.src = state.file; v.muted = true; v.classList.remove('mirror');
-  const ok = await new Promise(res => { if (v.readyState >= 1) return res(true); v.addEventListener('loadedmetadata', () => res(true), { once: true }); v.addEventListener('error', () => res(false), { once: true }); });
-  if (!ok || !v.videoWidth || !isFinite(v.duration)) { stopFile(); return showMsg('Видео не открылось', 'Попробуй другой файл: MP4 или MOV, снятый на телефон.', [{ label: 'Понятно', primary: true, run: hideMsg }]); }
+  const ok = await metaOf(v);
+  let dur = ok ? v.duration : NaN;
+  if (ok && !isFinite(dur)) dur = await fixDuration(v);
+  if (!ok || !v.videoWidth || !isFinite(dur) || dur <= 0) { stopFile(); showCameraMode(false); return showMsg('Видео не открылось', 'Попробуй другой файл: MP4 или MOV, снятый на телефон.', [{ label: 'Понятно', primary: true, run: hideMsg }]); }
   setAspect(v.videoWidth, v.videoHeight); newAnalyzer(); showCameraMode(true);
   if (!(await loadModelWithUi())) return stopCamera();
-  const token = ++fileToken, dur = v.duration;
-  state.detector.reset();
+  const token = ++fileToken, st = { n: 0, miss: {} };
+  const shadow = isFree() || state.fallback ? null : new AT.FreeAnalyzer(state.level);   // counts reps even when the angle does not suit the technique rules
+  resetDet(); state.analyzing = true; state.prog = 0;
   try { await v.play(); v.pause(); } catch (err) { /* priming */ }
-  for (let t = 0; token === fileToken && t <= dur; t += 1 / 15) {
+  const step = 1 / (dur > 60 ? 8 : dur > 20 ? 10 : 15);   // a long recording: fewer frames, still enough to see every rep
+  for (let t = 0; token === fileToken && t <= dur; t += step) {
     const w0 = performance.now();
     await seekTo(v, Math.min(t, Math.max(0, dur - 0.01)));
     if (token !== fileToken) return;
-    try { syncSize(v); const kp = toKp(await state.detector.estimatePoses(v, { maxPoses: 1, flipHorizontal: false }, t * 1000)); state.frame = { kp, W: v.videoWidth, H: v.videoHeight }; handleSnap(state.analyzer.update(kp, t)); }
-    catch (err) { console.error(err); }
-    const wait = 1000 / 15 - (performance.now() - w0); if (wait > 0) await sleep(wait);
+    try {
+      syncSize(v);
+      const kp = toKp(await state.detector.estimatePoses(v, { maxPoses: 1, flipHorizontal: false }, t * 1000));
+      state.frame = { kp, W: v.videoWidth, H: v.videoHeight };
+      const snap = state.analyzer.update(kp, t); handleSnap(snap);
+      if (shadow) { shadow.update(kp, t); shadow.drain(); }
+      st.n++; st[snap.status] = (st[snap.status] || 0) + 1;
+      if (snap.status === 'nobody') { const m = missingHint(kp); st.miss[m] = (st.miss[m] || 0) + 1; }
+      state.prog = Math.min(99, Math.round(t / dur * 100));
+    } catch (err) { console.error(err); }
+    const wait = 1000 / 30 - (performance.now() - w0); if (wait > 0) await sleep(wait);
   }
-  if (token === fileToken) { state.analyzer.endSet(); processEvents(state.analyzer.drain()); }
-});
+  state.analyzing = false;
+  if (token !== fileToken) return;
+  const A = state.analyzer, found = A.reps.length;
+  A.endSet(); processEvents(A.drain());
+  try { v.pause(); } catch (e) { /* fine */ }
+  videoVerdict(st, found, shadow, from);
+}
+function videoVerdict(st, found, shadow, from) {
+  const n = Math.max(1, st.n), share = k => (st[k] || 0) / n, turn = share('turn') + share('turn_front'), nobody = share('nobody');
+  const name = info().name, miss = Object.keys(st.miss).sort((a, b) => st.miss[b] - st.miss[a])[0];
+  const again = [{ label: from === 'rec' ? 'Снять ещё раз' : 'Снять на камеру', primary: true, run: () => { hideMsg(); startRecordMode(); } },
+    { label: 'Другое видео', run: () => { hideMsg(); pickVideo(); } }, { label: 'Записать вручную', run: () => { hideMsg(); manualSet(); } }];
+  const tell = (title, text, acts, say) => { state.flash = null; showMsg(title, text, acts); Voice.say(say || title, 'verdict', true); };
+  if (found) {
+    if (turn > 0.35) state.flash = { cls: 'info', text: 'Часть видео снята с неудобного ракурса — в следующий раз встань ' + viewWord(), until: performance.now() + 8000 };
+    return;
+  }
+  if (shadow && shadow.reps.length >= 2 && nobody < 0.5) {
+    state.fallback = true; state.analyzer = shadow; shadow.endSet(); processEvents(shadow.drain());
+    return tell('Повторы посчитала, технику — нет', 'Съёмка с неподходящего ракурса: для «' + name + '» нужно встать ' + viewWord() + '. Повторы (' + shadow.reps.length + ') я записала, а подсказки по технике дам, если в следующий раз снять по-другому.',
+      [{ label: 'Понятно', primary: true, run: hideMsg }, again[0]], 'Повторы посчитала. Технику по этому видео оценить не могу: снимай ' + viewWord());
+  }
+  if (nobody > 0.5) {
+    return tell('По этому видео я ничего не могу сказать', (miss && miss !== STATUS_TEXT.nobody && !/^Не вижу человека/.test(miss) ? miss + '.\n\n' : 'Не вижу человека в кадре целиком.\n\n') +
+      'В следующий раз встань подальше — в 2–3 м от телефона, чтобы в кадре было всё тело от головы до стоп. Встань ' + viewWord() + ', телефон на уровне пояса, свет спереди.', again,
+      'По этому видео я ничего не могу сказать. Встань подальше, чтобы было видно всё тело');
+  }
+  if (turn > 0.35) {
+    return tell('Съёмка с неподходящего ракурса', 'По этому видео я ничего не могу сказать: для «' + name + '» нужно встать ' + viewWord() + '. Отойди на 2–3 м, чтобы было видно всё тело, и сними ещё раз.', again,
+      'Съёмка с неподходящего ракурса. Встань ' + viewWord());
+  }
+  tell('Не нашла повторов', 'Тебя видно, но повторов я не нашла. Начни запись до подхода и замри на секунду в начальном положении, потом делай повторы на полную амплитуду — целиком в кадре.', again);
+}
 
 el.voice.addEventListener('click', () => {
   if (!('speechSynthesis' in window)) { el.voice.disabled = true; return; }
@@ -1551,8 +1805,8 @@ new MutationObserver(readColors).observe(document.documentElement, { attributes:
 fillSelect(); setAspect(1, 1); resize(); setExercise(state.ex); renderFacing(); renderPlan();
 el.voice.setAttribute('aria-pressed', String(Voice.on));
 requestAnimationFrame(loop);
-if (MODE_VIDEO) showMsg('Разбор видео', 'Выбери запись подхода до минуты: телефон сбоку или спереди, видно всё тело. Видео разбирается прямо на телефоне и никуда не загружается.',
-  [{ label: 'Выбрать видео', primary: true, run: () => { hideMsg(); $('#fileInput').click(); } }, { label: 'Включить камеру', run: () => { hideMsg(); startCamera(); } }]);
+if (MODE_VIDEO) pickVideo();
+if (!Rec.ok()) $('#recBtn').hidden = true;
 
 if (window.AI_TRAINER_STANDALONE) {
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
