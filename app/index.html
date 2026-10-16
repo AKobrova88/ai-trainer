@@ -2208,16 +2208,32 @@ function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw))), n 
 
 /* ---------- camera tab: live coach and video check (both run in the camera page, results come back here) ---------- */
 const hash = s => { let h = 0; for (const ch of norm(s)) h = (h * 31 + ch.charCodeAt(0)) | 0; return (h >>> 0).toString(36); };
+/* today's workout goes to the camera too: there you switch exercises and alternate sets (supersets) */
+const b64u = t => btoa(unescape(encodeURIComponent(t))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function camPlan() {
+  const W = S.workout; if (!W) return [];
+  const seen = new Set(), out = [];
+  W.items.forEach((x, pos) => {
+    if (x.sec && !x.cam) return;
+    let k = x.base || 'own_' + hash(x.name);
+    if (seen.has(k)) k = 'own_' + hash(x.name + pos);   // the same exercise twice in a day: count the second by name
+    seen.add(k);
+    out.push([k, x.name.slice(0, 60), x.sec ? 'time' : stepOf(x) ? 'w' : 'bw', x.sets && x.sets[0] ? x.sets[0].w : x.w || 0, pos]);
+  });
+  return out;
+}
 function camLink(it, mode) {
-  const u = new URL(CAM_URL);
+  const u = new URL(CAM_URL), plan = camPlan();
   if (it) {
+    const W = S.workout, pos = W ? W.items.findIndex(x => x === it || norm(x.name) === norm(it.name)) : -1, mine = plan.find(p => p[4] === pos);
     /* the camera knows technique for its own keys; anything else it still counts by name */
-    u.searchParams.set('ex', it.base || 'own_' + hash(it.name));
+    u.searchParams.set('ex', mine ? mine[0] : it.base || 'own_' + hash(it.name));
     u.searchParams.set('n', it.name.slice(0, 60));
     u.searchParams.set('u', it.sec ? 'time' : stepOf(it) ? 'w' : 'bw');
     const w = it.sets && it.sets[0] ? it.sets[0].w : it.w;
     if (w) u.searchParams.set('w', String(w));
   }
+  if (plan.length > 1) u.searchParams.set('plan', b64u(JSON.stringify(plan)));
   u.searchParams.set('cam', S.camFacing === 'back' ? 'back' : 'front');
   u.searchParams.set('l', S.profile.exp || 'normal');
   if (mode) u.searchParams.set('mode', mode);
@@ -2252,6 +2268,7 @@ function viewCamera() {
       <button class="pickbtn" data-act="cam-pick"><span class="grow"><small>Упражнение</small><b>${esc(it.name)}</b></span>${c && c.cam ? '<span class="badge cam">разбор техники</span>' : '<span class="badge">счёт повторов</span>'}${CHEV}</button>
       <div class="seg" role="group" aria-label="Какой камерой снимать"><button data-act="cam-facing" data-v="front" aria-pressed="${S.camFacing !== 'back'}">Фронтальная</button><button data-act="cam-facing" data-v="back" aria-pressed="${S.camFacing === 'back'}">Основная</button></div>
       <span class="hint">${S.camFacing === 'back' ? 'Основная — картинка чётче, а подсказки скажу голосом: экран смотрит от тебя.' : 'Фронтальная — видишь себя и подсказки на экране. Поставь телефон в 2–3 м.'}</span>
+      ${S.workout && camPlan().length > 1 ? '<span class="hint">В камеру уйдёт вся сегодняшняя тренировка: там можно переключать упражнения и чередовать подходы, а потом одной кнопкой записать всё сюда.</span>' : ''}
       <a class="btn primary big" href="${esc(camLink(it))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go">Включить камеру</a>
     </section>
     <section class="camcard">
@@ -2278,7 +2295,10 @@ function processInbox() {
   const msgs = box.map(applyCamResult).filter(Boolean);
   if (S.stage !== 'app' && S.user) S.stage = 'app';
   render();
-  if (msgs.length) toast(msgs.join(' · '));
+  if (msgs.length > 1) {
+    const ok = box.filter(m => m && Array.isArray(m.sets) && m.sets.some(x => x && x.r > 0));
+    toast('Из камеры: ' + ok.map(m => `${(m.name || 'упражнение').length > 22 ? m.name.slice(0, 21) + '…' : m.name} — ${m.sets.filter(x => x && x.r > 0).length}`).join(', '));
+  } else if (msgs.length) toast(msgs[0]);
 }
 function applyCamResult(m) {
   if (!m || !Array.isArray(m.sets)) return null;
@@ -2287,7 +2307,7 @@ function applyCamResult(m) {
   const name = m.name || (CAT[m.ex] ? CAT[m.ex].n : 'Упражнение');
   const faults = {};
   for (const s of sets) for (const f of s.ft) { const k = f.t || f.id; faults[k] = faults[k] || {t: f.t, c: f.c, n: 0}; faults[k].n += f.n || 1; }
-  const v = {id: nid('v'), at: m.at || Date.now(), ex: m.ex, name, mode: m.mode || 'live', sets, reps: sets.reduce((a, s) => a + (s.n || s.r), 0), n: sets.reduce((a, s) => a + s.n, 0), c: sets.reduce((a, s) => a + s.c, 0), g: sets.flatMap(s => s.g), faults: Object.values(faults).sort((a, b) => b.n - a.n), logged: false};
+  const v = {id: nid('v'), at: m.at || Date.now(), ex: m.ex, pos: Number.isInteger(m.pos) ? m.pos : null, name, mode: m.mode || 'live', sets, reps: sets.reduce((a, s) => a + (s.n || s.r), 0), n: sets.reduce((a, s) => a + s.n, 0), c: sets.reduce((a, s) => a + s.c, 0), g: sets.flatMap(s => s.g), faults: Object.values(faults).sort((a, b) => b.n - a.n), logged: false};
   S.videoLog.unshift(v); S.videoLog = S.videoLog.slice(0, 30);
   if (m.mode === 'video' && !S.workout) return `Разбор видео готов: чисто ${v.c} из ${v.n}`;
   return logCamSets(v);
@@ -2296,7 +2316,8 @@ function logCamSets(v) {
   const sets = v.sets.map(s => ({w: s.w, r: s.r, c: s.c, n: s.n}));
   v.logged = true;
   if (S.workout) {
-    const W = S.workout, i = W.items.findIndex(it => (v.ex && it.base === v.ex) || norm(it.name) === norm(v.name));
+    const W = S.workout, at = v.pos != null && W.items[v.pos], same = at && (norm(at.name) === norm(v.name) || (v.ex && at.base === v.ex));
+    const i = same ? v.pos : W.items.findIndex(it => norm(it.name) === norm(v.name) || (v.ex && it.base === v.ex));
     if (i >= 0) {
       const it = W.items[i];
       let k = 0;
