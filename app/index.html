@@ -1452,10 +1452,11 @@ function parseCards(lines) {
 }
 
 /* ---------- OCR on the phone (Tesseract, Russian + English). Files next to the app when installed; CDN otherwise ---------- */
-let OCR = null;
+let OCR = null, OCR_LOG = null;   // the worker keeps one logger; each import points it at its own progress bar
 const OCR_CDN = {lib: 'https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js', worker: 'https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/worker.min.js', core: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@6.0.0'};
 function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
 async function ocrWorker(onMsg) {
+  if (onMsg) OCR_LOG = onMsg;
   if (OCR) return OCR;
   const local = location.protocol.startsWith('http') && SAME_SITE;
   const base = new URL('vendor/tesseract/', location.href).href;
@@ -1463,8 +1464,8 @@ async function ocrWorker(onMsg) {
     try { if (!local) throw 0; await loadScript(base + 'tesseract.min.js'); } catch (e) { await loadScript(OCR_CDN.lib); }
   }
   const opts = window.Tesseract && local
-    ? {workerPath: base + 'worker.min.js', corePath: base + 'core/', langPath: base + 'lang', workerBlobURL: false, logger: onMsg}
-    : {workerPath: OCR_CDN.worker, corePath: OCR_CDN.core, logger: onMsg};
+    ? {workerPath: base + 'worker.min.js', corePath: base + 'core/', langPath: base + 'lang', workerBlobURL: false, logger: m => { if (OCR_LOG) OCR_LOG(m); }}
+    : {workerPath: OCR_CDN.worker, corePath: OCR_CDN.core, logger: m => { if (OCR_LOG) OCR_LOG(m); }};
   OCR = await window.Tesseract.createWorker(['rus', 'eng'], 1, opts);
   return OCR;
 }
