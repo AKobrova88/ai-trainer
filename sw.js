@@ -1,5 +1,5 @@
 // ИИ Тренер: offline cache. Page = network first, libraries and models = cache first.
-const CACHE = 'aitrainer-sumerki-20261015';
+const CACHE = 'aitrainer-sumerki-20261016-app';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
@@ -8,6 +8,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== location.origin) return;
+  if (url.pathname.includes('/app/')) return;   // the web app next door keeps its own files
   if (url.pathname.endsWith('.mp4')) return;   // example videos stream straight from the network (range requests)
   if (req.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('index.html')) {
     e.respondWith(fetch(req).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put('index.html', copy)); return r; })

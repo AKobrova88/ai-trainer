@@ -913,6 +913,10 @@ const store = {
 };
 const prefs = store.get('aitrainer.v2', {});
 const qp = new URLSearchParams(location.search);
+/* Opened from the web app on the same site: ret= is where to go back, results travel in localStorage 'aitrainer.inbox'. */
+const RET = (() => { const r = qp.get('ret') || ''; return /^\/[^/\\]/.test(r) ? r : null; })();
+const MODE_VIDEO = qp.get('mode') === 'video';
+const APP_INBOX = 'aitrainer.inbox';
 const pickOpt = (v, list, d) => list.includes(v) ? v : d;
 const keys = Object.keys(EX.ex).filter(k => AT.analyzerFor(k));
 /* An exercise from the bot without technique rules (a machine, an own exercise): the camera still runs and counts reps. */
@@ -1115,7 +1119,8 @@ function recordSet() {
   const prevW = state.sets.length ? state.sets[state.sets.length - 1].w : urlW();
   const set = {
     r: hold ? Math.round(reps.reduce((a, r) => a + (r.extra.secs || 0), 0)) : reps.length,
-    n: reps.length, c: reps.filter(r => !r.faultList.length).length, f: faults, w: weighted() ? prevW : null, cue: top ? A.meta(top).cue : ''
+    n: reps.length, c: reps.filter(r => !r.faultList.length).length, f: faults, w: weighted() ? prevW : null, cue: top ? A.meta(top).cue : '',
+    g: reps.map(r => !r.faultList.length ? 0 : r.grade === 'bad' ? 2 : 1), file: !!state.usedFile
   };
   set.note = setVerdict(set, set.cue);
   state.sets.push(set); state.view = A.view || state.view; saveSets();
@@ -1163,6 +1168,14 @@ function chatText() {
 }
 function renderSend() {
   const ok = state.sets.filter(s => s.r > 0), n = ok.length;
+  if (RET) {
+    const missW = n && weighted() && ok.some(s => !s.w);
+    el.sendBox.innerHTML = !n ? '<p>Сделай подход перед камерой — он появится здесь, потом одной кнопкой вернёшь его в приложение.</p><button class="main-btn secondary" type="button" id="backBtn">Вернуться в приложение</button>'
+      : (missW ? '<p>Укажи вес в каждом подходе — так прогресс посчитается точно.</p>' : '') +
+        '<button class="main-btn" type="button" id="appBtn">Записать ' + n + ' ' + plural(n, 'подход', 'подхода', 'подходов') + ' в дневник</button>' +
+        '<button class="main-btn secondary" type="button" id="backBtn">Вернуться без записи</button>';
+    return;
+  }
   if (!n) { el.sendBox.innerHTML = state.fromBot ? '<p>Сделай подход перед камерой — он появится здесь, потом одной кнопкой запишешь всё в дневник.</p>' : ''; return; }
   const missW = weighted() && ok.some(s => !s.w);
   if (canSend()) {
@@ -1175,7 +1188,23 @@ function renderSend() {
     el.sendBox.innerHTML = '<p>Подходы сохранены на этом телефоне до конца дня.</p>';
   }
 }
+function toApp() {
+  if (state.on) stopCamera();
+  const A = state.analyzer, free = isFree();
+  const sets = state.sets.filter(s => s.r > 0).map(s => {
+    const ft = free ? [] : Object.keys(s.f || {}).sort((a, b) => s.f[b] - s.f[a]).slice(0, 3).map(k => { const m = A ? A.meta(k) : { title: 'Техника', cue: '' }; return { id: k, t: m.title, c: m.cue, n: s.f[k] }; });
+    return { w: weighted() ? (s.w || 0) : 0, r: s.r, n: free ? 0 : s.n, c: free ? 0 : s.c, g: free ? [] : (s.g || []), cue: free ? '' : (s.cue || ''), ft };
+  });
+  const entry = { id: 'c' + Date.now().toString(36), at: Date.now(), ex: state.ex, name: info().name, free, mode: state.usedFile ? 'video' : 'live', view: (A && A.view) || state.view, sets };
+  let box = []; try { box = JSON.parse(localStorage.getItem(APP_INBOX) || '[]'); if (!Array.isArray(box)) box = []; } catch (err) { box = []; }
+  box.push(entry);
+  try { localStorage.setItem(APP_INBOX, JSON.stringify(box)); } catch (err) { el.sendBox.insertAdjacentHTML('afterbegin', '<p>Не получилось сохранить на телефоне. Освободи место и попробуй ещё раз.</p>'); return; }
+  state.sets = []; saveSets();
+  location.href = RET;
+}
 el.sendBox.addEventListener('click', async e => {
+  if (e.target.closest('#appBtn')) return toApp();
+  if (e.target.closest('#backBtn')) { stopCamera(); location.href = RET; return; }
   if (e.target.closest('#sendBtn')) {
     const W = tg(), A = state.analyzer;
     const sets = state.sets.filter(s => s.r > 0).map(s => {
@@ -1308,7 +1337,7 @@ function showCameraMode(on) {
   renderMain(); renderLive();
 }
 async function startCamera() {
-  stopFile();
+  stopFile(); state.usedFile = false;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return cameraBlocked();
   let stream;
   stopStream();                                   // many phones cannot open the second camera while the first one is busy
@@ -1373,7 +1402,7 @@ function stopFile() {
 $('#fileInput').addEventListener('change', async e => {
   const file = e.target.files[0]; e.target.value = ''; if (!file) return;
   stopStream(); stopFile();
-  state.file = URL.createObjectURL(file);
+  state.file = URL.createObjectURL(file); state.usedFile = true;
   const v = el.vid; v.srcObject = null; v.src = state.file; v.muted = true; v.classList.remove('mirror');
   const ok = await new Promise(res => { if (v.readyState >= 1) return res(true); v.addEventListener('loadedmetadata', () => res(true), { once: true }); v.addEventListener('error', () => res(false), { once: true }); });
   if (!ok || !v.videoWidth || !isFinite(v.duration)) { stopFile(); return showMsg('Видео не открылось', 'Попробуй другой файл: MP4 или MOV, снятый на телефон.', [{ label: 'Понятно', primary: true, run: hideMsg }]); }
@@ -1404,6 +1433,8 @@ new MutationObserver(readColors).observe(document.documentElement, { attributes:
 
 fillSelect(); setAspect(1, 1); resize(); setExercise(state.ex); renderFacing();
 requestAnimationFrame(loop);
+if (MODE_VIDEO) showMsg('Разбор видео', 'Выбери запись подхода до минуты: телефон сбоку или спереди, видно всё тело. Видео разбирается прямо на телефоне и никуда не загружается.',
+  [{ label: 'Выбрать видео', primary: true, run: () => { hideMsg(); $('#fileInput').click(); } }, { label: 'Включить камеру', run: () => { hideMsg(); startCamera(); } }]);
 
 if (window.AI_TRAINER_STANDALONE) {
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
