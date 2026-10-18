@@ -3,7 +3,7 @@
  "short_name": "ИИ Тренер",
  "lang": "ru",
  "description": "Разбор техники упражнений по камере в реальном времени",
- "start_url": "./",
+ "start_url": "./?camera",
  "scope": "./",
  "display": "standalone",
  "orientation": "portrait",
