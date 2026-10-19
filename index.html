@@ -181,6 +181,16 @@ body{font:400 16px/1.45 var(--f-body)}
 .stage-msg{overflow-y:auto}
 .msg-actions{flex-wrap:wrap}
 .alt-btns:has(.sub-btn[hidden]){grid-template-columns:1fr}
+.setup-check{display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:22px;background:var(--surface)}
+.setup-check h2{margin:0;font:700 22px/1.2 var(--f-display)}
+.setup-check ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.setup-check li{display:flex;align-items:center;gap:10px;color:var(--muted)}
+.setup-check li::before{content:'○';width:24px;text-align:center;flex:none}
+.setup-check li[data-ok="true"]{color:var(--good)}
+.setup-check li[data-ok="true"]::before{content:'✓'}
+.setup-check p{margin:0;color:var(--muted);font-size:14px;line-height:1.4}
+.setup-check .main-btn{min-height:52px;font-size:17px}
+.setup-check button:disabled{opacity:.45;cursor:default}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -217,6 +227,13 @@ body{font:400 16px/1.45 var(--f-body)}
     <div class="cue info" id="cue" role="status" aria-live="polite"><i></i><span id="cueText"></span></div>
   </section>
   <p class="camtip" id="camTip"></p>
+  <section class="setup-check" id="setupCheck" aria-labelledby="setupTitle" hidden>
+    <h2 id="setupTitle">Подготовка к подходу</h2>
+    <ul><li data-setup="body">Всё тело в кадре</li><li data-setup="angle">Подходящий ракурс</li><li data-setup="position">Исходное положение</li></ul>
+    <p id="setupStatus" role="status">Встань в кадр и замри на секунду. Счёт пока не идёт.</p>
+    <button class="main-btn" id="setupStart" type="button" disabled>Начать подход</button>
+    <button class="sub-btn" id="setupCount" type="button" disabled>Только счёт повторов, без оценки техники</button>
+  </section>
   <div class="camsel" role="group" aria-label="Какой камерой снимать">
     <span>Камера</span>
     <button type="button" data-facing="user" aria-pressed="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2.5" width="10" height="15" rx="2.2"/><circle cx="10" cy="5.2" r=".9" fill="currentColor"/><path d="M7.6 13.2c.6-1.3 1.4-1.9 2.4-1.9s1.8.6 2.4 1.9"/><circle cx="10" cy="9.3" r="1.4"/></svg>Фронтальная</button>
@@ -993,6 +1010,7 @@ const state = {
   level: pickOpt(qp.get('l'), ['novice', 'normal', 'pro'], pickOpt(prefs.level, ['novice', 'normal', 'pro'], 'normal')),
   urlW: num(qp.get('w')), fromBot: qp.has('ex'),
   analyzer: null, snap: null, frame: null, flash: null, sets: [], view: null,
+  preflight: false, preflightReady: false, preflightSince: null,
   detector: null, detectorLoading: null, stream: null, facing: FACING[qp.get('cam')] || (['user', 'environment'].includes(prefs.facing) ? prefs.facing : 'user'), on: false, busy: false, file: null
 };
 store.set('aitrainer.v2', Object.assign(prefs, { depth: state.depth, level: state.level }));
@@ -1063,6 +1081,7 @@ function setExercise(key) {
     if (!state.on) try { const p = el.howto.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* autoplay blocked */ }
   }
   state.fallback = false;
+  if (state.on && !state.file && !state.recOnly) { Rec.drop(); state.preflight = true; }
   el.note.hidden = !isFree() || state.on;
   loadSets();
   newAnalyzer();
@@ -1071,6 +1090,7 @@ function setExercise(key) {
 function newAnalyzer() {
   state.analyzer = isFree() || state.fallback ? new AT.FreeAnalyzer(state.level) : AT.analyzerFor(state.ex, state.depth, state.level);
   state.snap = null; state.flash = null;
+  state.preflightReady = false; state.preflightSince = null;
   resetDet();
 }
 el.sel.addEventListener('change', () => setExercise(el.sel.value));
@@ -1174,7 +1194,14 @@ async function infer() {
     state.frame = { kp, W: v.videoWidth, H: v.videoHeight };
     H.ok++; H.noPose = kp ? 0 : H.noPose + 1;
     if (state.recOnly) state.snap = { status: framed(kp) ? 'rec' : 'nobody', live: [], view: 'side', side: 'l', reps: 0, phase: 'top' };
-    else handleSnap(state.analyzer.update(kp, t));
+    else if (state.preflight) {
+      state.snap = state.analyzer.update(kp, t);
+      state.analyzer.drain(); // Preparation movements never become recorded sets.
+      const checks = checkSetup(kp, v.videoWidth, v.videoHeight, state.snap);
+      if (!checks.ready) state.preflightSince = null;
+      else if (state.preflightSince == null) state.preflightSince = t;
+      state.preflightReady = checks.ready && t - state.preflightSince >= .7;
+    } else handleSnap(state.analyzer.update(kp, t));
   } catch (e) {
     console.error(e); H.errors++; H.lastErr = String((e && e.message) || e);
     if (state.engine && state.engine !== 'tfjs' && H.errors > 10 && !H.ok) swapEngine('tfjs');
@@ -1189,7 +1216,7 @@ function processEvents(evts) {
     else if (e.type === 'rep') {
       const r = e.rep, now = performance.now();
       if (isHold()) continue;
-      state.flash = r.faultList.length
+      state.flash = isFree() || state.fallback ? { cls: 'info', text: 'Повтор ' + r.n + ' · без оценки техники', until: now + 1400 } : r.faultList.length
         ? { cls: r.grade === 'bad' ? 'bad' : 'warn', text: 'Повтор ' + r.n + ': ' + A.meta(r.faultList[0]).cue.toLowerCase(), until: now + 1800 }
         : { cls: 'good', text: 'Повтор ' + r.n + ' — ' + (Math.random() < 0.3 ? pick(T.praise).toLowerCase() : 'чисто'), until: now + 1400 };
       if (!state.file) Voice.say(String(r.n), 'rep' + r.n, false, true);
@@ -1203,16 +1230,16 @@ function processEvents(evts) {
 /* ---------- sets ---------- */
 function recordSet() {
   const A = state.analyzer; if (!A || !A.reps.length) return;
-  const reps = A.reps, hold = isHold();
+  const reps = A.reps, hold = isHold(), countOnly = isFree() || !!state.fallback;
   const faults = {}; for (const r of reps) for (const id of r.faultList) faults[id] = (faults[id] || 0) + 1;
   const top = Object.keys(faults).sort((a, b) => faults[b] * A.meta(b).pen - faults[a] * A.meta(a).pen)[0];
   const prevW = state.sets.length ? state.sets[state.sets.length - 1].w : urlW();
   const set = {
     r: hold ? Math.round(reps.reduce((a, r) => a + (r.extra.secs || 0), 0)) : reps.length,
-    n: reps.length, c: reps.filter(r => !r.faultList.length).length, f: faults, w: weighted() ? prevW : null, cue: top ? A.meta(top).cue : '',
-    g: reps.map(r => !r.faultList.length ? 0 : r.grade === 'bad' ? 2 : 1), file: !!state.usedFile
+    n: countOnly ? 0 : reps.length, c: countOnly ? 0 : reps.filter(r => !r.faultList.length).length, f: countOnly ? {} : faults, w: weighted() ? prevW : null, cue: countOnly ? '' : top ? A.meta(top).cue : '',
+    g: countOnly ? [] : reps.map(r => !r.faultList.length ? 0 : r.grade === 'bad' ? 2 : 1), file: !!state.usedFile, countOnly
   };
-  set.note = setVerdict(set, set.cue);
+  set.note = countOnly ? 'Повторы посчитаны. Техника не оценивалась.' : setVerdict(set, set.cue);
   state.sets.push(set); state.view = A.view || state.view; saveSets();
   if (!state.file) { Rec.restart(); attemptT0 = performance.now(); helperAt = 25000; }
   state.flash = { cls: set.c / set.n >= 0.8 ? 'good' : 'info', text: 'Подход ' + state.sets.length + ' · ' + set.note, until: performance.now() + 6000 };
@@ -1344,7 +1371,7 @@ function toApp() {
   const entries = [];
   for (const k of appKeys()) {
     const ss = setsOf(k).filter(s => s.r > 0); if (!ss.length || !EX.ex[k]) continue;
-    const free = FREE_KEYS.has(k), A = k === state.ex && state.analyzer ? state.analyzer : free ? new AT.FreeAnalyzer() : AT.analyzerFor(k);
+    const free = FREE_KEYS.has(k) || ss.every(s => s.countOnly), A = k === state.ex && state.analyzer ? state.analyzer : free ? new AT.FreeAnalyzer() : AT.analyzerFor(k);
     const wtd = !['bw', 'time'].includes(EX.ex[k].inc), p = PLAN.find(x => x.k === k);
     const sets = ss.map(s => {
       const ft = free ? [] : Object.keys(s.f || {}).sort((a, b) => s.f[b] - s.f[a]).slice(0, 3).map(id => { const m = A ? A.meta(id) : { title: 'Техника', cue: '' }; return { id, t: m.title, c: m.cue, n: s.f[id] }; });
@@ -1430,6 +1457,7 @@ function speakStatus() {
     if (s === 'calib') { if (!calibSaid) { Voice.say(text, null, true); calibSaid = true; } }   // said once
     else if (now - lastStatusSay > 6000) { Voice.say(text, null, true); lastStatusSay = now; }
   }
+  if (state.preflight) return;
   /* the phone stands at an angle the rules cannot judge: keep counting reps instead of waiting */
   if (!isFree() && !state.fallback && (s === 'turn' || s === 'turn_front')) {
     if (turnSince == null) turnSince = now;
@@ -1440,13 +1468,34 @@ function speakStatus() {
     }
   } else turnSince = null;
 }
+/* Setup check: pure pose visibility and analyzer-state checks, also covered by tests. */
+function checkSetup(kp, width, height, snap) {
+  const visible = i => { const p = kp && kp[i]; return !!(p && p.score > .5 && Number.isFinite(p.x) && Number.isFinite(p.y) && width > 0 && height > 0 && p.x >= 0 && p.x <= width && p.y >= 0 && p.y <= height); };
+  const body = [[0,7,8],[11,12],[13,14],[15,16],[23,24],[25,26],[27,28]].every(pair => pair.some(visible));
+  const angle = body && !!snap && !['nobody','turn','turn_front'].includes(snap.status);
+  const position = angle && snap.status === 'track' && ['top','hold'].includes(snap.phase);
+  return {body, angle, position, ready: body && angle && position};
+}
+/* End setup check. */
+function renderSetup() {
+  const panel = $('#setupCheck'), active = state.on && state.preflight && !state.file && !state.recOnly;
+  panel.hidden = !active;
+  if (!active) return;
+  const f = state.frame, checks = checkSetup(f && f.kp, f && f.W, f && f.H, state.snap);
+  for (const item of panel.querySelectorAll('[data-setup]')) item.dataset.ok = String(checks[item.dataset.setup]);
+  $('#setupStart').disabled = !state.preflightReady;
+  $('#setupCount').disabled = !checks.body;
+  const text = state.preflightReady ? 'Кадр готов. Нажми «Начать подход» — включится счёт.' : 'Встань в кадр и замри на секунду. Счёт пока не идёт.';
+  if ($('#setupStatus').textContent !== text) $('#setupStatus').textContent = text;
+}
 function renderLive() {
+  renderSetup();
   speakStatus();
   const cs = cueState();
   el.cue.className = 'cue ' + cs.cls;
   if (el.cueText.textContent !== cs.text) el.cueText.textContent = cs.text;
   const snap = state.snap, hold = isHold();
-  el.hud.hidden = !state.on || !!state.recOnly;
+  el.hud.hidden = !state.on || !!state.recOnly || state.preflight;
   if (snap) {
     const n = hold ? Math.floor(snap.held || 0) : (snap.setEnded ? 0 : snap.reps);
     el.repNum.textContent = n;
@@ -1459,6 +1508,7 @@ function renderMain() {
   const A = state.analyzer, inSet = state.on && A && A.reps.length && !A.setEnded;
   const b = el.main;
   $('#altBtns').hidden = state.on;
+  if (state.on && state.preflight) { b.className = 'main-btn secondary'; b.innerHTML = 'Выключить камеру'; return; }
   if (state.on && state.recOnly) { b.className = 'main-btn rec'; b.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="2"/></svg>Стоп — разобрать видео'; return; }
   b.className = 'main-btn' + (inSet ? ' stop' : state.on ? ' secondary' : '');
   b.innerHTML = !state.on ? ICON_PLAY + (state.sets.length ? 'Следующий подход с камерой' : 'Начать подход с камерой')
@@ -1467,12 +1517,26 @@ function renderMain() {
 el.main.addEventListener('click', () => {
   const A = state.analyzer;
   if (!state.on) { state.recOnly = false; return startCamera(); }
+  if (state.preflight) return stopCamera();
   if (state.recOnly) return finishRecording();
   if (A && A.reps.length && !A.setEnded) { A.endSet(); processEvents(A.drain()); return; }
   if (!state.file && A && !A.reps.length && Rec.secs() >= 12 && el.msg.hidden) return showLiveHelp('Подход не посчитан', 'Я не увидела ни одного повтора.');
   stopCamera();
 });
 $('#recBtn').addEventListener('click', () => startRecordMode());
+function beginPreparedSet(countOnly = false) {
+  if (!state.on || !state.preflight) return;
+  const f = state.frame;
+  if (countOnly ? !checkSetup(f && f.kp, f && f.W, f && f.H, state.snap).body : !state.preflightReady) return;
+  if (countOnly) state.fallback = true;
+  state.preflight = false;
+  newAnalyzer();
+  Rec.start(state.stream); attemptT0 = performance.now(); helperAt = 25000;
+  state.flash = null; lastStatus = ''; renderMain(); renderLive();
+  if (Voice.on) Voice.say(countOnly ? 'Считаю повторы, без оценки техники' : 'Начинаем. Замри на секунду в исходном положении', 'start', true);
+}
+$('#setupStart').addEventListener('click', () => beginPreparedSet());
+$('#setupCount').addEventListener('click', () => beginPreparedSet(true));
 $('#vidBtn').addEventListener('click', () => pickVideo());
 $('#voiceSel').addEventListener('change', e => { store.set(VOICE_KEY, e.target.value); pickVoice(); });
 $('#voiceTest').addEventListener('click', () => { const was = Voice.on; Voice.on = true; Voice.say('Привет! Отойди подальше, чтобы было видно всё тело. Начинаем подход.', 'test', true); Voice.on = was; });
@@ -1572,6 +1636,7 @@ async function startCamera() {
   try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: state.facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }); }
   catch (e) { return cameraBlocked(); }
   stopStream(); state.stream = stream;
+  state.preflight = !state.recOnly;
   el.vid.muted = true; el.vid.setAttribute('playsinline', ''); el.vid.srcObject = stream;
   el.vid.classList.toggle('mirror', state.facing === 'user');
   newAnalyzer(); showCameraMode(true);          // the video is on screen before play(): hidden videos stay frozen on some phones
@@ -1580,7 +1645,7 @@ async function startCamera() {
   requestWake();
   if (!(await loadModelWithUi())) { stopCamera(); return; }
   resetDet();
-  Rec.start(state.stream); attemptT0 = performance.now(); helperAt = 25000;
+  if (!state.preflight) { Rec.start(state.stream); attemptT0 = performance.now(); helperAt = 25000; }
   if (state.recOnly) Voice.say('Запись пошла. Сделай подход и нажми «Стоп»', 'rec', true);
 }
 function stopStream() {
@@ -1591,7 +1656,8 @@ function stopStream() {
 function stopCamera() {
   state.recOnly = false;
   const A = state.analyzer;
-  if (A && A.reps.length && !A.setEnded) { A.endSet(); processEvents(A.drain()); }
+  if (!state.preflight && A && A.reps.length && !A.setEnded) { A.endSet(); processEvents(A.drain()); }
+  state.preflight = false; state.preflightReady = false; state.preflightSince = null;
   stopStream(); stopFile(); releaseWake(); state.frame = null; showCameraMode(false);
 }
 function cameraBlocked() {
@@ -1661,7 +1727,7 @@ function manualSet() {
 /* the live coach could not count: offer the recording, or the set by hand */
 let attemptT0 = 0, helperAt = 25000;
 function helperCheck() {
-  if (!state.on || state.file || state.recOnly || !el.msg.hidden) return;
+  if (!state.on || state.file || state.recOnly || state.preflight || !el.msg.hidden) return;
   const A = state.analyzer;
   if (!A || A.reps.length || A.rep) { attemptT0 = performance.now(); return; }
   if (performance.now() - attemptT0 < helperAt) return;

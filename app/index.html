@@ -33,7 +33,7 @@
   --tab-on-bg:#c3eb6e; --tab-on-ink:#12151f;
   --rest-bg:#1c2131; --rest-ink:#f3efe7; --rest-num:#c3eb6e; --rest-btn:#252b3e;
   --cal-has-bg:#2b3522; --cal-has-ink:#c3eb6e; --chart:#9dcbf4;
-  --sub-bg:#2a1f2b; --sub-ink:#f3efe7; --sub-line:#f4a9c0; --toast-act:#c3eb6e;
+  --sub-bg:#2a1f2b; --sub-ink:#f3efe7; --sub-line:#f4a9c0; --toast-act:#314a0b;
   --stat1-bg:#1c2131; --stat1-num:#c3eb6e; --stat2-bg:#1c2131; --stat2-num:#f4a9c0; --stat3-bg:#1c2131; --stat3-num:#9dcbf4;
   --path1-bg:#c3eb6e; --path1-ink:#12151f; --path1-sub:#2c3a14;
   --path-bg:#1c2131; --path-ink:#f3efe7; --path-ico-bg:#252b3e; --path-ico:#9dcbf4;
@@ -88,7 +88,7 @@
 
 *{box-sizing:border-box}
 html,body{background:var(--bg);color:var(--ink)}
-body{font:15px/1.45 var(--f-body);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+body{margin:0;font:15px/1.45 var(--f-body);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;border:0;background:none;padding:0}
 a{color:var(--accent)}
@@ -654,6 +654,54 @@ body.onb-mode .tabs,body.onb-mode .top{display:none}
 .help-card>span:nth-child(2){flex:1;display:flex;flex-direction:column;gap:2px}
 .help-card small{color:var(--muted);font-size:13.5px;line-height:1.35}
 
+/* Small phones, keyboard access, and clear feedback in both themes. */
+.view>*{min-width:0}
+.grid2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.kpis,.statline{grid-template-columns:repeat(3,minmax(0,1fr))}
+.set{grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) 48px}
+.step input{width:100%;min-width:0}
+.plan-list .nm{min-width:0;overflow-wrap:anywhere}
+.plan-list .ds{flex:none;text-align:right}
+.daypick .btn.primary{margin-block:2px 4px}
+.seg button{min-width:0;padding:5px 4px;line-height:1.25}
+.sheet-h,.sheet-f{flex-shrink:0}
+.sheet-b{overscroll-behavior:contain;scrollbar-gutter:stable}
+body.sheet-open{overflow:hidden}
+.input[aria-invalid="true"],.step input[aria-invalid="true"]{outline:2px solid var(--bad);outline-offset:-2px}
+.demo-banner{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--cam-bg);color:var(--cam-ink);border-radius:18px;font-size:14px;line-height:1.35}
+.demo-banner span{flex:1;min-width:0}
+.demo-banner b{display:block}
+.demo-banner button{min-height:44px;padding:6px 12px;border:1px solid currentColor;border-radius:12px;flex:none;font-weight:var(--w-strong)}
+.rest .l{min-width:0;line-height:1.25}
+.rest button{flex:none}
+.toast{pointer-events:none}
+.toast button{pointer-events:auto}
+.ck-row .box{position:relative}
+.ck-row .box::before{content:"";position:absolute;inset:-10px}
+.cal-d[disabled]{cursor:default;color:var(--muted)}
+.empty .btn{margin-top:14px}
+@media (max-width:360px){
+  .fld .seg:has([data-v^="goal:"]){grid-auto-flow:row;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .set{grid-template-columns:16px minmax(0,1fr) minmax(0,1fr) 44px;gap:5px}
+  .set .step{grid-template-columns:24px minmax(0,1fr) 24px}
+  .set .step input{font-size:17px}
+  .check{width:44px;height:48px}
+  .wx-b{padding-inline:10px}
+  .rest{gap:6px;padding-left:12px}
+  .rest .t{min-width:62px;font-size:26px}
+  .rest button{padding-inline:8px}
+  .stat b{font-size:18px}
+  :root[data-theme="bento"] .stat b{font-size:14px}
+  .path{padding:14px;gap:10px}
+  .path b{font-size:17px}
+  .brand{gap:8px;flex-wrap:wrap}
+  .brand .pill{font-size:11px}
+}
+@media (hover:hover){
+  .btn:not(:disabled):hover,.path:hover,.pickbtn:hover{filter:brightness(.94)}
+  .tab:not([aria-current]):hover{background:var(--surface-2);color:var(--ink)}
+}
+
 </style>
 </head>
 <body>
@@ -676,7 +724,7 @@ const CAT = {};
 for (const [k, n, g, c, i, cue, p] of CAT_DATA.ex) CAT[k] = {k, n, g: g || 'legs', cam: !!c, inc: i, cue: cue || '', p: p || ''};
 const SYN = CAT_DATA.syn || {};
 
-const APP_VERSION = '2.2 · тест';
+const APP_VERSION = '2.3 · тест';
 const KEY = 'ai-trainer-app-1';
 const INBOX = 'aitrainer.inbox';
 const STEP = {bb_lower: 5, bb_upper: 2.5, machine: 2.5, db: 1, bw: 0, time: 0};
@@ -709,6 +757,12 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const fmt = w => (Math.round(w * 10) / 10).toString().replace('.', ',');
 const parseNum = s => { const v = parseFloat(String(s).replace(',', '.')); return isFinite(v) ? v : 0; };
+function inputNumber(input, min = 0, integer = false) {
+  const text = input.value.trim(), n = Number(text.replace(',', '.'));
+  const valid = /^\d+(?:[.,]\d+)?$/.test(text) && Number.isFinite(n) && n >= min && (!integer || Number.isInteger(n));
+  input.setAttribute('aria-invalid', String(!valid));
+  return valid ? n : null;
+}
 const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? b : c; };
 const reps = it => it.lo === it.hi ? `${it.lo}` : `${it.lo}–${it.hi}`;
 const dose = it => `${it.s} × ${reps(it)}${it.sec ? ' с' : ''}`;
@@ -1578,6 +1632,7 @@ function viewWelcome() {
       <button class="btn primary big" data-act="reg-go" id="reg-go" ${REG.pd && REG.terms ? '' : 'disabled'}>Начать</button>
       <span class="hint">* без этих отметок регистрация недоступна. Первые ${PRICING.trialDays} дней открыто всё, оплата в тесте отключена. Аккаунт пока хранится только на этом телефоне.</span>
     </section>
+    <button class="btn big" data-act="demo">Посмотреть приложение на примере</button>
     <div class="note blue">${I.phone}<span>Камера и видео работают только в твоём телефоне. Мы их не получаем и не храним.</span></div>
     <div class="foot-links"><button data-act="doc" data-v="consent">Как мы обращаемся с данными</button><button data-act="doc" data-v="health">Здоровье и безопасность</button></div>
   </div>`;
@@ -1683,7 +1738,7 @@ function renderWizard() {
     <section class="fld"><span class="lab">Почему так</span><ul class="why">${explain(R).map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>
     <p class="hint">${P.weight ? 'Стартовые веса примерные — на первой тренировке уточним, дальше прибавлю сама.' : 'Веса подберёшь на первой тренировке — дальше прибавлю сама.'} Гантели — вес одной.</p>`;
   const had = S.program.days.length;
-  f.innerHTML = `<button class="btn" data-act="wiz-accept" data-v="program">Поправить</button><button class="btn primary" data-act="wiz-accept" data-v="today">${had ? 'Заменить мою программу' : 'Начать'}</button>`;
+  f.innerHTML = `<button class="btn" data-act="wiz-accept" data-v="program">Поправить</button><button class="btn primary" data-act="wiz-accept" data-v="today">${S.demo && !S.user ? 'Попробовать программу' : had ? 'Заменить мою программу' : 'Начать'}</button>`;
 }
 let REC = null;
 function toggleMic() {
@@ -1715,7 +1770,7 @@ function render() {
   const [title, html, act] = (views[S.tab] || viewToday)();
   $('#title').textContent = title;
   $('#top-act').innerHTML = act || '';
-  $('#view').innerHTML = html;
+  $('#view').innerHTML = (S.demo ? `<div class="demo-banner"><span><b>Пример программы и дневника</b>Здесь можно попробовать приложение.${S.demoReturn && S.user ? ' Твои данные сохранены.' : ''}</span><button data-act="demo-off">${S.user ? 'Выйти' : 'К началу'}</button></div>` : '') + html;
   if (S.tab === 'diary' && S.dtab === 'prog') mountChart();
   renderRest();
   document.documentElement.style.setProperty('--top-h', $('.top').offsetHeight + 'px');
@@ -1743,12 +1798,12 @@ function viewToday() {
       <div class="stat"><b>${last ? Math.max(0, Math.round((T0 - last.date) / 864e5)) + ' дн.' : '—'}</b><span>с прошлой</span></div>
     </div>
     <section class="card pad daypick">
-      <div class="eyebrow">Сегодня по плану</div>
+      <div class="eyebrow">${d.id === S.next ? 'Следующая тренировка' : 'Выбранная тренировка'}</div>
       <div class="chips">${chips}</div>
       <div class="row"><div class="grow"><h2>${esc(d.title.replace(/^День \d+ · /, ''))}</h2><div class="hint">${d.items.length} ${plural(d.items.length, 'упражнение', 'упражнения', 'упражнений')} · около ${mins} мин</div></div></div>
+      <button class="btn primary big" data-act="start" data-v="${d.id}" ${d.items.length ? '' : 'disabled'}>Начать тренировку</button>
       ${ups.length ? `<p class="coach up" style="margin:0">${ups.length === 1 ? `В «${esc(ups[0].name)}» прибавляем вес` : `Прибавляем вес в ${ups.length} ${plural(ups.length, 'упражнении', 'упражнениях', 'упражнениях')}`}: прошлый раз ты закрыла все подходы.</p>` : ''}
       <ul class="plan-list">${items || '<li class="muted">В этом дне пока нет упражнений</li>'}</ul>
-      <button class="btn primary big" data-act="start" data-v="${d.id}" ${d.items.length ? '' : 'disabled'}>Начать тренировку</button>
     </section>`];
 }
 function startWorkout(dayId) {
@@ -1773,7 +1828,7 @@ function viewWorkout() {
     const fin = it.sets.length && it.sets.every(s => s.done), open = i === W.active;
     const G = groupOf(W.items, i), ssHead = it.ss && G[0] === i ? `<div class="ss-h">Суперсет ${labs[G[0]]}–${labs[G[G.length - 1]]}: по подходу по очереди, отдых после круга</div>` : '';
     const sum = it.sets.filter(s => s.done).map(s => `${s.w ? fmt(s.w) + '×' : ''}${s.r}${it.sec ? ' с' : ''}`).join('  ');
-    const head = `<button class="wx-h" data-act="wx-open" data-v="${i}"><span class="wx-n">${fin ? '✓' : labs[i]}</span><span class="wx-t"><b>${esc(it.name)}</b><span>${open || !sum ? dose(it) + (it.sets[0] && it.sets[0].w ? ' · ' + fmt(it.sets[0].w) + ' кг' : '') : sum}</span></span>${it.cam ? '<span class="badge cam">камера</span>' : ''}</button>`;
+    const head = `<button class="wx-h" data-act="wx-open" data-v="${i}" aria-expanded="${open}"><span class="wx-n">${fin ? '✓' : labs[i]}</span><span class="wx-t"><b>${esc(it.name)}</b><span>${open || !sum ? dose(it) + (it.sets[0] && it.sets[0].w ? ' · ' + fmt(it.sets[0].w) + ' кг' : '') : sum}</span></span>${it.cam ? '<span class="badge cam">камера</span>' : ''}</button>`;
     if (!open) return `${ssHead}<article class="wx ${fin ? 'done' : ''} ${it.ss ? 'ss' : ''}">${head}</article>`;
     const wcol = !!stepOf(it) || it.sets.some(s => s.w);
     const rows = it.sets.map((s, k) => `
@@ -1802,7 +1857,12 @@ function renderRest() {
   if (!S.workout || !S.rest || S.tab !== 'today' || S.stage !== 'app') { el.hidden = true; return; }
   const lft = Math.round((S.rest.end - Date.now()) / 1000);
   el.hidden = false;
-  el.innerHTML = `<div class="rest ${lft <= 0 ? 'over' : ''}" role="timer"><span class="t">${lft > 0 ? clock(lft * 1000) : '0:00'}</span><span class="l">${lft > 0 ? 'Отдых' : 'Пора, следующий подход'}</span><button data-act="rest-add">+15 с</button><button data-act="rest-skip">${lft > 0 ? 'Дальше' : 'Скрыть'}</button></div>`;
+  if (!el.firstElementChild) el.innerHTML = '<div class="rest" role="group" aria-label="Отдых между подходами"><span class="t" role="timer" aria-label="Осталось отдыхать"></span><span class="l" role="status"></span><button data-act="rest-add" aria-label="Добавить 15 секунд отдыха">+15 с</button><button data-act="rest-skip"></button></div>';
+  $('.rest', el).classList.toggle('over', lft <= 0);
+  $('.t', el).textContent = lft > 0 ? clock(lft * 1000) : '0:00';
+  const label = lft > 0 ? 'Отдых' : 'Пора, следующий подход';
+  if ($('.l', el).textContent !== label) $('.l', el).textContent = label;
+  $('[data-act="rest-skip"]', el).textContent = lft > 0 ? 'Дальше' : 'Скрыть';
 }
 setInterval(() => {
   if (S.workout) { const c = $('#clock'); if (c) c.textContent = clock(Date.now() - S.workout.start); }
@@ -2193,9 +2253,9 @@ function viewDiary() {
   const has = new Set(inMonth.map(w => new Date(w.date).getDate()));
   let cells = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'].map(d => `<div class="wd">${d}</div>`).join('');
   for (let i = 0; i < shift; i++) cells += '<div class="cal-d out"></div>';
-  for (let d = 1; d <= nDays; d++) cells += `<button class="cal-d ${has.has(d) ? 'has' : ''} ${sameDay(new Date(y, m, d), new Date()) ? 'today' : ''}" ${has.has(d) ? `data-act="cal-go" data-v="${y}-${m}-${d}"` : 'tabindex="-1"'}>${d}</button>`;
+  for (let d = 1; d <= nDays; d++) cells += `<button class="cal-d ${has.has(d) ? 'has' : ''} ${sameDay(new Date(y, m, d), new Date()) ? 'today' : ''}" aria-label="${d} ${MONTHS[m]} ${y}${has.has(d) ? ', есть тренировка' : ', без тренировок'}" ${has.has(d) ? `data-act="cal-go" data-v="${y}-${m}-${d}"` : 'disabled'}>${d}</button>`;
   const vol = inMonth.reduce((a, w) => a + w.items.reduce((b, e) => b + e.sets.reduce((c, s) => c + s.w * s.r, 0), 0), 0), mins = inMonth.reduce((a, w) => a + (w.dur || 0), 0);
-  const logs = S.diary.map(logCard).join('') || '<div class="empty">Здесь появятся твои тренировки</div>';
+  const logs = inMonth.map(logCard).join('') || `<div class="empty">${S.diary.length ? 'В этом месяце тренировок пока нет. Выбери другой месяц в календаре.' : 'Здесь появятся твои тренировки.'}<br><button class="btn" data-act="tab" data-v="today">К тренировке</button></div>`;
   return ['Дневник', `${seg}
     <section class="card cal"><div class="cal-h"><button class="icon-btn" data-act="cal-m" data-v="-1" aria-label="предыдущий месяц" style="transform:scaleX(-1)">${CHEV}</button><b>${MONTHS[m]} ${y}</b><button class="icon-btn" data-act="cal-m" data-v="1" aria-label="следующий месяц">${CHEV}</button></div>
       <div class="cal-g">${cells}</div>
@@ -2414,10 +2474,16 @@ function subStatus() {
 }
 function limRows() {
   const a = allowance(), u = usage();
-  return AI_KINDS.map(([k, l]) => `<div class="lim"><span>${l}</span><small>${!a[k] ? 'после оформления' : k === 'ask' ? `${a[k]} · скоро` : `осталось ${Math.max(0, a[k] - u[k])} из ${a[k]}`}</small></div>`).join('');
+  return AI_KINDS.filter(([k]) => PRICING.payments || k !== 'ask').map(([k, l]) => `<div class="lim"><span>${l}</span><small>${!a[k] ? PRICING.payments ? 'после оформления' : 'по промокоду' : k === 'ask' ? `${a[k]} · скоро` : `осталось ${Math.max(0, a[k] - u[k])} из ${a[k]}`}</small></div>`).join('');
 }
 function subCard(inSheet) {
   const st = subStatus(), P = PRICING, a = access(), p = period();
+  if (!P.payments) return `<section class="card sub"><div class="eyebrow">Бесплатное тестирование</div>
+    <b class="big">${a.test ? 'Тестовый доступ включён' : 'Попробуй возможности тренера'}</b>
+    <span>Оплата отключена. Своя программа, дневник и прогресс доступны бесплатно.</span>
+    <span class="hint" style="color:inherit">${a.test ? 'Камера и разбор видео открыты. Доступные подборы и распознавания указаны ниже.' : a.level === 'trial' ? `Камера и разбор видео открыты ещё ${a.days} ${plural(a.days, 'день', 'дня', 'дней')}. Для полного тестового доступа введи TEST2026.` : 'Для камеры, разбора видео и подбора программы активируй бесплатный промокод TEST2026.'}</span>
+    <div class="lims" aria-label="Доступные функции">${limRows()}</div>
+    ${!inSheet && !a.test ? '<button class="btn primary" data-act="promo">Активировать бесплатный доступ</button>' : ''}</section>`;
   const total = P.sub.price + (S.sub.plusPick ? P.aiPlus.price : 0);
   return `<section class="card sub"><div class="eyebrow">Подписка</div><b class="big">${st.title}</b>
     <div class="price"><b>${rub(P.sub.price)}</b><span>в месяц · ${P.trialDays} дней бесплатно новым</span></div>
@@ -2429,6 +2495,7 @@ function subCard(inSheet) {
 }
 function addonCards() {
   const P = PRICING;
+  if (!P.payments) return '';
   return `<section class="addon"><div class="row"><span class="grow"><b style="font-size:17px">ИИ+</b> · +${rub(P.aiPlus.price)} в месяц</span><button class="switch" role="switch" aria-checked="${!!S.sub.plusPick}" aria-label="Добавить ИИ+ к подписке" data-act="ai-plus"><i></i></button></div>
       <span class="hint">Ещё +${P.aiPlus.ai.prog} подборов, +${P.aiPlus.ai.photo} фото и +${P.aiPlus.ai.ask} вопросов каждый месяц. Вместе с подпиской — ${rub(P.sub.price + P.aiPlus.price)} в месяц.</span></section>
     <section class="card pad row"><div class="grow"><b>Разовый пакет ИИ</b><span class="hint" style="display:block">+${P.aiOnce.ai.prog} подборов, +${P.aiOnce.ai.photo} фото, +${P.aiOnce.ai.ask} вопросов на ${P.aiOnce.days} дней</span></div><button class="btn sm" data-act="ai-once">${rub(P.aiOnce.price)}</button></section>
@@ -2493,7 +2560,7 @@ function paywallSheet(reason) {
       <div class="row"><input class="input grow" id="promo" placeholder="Например, TEST2026" autocomplete="off" value="${esc(S.sub.promo)}" style="text-transform:uppercase"><button class="btn primary" data-act="promo-go">Применить</button></div>
       ${S.sub.promo && PROMOS[S.sub.promo] ? `<span class="hint" style="color:var(--good-text);font-weight:700">✓ ${PROMOS[S.sub.promo].text}</span>` : ''}</section>`;
   /* limits ran out while subscribed: offer ИИ+ or the one-off pack first */
-  sheet('Подписка', `
+  sheet(PRICING.payments ? 'Подписка' : 'Тестовый доступ', `
     ${reason ? `<div class="note warn">${I.info}<span>${esc(reason)}</span></div>` : ''}
     ${lvl === 'sub' ? addonCards() + subCard(true) : subCard(true) + addonCards()}
     ${promo}
@@ -2540,7 +2607,10 @@ function docSheet(k) { const d = DOCS[k]; if (d) sheet(d.title, `<div class="doc
 const BACKUP_KEYS = ['program', 'diary', 'next', 'profile', 'videoLog', 'theme', 'usage', 'sub', 'user', 'healthOk'];
 /* a file download works in the browser; inside a preview frame or Telegram the copy goes through the clipboard */
 const canDownload = () => window.parent === window && !(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
-function backupText() { return JSON.stringify({app: 'ii-trener', v: 1, at: new Date().toISOString(), ...Object.fromEntries(BACKUP_KEYS.map(k => [k, S[k]]))}); }
+function backupText() {
+  const source = S.demo && S.demoReturn ? JSON.parse(S.demoReturn) : S;
+  return JSON.stringify({app: 'ii-trener', v: 1, at: new Date().toISOString(), ...Object.fromEntries(BACKUP_KEYS.map(k => [k, source[k]]))});
+}
 function backupFile() {
   const text = backupText(), name = `ii-trener-kopiya-${new Date().toISOString().slice(0, 10)}.json`;
   if (canDownload()) {
@@ -2560,29 +2630,57 @@ function restoreSheet() {
     '<button class="btn" data-act="close">Отмена</button><button class="btn primary" data-act="rs-text">Дальше</button>');
 }
 function restoreText(text) {
+  RESTORE = null;
   try {
     const d = JSON.parse(text);
-    if (!d || d.app !== 'ii-trener' || !d.program || !Array.isArray(d.diary)) throw new Error('not ours');
+    if (!validBackup(d)) throw new Error('invalid backup');
     sheet('Восстановить из копии?', `<p style="margin:0">Копия от ${ruDate(d.at)}: ${d.program.days.length} ${plural(d.program.days.length, 'день', 'дня', 'дней')} программы, ${d.diary.length} ${plural(d.diary.length, 'тренировка', 'тренировки', 'тренировок')} в дневнике. Текущие данные на телефоне заменятся.</p>`,
       `<button class="btn" data-act="close">Отмена</button><button class="btn primary" data-act="restore-go">Восстановить</button>`);
     RESTORE = d;
   } catch (e) { toast('Это не копия ИИ Тренера — нужен файл ii-trener-kopiya-….json или его текст'); }
 }
+function validBackup(d) {
+  const text = x => typeof x === 'string', num = x => typeof x === 'number' && Number.isFinite(x) && x >= 0;
+  const dose = x => num(x) && Number.isInteger(x) && x > 0;
+  const item = x => x && text(x.id) && text(x.name) && dose(x.s) && dose(x.lo) && dose(x.hi) && x.hi >= x.lo && num(x.w) && num(x.rest);
+  if (!d || d.app !== 'ii-trener' || d.v !== 1 || !d.program || !Array.isArray(d.program.days) || !Array.isArray(d.diary)) return false;
+  if (!d.program.days.every(day => day && text(day.id) && text(day.title) && Array.isArray(day.items) && day.items.every(item))) return false;
+  if (!d.diary.every(w => w && text(w.id) && text(w.title) && num(w.date) && Array.isArray(w.items) && w.items.every(e => e && text(e.name) && Array.isArray(e.sets) && e.sets.every(s => s && num(s.w) && dose(s.r))))) return false;
+  if (d.profile && (!Array.isArray(d.profile.limits) || !d.profile.limits.every(text) || !Array.isArray(d.profile.other) || !d.profile.other.every(text) || !d.profile.focus || typeof d.profile.focus !== 'object')) return false;
+  if (d.videoLog && !Array.isArray(d.videoLog)) return false;
+  if (d.sub && (!Array.isArray(d.sub.packs) || d.sub.packs.some(p => !p || !num(p.until)))) return false;
+  return true;
+}
 function restoreFile(file) { const r = new FileReader(); r.onload = () => restoreText(r.result); r.readAsText(file); }
 let RESTORE = null;
 
 /* ---------- sheets & toasts ---------- */
+function syncSheets(returnTo) {
+  const wraps = $$('#sheets > .sheet-wrap'), top = wraps[wraps.length - 1];
+  document.body.classList.toggle('sheet-open', !!top);
+  $$('#onb,.top,#view,.tabs,#restbar').forEach(el => { el.inert = !!top; });
+  wraps.forEach(w => { w.inert = w !== top; });
+  if (returnTo && returnTo.isConnected && !returnTo.closest('[inert]')) returnTo.focus({preventScroll: true});
+  else if (top) $('[role="dialog"]', top).focus({preventScroll: true});
+}
 function sheet(title, body, foot = '', size = '', stack = false) {
-  if (!stack) closeSheet();
+  const returnTo = sheetTop()?._returnFocus || document.activeElement;
+  if (!stack) closeSheet(false);
   const w = document.createElement('div');
+  w._returnFocus = stack ? document.activeElement : returnTo;
   w.className = 'sheet-wrap';
-  w.innerHTML = `<div class="sheet ${size}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-h"><h2>${esc(title)}</h2><button class="icon-btn" data-act="${stack ? 'close-top' : 'close'}" aria-label="закрыть">✕</button></div><div class="sheet-b">${body}</div>${foot ? `<div class="sheet-f">${foot}</div>` : ''}</div>`;
+  w.innerHTML = `<div class="sheet ${size}" role="dialog" aria-modal="true" aria-label="${esc(title)}" tabindex="-1"><div class="sheet-h"><h2>${esc(title)}</h2><button class="icon-btn" data-act="${stack ? 'close-top' : 'close'}" aria-label="закрыть">✕</button></div><div class="sheet-b">${body}</div>${foot ? `<div class="sheet-f">${foot}</div>` : ''}</div>`;
   w.addEventListener('pointerdown', e => { if (e.target === w) w.dataset.down = '1'; });
-  w.addEventListener('click', e => { if (e.target === w && w.dataset.down) { stack ? w.remove() : closeSheet(); } });
+  w.addEventListener('click', e => { if (e.target === w && w.dataset.down) { stack ? closeTop() : closeSheet(); } delete w.dataset.down; });
   $('#sheets').appendChild(w);
+  syncSheets();
   return w;
 }
-function closeSheet() { $('#sheets').innerHTML = ''; if (REC) toggleMic(); S.wiz = null; }
+function closeSheet(restoreFocus = true) {
+  const returnTo = $('#sheets').firstElementChild?._returnFocus;
+  $('#sheets').innerHTML = ''; if (REC) toggleMic(); S.wiz = null;
+  syncSheets(restoreFocus ? returnTo : null);
+}
 let toastT;
 function toast(msg, withUndo) {
   clearTimeout(toastT);
@@ -2592,12 +2690,13 @@ function toast(msg, withUndo) {
 
 /* ---------- actions: every button carries data-act (+ data-v) ---------- */
 const sheetTop = () => $('#sheets').lastElementChild;
-const closeTop = () => { const t = sheetTop(); if (!t) return; if (t.querySelector('#wiz')) { if (REC) toggleMic(); S.wiz = null; } if (t.querySelector('#imp')) IMP = null; t.remove(); };
+const closeTop = () => { const t = sheetTop(); if (!t) return; if (t.querySelector('#wiz')) { if (REC) toggleMic(); S.wiz = null; } if (t.querySelector('#imp')) IMP = null; const returnTo = t._returnFocus; t.remove(); syncSheets(returnTo); };
 const scrollSheet = () => { const b = $('.sheet-b', sheetTop() || document); if (b) b.scrollTop = 0; };
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 function useProgram(days, profile, tab) {
   if (S.program.days.length) snap();
-  if (S.demo) { S.diary = S.diary.filter(w => !w.demo); S.demo = false; }
+  if (S.demo && S.user) { S.diary = S.demoReturn ? JSON.parse(S.demoReturn).diary : S.diary.filter(w => !w.demo); S.demo = false; delete S.demoReturn; S.workout = null; S.rest = null; }
+  else if (S.demo) { S.diary = []; S.workout = null; S.rest = null; }
   S.program = {days, at: Date.now(), by: profile ? 'wish' : 'other'}; S.next = days[0] ? days[0].id : null; S.pick = null;
   if (profile) { const {found, ...p} = profile; S.profile = {...blankProfile(), ...p, filled: true}; }
   S.stage = 'app'; S.tab = tab; S.open = {};
@@ -2631,13 +2730,24 @@ const A = {
     if (v === 'video') toast('Нажми «Выбрать видео» — запись разберётся прямо на телефоне');
   },
   demo: () => {
+    if (S.demo) return;
+    const previous = JSON.stringify(S);
+    undoSnap = null;
     const p = demoProgram(), d = demoDiary(p); d.forEach(w => { w.demo = true; });
-    if (S.program.days.length && !S.demo) snap();
-    S.program = p; S.diary = [...S.diary.filter(w => !w.demo), ...d].sort((a, b) => b.date - a.date); S.next = p.days[0].id; S.demo = true;
+    S.demoReturn = previous;
+    S.program = p; S.diary = d.sort((a, b) => b.date - a.date); S.next = p.days[0].id; S.demo = true;
+    S.workout = null; S.rest = null;
     S.stage = 'app'; S.tab = 'today'; S.pick = null; closeSheet(); render(); window.scrollTo({top: 0});
-    toast('Пример: программа из твоих скриншотов и 5 недель дневника');
+    toast('Пример: 2 дня программы и 5 недель дневника');
   },
-  'demo-off': () => { S.diary = S.diary.filter(w => !w.demo); S.program = {days: []}; S.next = null; S.demo = false; S.workout = null; S.rest = null; S.tab = 'today'; render(); window.scrollTo({top: 0}); toast('Пример убран'); },
+  'demo-off': () => {
+    const theme = S.theme;
+    if (S.demoReturn) { S = JSON.parse(S.demoReturn); S.theme = theme; }
+    else { S.diary = S.diary.filter(w => !w.demo); S.program = {days: []}; S.next = null; S.demo = false; S.workout = null; S.rest = null; S.tab = 'today'; }
+    if (!S.user) S.stage = 'welcome';
+    undoSnap = null;
+    closeSheet(); render(); window.scrollTo({top: 0}); toast('Пример закрыт — твои данные на месте');
+  },
 
   /* wishes → program */
   wish: () => openWizard(),
@@ -2679,12 +2789,17 @@ const A = {
   adj: v => {
     const [i, k, f, d] = v.split(':'), it = S.workout.items[+i], s = it.sets[+k];
     if (f === 'w') s.w = Math.max(0, Math.round((s.w + (+d) * (stepOf(it) || 1)) * 10) / 10);
-    else s.r = Math.max(0, s.r + (+d));
+    else s.r = Math.max(1, s.r + (+d));
     if (f === 'w' && !s.done) it.sets.forEach((o, j) => { if (j > +k && !o.done) o.w = s.w; });
     render();
   },
   done: v => {
     const [i, k] = v.split(':').map(Number), W = S.workout, it = W.items[i], s = it.sets[k];
+    if (!s.done) {
+      const inputs = $$('[data-in]').filter(el => el.dataset.v === v);
+      if (inputs.some(el => inputNumber(el, el.dataset.in === 'r' ? 1 : 0, el.dataset.in === 'r') === null)) return toast('Укажи вес от 0 и целое число повторов или секунд больше 0');
+      if (!(s.r > 0)) return toast('Укажи число повторов или секунд больше 0');
+    }
     s.done = !s.done;
     if (s.done) {
       const G = groupOf(W.items, i), left = j => W.items[j].sets.some(x => !x.done);
@@ -2729,8 +2844,8 @@ const A = {
   'save-wo': () => { closeSheet(); saveWorkout(); },
   discard: () => { S.workout = null; S.rest = null; closeSheet(); render(); },
   'go-diary': () => { closeSheet(); S.tab = 'diary'; S.dtab = 'hist'; if (S.diary[0]) S.open[S.diary[0].id] = true; render(); window.scrollTo({top: 0}); },
-  'rest-add': () => { if (S.rest) { S.rest.end = Math.max(Date.now(), S.rest.end) + 15000; S.rest.buzz = 0; renderRest(); } },
-  'rest-skip': () => { S.rest = null; renderRest(); },
+  'rest-add': () => { if (S.rest) { S.rest.end = Math.max(Date.now(), S.rest.end) + 15000; S.rest.buzz = 0; renderRest(); save(); } },
+  'rest-skip': () => { S.rest = null; renderRest(); save(); },
 
   /* program */
   'day-toggle': v => { S.open[v] = S.open[v] === false; render(); },
@@ -2764,9 +2879,11 @@ const A = {
   'dz-rest': v => { $('#sheets').dataset.rest = v; $$('#dz-rest button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === v)); },
   'dz-save': v => {
     const [d, i] = v.split(':'), [, , it] = findItem(d, i);
+    const s = inputNumber($('#dz-s'), 1, true), w = inputNumber($('#dz-w'));
+    const lo = inputNumber($('#dz-lo'), 1, true), hi = inputNumber($('#dz-hi'), 1, true);
+    if ([s, w, lo, hi].some(n => n === null)) return toast('Укажи вес от 0, подходы и повторы или секунды — целыми числами больше 0');
     snap();
-    it.s = Math.max(1, Math.round(parseNum($('#dz-s').value))); it.w = parseNum($('#dz-w').value);
-    const lo = Math.round(parseNum($('#dz-lo').value)), hi = Math.round(parseNum($('#dz-hi').value));
+    it.s = s; it.w = w;
     it.lo = Math.max(1, Math.min(lo, hi)); it.hi = Math.max(lo, hi, 1); it.rest = +$('#sheets').dataset.rest || 90;
     closeSheet(); render(); toast('Сохранено', true);
   },
@@ -2803,7 +2920,7 @@ const A = {
     if (IMP.fixPick !== undefined) { const c = CAT[IMP.fixPick]; it.base = c ? c.k : null; it.cam = !!(c && c.cam); if (c) { it.inc = c.inc; it.sec = c.inc === 'time'; } }
     it.st = it.base ? 'ok' : 'new';
     IMP.fixPick = undefined;
-    sheetTop().remove(); renderImport();
+    closeTop(); renderImport();
   },
   'imp-save': () => importSave(),
 
@@ -2823,7 +2940,13 @@ const A = {
   'log-toggle': v => { S.open[v] = !S.open[v]; render(); },
   'set-edit': v => { const [w, e, s] = v.split(':'); setSheet(w, +e, +s); },
   'set-add': v => { const [w, e] = v.split(':'); setSheet(w, +e, null); },
-  'se-save': () => { const {wid, ei, si} = S.setEdit, e = S.diary.find(x => x.id === wid).items[ei], s = {w: parseNum($('#se-w').value), r: Math.round(parseNum($('#se-r').value))}; if (si == null) e.sets.push(s); else e.sets[si] = {...e.sets[si], ...s}; closeSheet(); render(); toast(si == null ? 'Подход добавлен' : 'Сохранено'); },
+  'se-save': () => {
+    const w = inputNumber($('#se-w')), r = inputNumber($('#se-r'), 1, true);
+    if (w === null || r === null) return toast('Укажи вес от 0 и целое число повторов или секунд больше 0');
+    const {wid, ei, si} = S.setEdit, e = S.diary.find(x => x.id === wid).items[ei], s = {w, r};
+    if (si == null) e.sets.push(s); else e.sets[si] = {...e.sets[si], ...s};
+    closeSheet(); render(); toast(si == null ? 'Подход добавлен' : 'Сохранено');
+  },
   'se-del': () => { const {wid, ei, si} = S.setEdit, w = S.diary.find(x => x.id === wid), e = w.items[ei]; e.sets.splice(si, 1); if (!e.sets.length) w.items.splice(ei, 1); if (!w.items.length) S.diary.splice(S.diary.indexOf(w), 1); closeSheet(); render(); toast('Подход удалён'); },
   'prog-ex': v => { S.prog = v; render(); },
 
@@ -2864,7 +2987,7 @@ const A = {
   'restore-go': () => {
     const d = RESTORE; if (!d) return;
     for (const k of BACKUP_KEYS) if (k in d && d[k] != null) S[k] = d[k];
-    S.workout = null; S.rest = null; S.pick = null; S.open = {}; S.stage = S.user ? 'app' : S.stage; S.tab = 'today';
+    S.workout = null; S.rest = null; S.pick = null; S.open = {}; S.stage = S.user ? 'app' : S.stage; S.tab = 'today'; S.demo = false; delete S.demoReturn;
     RESTORE = null; closeSheet(); render(); window.scrollTo({top: 0}); toast('Данные восстановлены из копии');
   },
   wipe: () => sheet('Удалить все данные?', `<p style="margin:0">С этого телефона удалятся программа, дневник, разборы камеры, пожелания и аккаунт с отметками согласия. Вернуть их можно будет только из сохранённой копии.</p>`,
@@ -2886,7 +3009,21 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => {
   const t = e.target;
-  if (t.dataset.in && S.workout) { const [i, k] = t.dataset.v.split(':').map(Number), s = S.workout.items[i].sets[k]; s[t.dataset.in] = t.dataset.in === 'w' ? parseNum(t.value) : Math.round(parseNum(t.value)); save(); }
+  if (t.dataset.in && S.workout) {
+    const [i, k] = t.dataset.v.split(':').map(Number), it = S.workout.items[i], s = it.sets[k], f = t.dataset.in;
+    const value = inputNumber(t, f === 'r' ? 1 : 0, f === 'r');
+    if (value !== null) {
+      s[f] = value;
+      if (f === 'w' && !s.done) it.sets.forEach((o, j) => {
+        if (j > k && !o.done) {
+          o.w = value;
+          const input = $(`[data-in="w"][data-v="${i}:${j}"]`);
+          if (input) { input.value = fmt(value); input.setAttribute('aria-invalid', 'false'); }
+        }
+      });
+      save();
+    }
+  }
   if (t.id === 'reg-email') REG.email = t.value;
   if (t.id === 'reg-promo') REG.promo = t.value;
 });
@@ -2900,6 +3037,13 @@ document.addEventListener('focusout', e => {
 });
 document.addEventListener('keydown', e => {
   const id = e.target.id;
+  if (e.key === 'Tab' && sheetTop()) {
+    const dialog = $('[role="dialog"]', sheetTop()), focusable = $$('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]', dialog).filter(el => el.getClientRects().length);
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (!first) { e.preventDefault(); dialog.focus(); }
+    else if (e.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (document.activeElement === last || document.activeElement === dialog)) { e.preventDefault(); first.focus(); }
+  }
   if (e.key === 'Enter' && id === 'rename') e.target.blur();
   if (e.key === 'Enter' && id === 'reg-email') A['reg-go']();
   if (e.key === 'Enter' && id === 'promo') A['promo-go']();
@@ -2917,7 +3061,7 @@ if (/tgWebApp/.test(location.hash) || window.TelegramWebviewProxy) {
   loadScript('https://telegram.org/js/telegram-web-app.js').then(() => { try { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } catch (e) { /* old client */ } applyTheme(); }).catch(() => {});
 }
 if (location.hash === '#from-camera') { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ } }
-if (S.stage !== 'welcome' && !S.user) S.stage = 'welcome';
+if (S.stage !== 'welcome' && !S.user && !S.demo) S.stage = 'welcome';
 render();
 processInbox();
 
