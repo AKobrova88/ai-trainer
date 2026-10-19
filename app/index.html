@@ -277,7 +277,7 @@ textarea.input{padding:10px 12px;min-height:140px;resize:vertical;font-size:14px
 .rday-h{display:flex;align-items:center;gap:8px;padding:10px 10px 8px 12px}
 .rday-h input{flex:1;min-width:0;font-weight:600;font-size:16px;border:1px solid transparent;border-radius:8px;padding:4px 6px;background:transparent}
 .rday-h input:focus{border-color:var(--accent);background:var(--surface);outline:none}
-.rrow{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:start;padding:9px 6px 9px 12px;border-top:1px solid var(--line)}
+.rrow{display:grid;grid-template-columns:22px minmax(0,1fr) 44px;gap:8px;align-items:start;padding:9px 6px 9px 12px;border-top:1px solid var(--line)}
 .rrow .st{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-top:1px}
 .st.ok{background:var(--good-soft);color:var(--good)}
 .st.check{background:var(--warn-soft);color:var(--warn)}
@@ -285,6 +285,20 @@ textarea.input{padding:10px 12px;min-height:140px;resize:vertical;font-size:14px
 .rrow .nm{font-weight:500;line-height:1.3;overflow-wrap:anywhere;text-align:left}
 .rrow .mt{font-size:13px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
 .rrow .mt .badge{margin-left:4px}
+.photo-order{position:absolute;bottom:4px;left:4px;right:4px;display:flex;justify-content:space-between;gap:4px}
+.photo-order button{width:36px;min-height:36px;border-radius:8px;background:var(--surface);color:var(--ink);border:1px solid var(--line);font-size:18px}
+.photo-order button:disabled{opacity:.35}
+.review-day-tools{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:0 12px 8px}
+.review-day-tools .hint{flex:1;min-width:140px}
+.review-row-tools{grid-column:2/-1;display:flex;flex-wrap:wrap;gap:4px 12px}
+.review-row-tools button{min-height:40px;padding:6px 0;color:var(--accent);font-size:13px;text-align:left;text-decoration:underline;text-underline-offset:3px}
+.import-count{display:flex;flex-direction:column;gap:10px}
+.import-save{width:100%;display:flex;flex-direction:column;gap:8px}
+.import-save .row{display:flex;gap:8px}
+.import-save .row .btn{flex:1;min-width:0}
+.import-note{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 0;border-top:1px solid var(--line)}
+.import-note p{width:100%;margin:0;overflow-wrap:anywhere;white-space:pre-wrap}
+.ex-coach-note{display:block;margin-top:6px;font-size:13px;font-weight:400;color:var(--muted);white-space:normal}
 .split{display:flex;justify-content:center}
 .split button{font-size:13px;color:var(--accent);font-weight:600;padding:4px 10px}
 .spinner{width:42px;height:42px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--accent);animation:spin 1s linear infinite}
@@ -724,7 +738,7 @@ const CAT = {};
 for (const [k, n, g, c, i, cue, p] of CAT_DATA.ex) CAT[k] = {k, n, g: g || 'legs', cam: !!c, inc: i, cue: cue || '', p: p || ''};
 const SYN = CAT_DATA.syn || {};
 
-const APP_VERSION = '2.3 · тест';
+const APP_VERSION = '2.4 · тест';
 const KEY = 'ai-trainer-app-1';
 const INBOX = 'aitrainer.inbox';
 const STEP = {bb_lower: 5, bb_upper: 2.5, machine: 2.5, db: 1, bw: 0, time: 0};
@@ -1310,7 +1324,64 @@ const GROUP_WORDS = new Set('ноги ног грудь груди спина с
 const LONE_REPS = /^(.*?[A-Za-zА-Яа-яЁё)])\s{2,}(\d{1,3})(?:\s*[-–—]\s*(\d{1,3}))?\s*(?:повт\S*|раз\S*|reps?)?\s*$/;
 const NOISE = /^\W*(назад|готово|сохранить|начать|старт|меню|поделиться|редактировать|изменить|добавить|отдых|разминка|заминка|кардио|примечание|комментарий|итого|всего|упражнени[ея]|подходы?|повторения|вес|kg|кг|\d{1,2}:\d{2})\W*$/i;
 const W_ROW = /^\s*(вес|weight)(?![а-яёa-z])[\s:.]*(.*)$/i, R_ROW = /^\s*(повт\S*|повтор\S*|reps?|раз)(?![а-яёa-z])[\s:.]*(.*)$/i;
-const STATUS = /^\W*((оставля|увеличива|уменьша|закрепля|снижа|повыша|добавля|сохраня|прибавля)\S*\s+вес\S*|нужно\s+видео)/i;
+function coachNote(text) {
+  const t = String(text).replace(/^\s*\d{1,2}[.)]\s*/, '').replace(/^[^\p{L}\p{N}+]+/u, '').trim().toLowerCase();
+  return /^(?:рекомендаци\S*|комментари\S*|совет\S*|заметк\S*|примечани\S*|подсказк\S*)(?:\s|:|$)/u.test(t)
+    || /^(?:увеличива\S*|увеличи\S*|уменьша\S*|уменьши\S*|оставля\S*|остав\S*|закрепля\S*|снижа\S*|сниз\S*|повыша\S*|повыси\S*|добавля\S*|добав\S*|сохраня\S*|сохрани\S*|прибавля\S*|прибав\S*)(?:$|\s+(?:(?:рабоч\S*|текущ\S*|прежн\S*|немного|постепенно|все|всё|по|на|к)\s+){0,3}(?:вес\S*|нагруз\S*|\d))/u.test(t)
+    || /^(?:рабоч\S*\s+)?вес\S*\s+(?:увелич\S*|повы\S*|уменьш\S*|сниж\S*|остав\S*|сохра\S*|прибав\S*)/u.test(t)
+    || /^(?:в\s+следующ\S*\s+(?:раз|тренировк\S*|подход\S*)|на\s+следующ\S*\s+тренировк\S*|если\s+(?:легко|тяжело|получ\S*)|нужно\s+видео|нужен\s+видео\S*|сними\S*\s+видео|пришли\S*\s+видео)/u.test(t)
+    || /^\+\s*\d+(?:[.,]\d+)?\s*(?:кг|kg)(?:\s|$)/u.test(t);
+}
+function importOrdinal(line) {
+  const m = String(line).match(/^\s*(?:№\s*)?(\d{1,2})(?:[.)]\s*|\s+)(?=[\p{L}])/u);
+  return m ? +m[1] : null;
+}
+function importLines(lines) {
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] === PHOTO_BREAK) { out.push(PHOTO_BREAK); continue; }
+    let line = fixOcr(String(lines[i] || '').trim());
+    const next = lines[i + 1] !== PHOTO_BREAK ? String(lines[i + 1] || '').trim() : '';
+    // OCR sometimes puts the verb or a table label on its own line.
+    if (/^(?:увеличиваем|увеличить|уменьшаем|уменьшить|оставляем|повышаем|снижаем|прибавляем|добавляем)(?:\s+рабочий)?$/iu.test(line) && /^(?:(?:рабочий\s+)?вес|нагруз|по\s*\d|на\s*\d)/iu.test(next)) { line += ' ' + next; i++; }
+    else if (/^(?:вес|weight|повт\.?|повторы|повторения|reps?)\s*:?$/iu.test(line) && /^\d[\d\s.,/хx×–—-]*(?:\s*(?:кг|kg))?$/iu.test(next)) { line += ' ' + next; i++; }
+    if (line) out.push(line);
+  }
+  return out;
+}
+function importTracker(report = {}) {
+  report.notes = report.notes || []; report.warnings = report.warnings || [];
+  const c = {days: [], current: null, photo: 1, overlap: 0, report};
+  c.day = (title, reason) => { c.current = {id: nid('r'), title: title || `День ${c.days.length + 1}`, items: [], _reason: reason}; c.days.push(c.current); c.overlap = 0; return c.current; };
+  c.ensure = () => c.current || c.day(null, 'Не найдена явная граница');
+  c.header = title => {
+    if (c.current && norm(c.current.title) === norm(title)) return c.current;
+    if (c.current && !c.current.items.length) { c.current.title = title; c.current._reason = 'Заголовок на скриншоте'; return c.current; }
+    return c.day(title, 'Заголовок на скриншоте');
+  };
+  c.add = (it, number, photo = c.photo) => {
+    let day = c.ensure();
+    const last = day.items[day.items.length - 1];
+    if (c.overlap > 0) {
+      c.overlap--;
+      const old = day.items.slice(-4).find(o => norm(o.name) === norm(it.name) && (number && o._number ? number === o._number : !number && !o._number && o === last));
+      const sameDose = old && (!parseDose(it.raw || '') || ['s', 'lo', 'hi', 'w', 'sec'].every(k => old[k] === it[k]));
+      if (sameDose && (number !== 1 || old === last)) { old._photos = [...new Set([...(old._photos || []), photo])]; return old; }
+    }
+    if (number === 1 && last && last._number && !(last._number === 1 && norm(last.name) === norm(it.name))) day = c.day(null, 'Нумерация упражнений началась заново с 1');
+    else if (number && last && last._number && number < last._number) {
+      const warning = `Нумерация ${last._number} → ${number}: проверь порядок фото и границы дней.`;
+      if (!report.warnings.includes(warning)) report.warnings.push(warning);
+    }
+    it._number = number; it._photos = [photo]; day.items.push(it); return it;
+  };
+  c.note = (text, owner) => {
+    if (owner) { owner.coachNotes = owner.coachNotes || []; if (!owner.coachNotes.includes(text)) owner.coachNotes.push(text); }
+    report.notes.push({id: nid('note'), text, photo: c.photo, ownerId: owner ? owner.id : null, dayId: c.current ? c.current.id : null});
+  };
+  c.nextPhoto = () => { c.photo++; c.overlap = 4; };
+  return c;
+}
 const CARD_NOISE = /^\W*(начать|добавить в план|заметка|завершить|пропустить|история|поделиться|\d{1,2}[:.]\d{2}(?!\d)|\d{1,2}\.\d{1,2}\.\d{2,4})/i;
 const LEAD_JUNK = /^(?:\d{1,2}|[а-яёa-z]{1,2})[.)]?\s+(?=[А-ЯЁA-Z])/;
 const STOP = new Set('в во на с со к ко и для по из от до за a the with on in of'.split(' '));
@@ -1454,22 +1525,22 @@ function importItem(name, d, src, wHint) {
   if (st === 'new') { it.base = null; it.cam = false; }
   return it;
 }
-function parseImport(lines) {
+function parseImport(lines, report = {}) {
+  lines = importLines(lines);
   const cardMode = lines.filter(x => x !== PHOTO_BREAK && (W_ROW.test(x || '') || R_ROW.test(x || ''))).length >= 2;
-  return cardMode ? parseCards(lines) : parseList(lines);
+  return cardMode ? parseCards(lines, report) : parseList(lines, report);
 }
 const SS_MARK = /^\s*(?:(\d{1,2})([абвгabcd])|([абвгabcd])(\d))(?=[\s.):\-—–]|$)[\s.):\-—–]*/i;
 const SS_HEAD = /^\s*(?:супер|три|гигант|super|tri|giant)\s*-?\s*сет[а-яё]*(?![а-яёa-z])[\s:.\-—–\dх×x]*(?:раз|круг[а-яё]*)?\s*$|^\s*(?:super|tri|giant)\s*-?\s*sets?\s*[\s:.\-—–\d]*$/i;
-function parseList(lines) {
-  const days = []; let cur = null, pending = null, overlap = 0, open = null;
-  const ensure = () => { if (!cur) { cur = {id: nid('r'), title: `День ${S.program.days.length + days.length + 1}`, items: []}; days.push(cur); } return cur; };
-  const add = (it, d) => {
-    if (overlap > 0 && cur) { overlap--; const old = cur.items.slice(-4).find(o => norm(o.name) === norm(it.name) && (!d || (o.s === d.s && o.lo === d.lo && o.hi === d.hi))); if (old) return old; }
-    ensure().items.push(it); return it;
-  };
+function parseList(lines, report = {}) {
+  const tracker = importTracker(report), days = tracker.days; let cur = null, pending = null, open = null, ordinal = null;
+  const add = it => { const result = tracker.add(it, ordinal); cur = tracker.current; ordinal = null; return result; };
   for (const raw of lines) {
-    if (raw === PHOTO_BREAK) { overlap = 4; pending = null; continue; }
+    if (raw === PHOTO_BREAK) { tracker.nextPhoto(); ordinal = null; continue; }
     let line = fixOcr(String(raw || '').trim()); if (!line) continue;
+    if (coachNote(line)) { tracker.note(line, pending || (cur && cur.items[cur.items.length - 1])); continue; }
+    if (/^\s*(?:№\s*)?\d{1,2}[.)]?\s*$/.test(line)) { ordinal = +line.replace(/\D/g, ''); continue; }
+    ordinal = importOrdinal(line) || ordinal;
     if (SS_HEAD.test(line)) { open = {g: nid('g'), n: 0}; pending = null; continue; }
     let mk = null; const sm = line.match(SS_MARK);
     if (sm && line.length > sm[0].length + 2) { mk = sm[1] ? 'n' + sm[1] : 'l' + sm[3].toLowerCase().replace('a', 'а').replace('b', 'б').replace('c', 'в').replace('d', 'г'); line = line.slice(sm[0].length); open = null; }
@@ -1481,14 +1552,13 @@ function parseList(lines) {
     if (!d) { const lone = line.match(LONE_REPS); if (lone && matchEx(lone[1])[0]) { const lo = +lone[2], hi = +(lone[3] || lo); if (lo >= 1 && lo <= 50) d = {s: 3, lo: Math.min(lo, hi), hi: Math.max(lo, hi), sec: false, rest: null, span: [line.indexOf(lone[2], lone[1].length), line.length]}; } }
     if (!d && !head && groupHeading(line)) {
       pending = null; open = null; let title = line.replace(/^[\s:.\-—–]+|[\s:.\-—–]+$/g, ''); title = title[0].toUpperCase() + title.slice(1);
-      if (cur && !cur.items.length && /^День \d+$/.test(cur.title)) cur.title = title;
-      else if (!cur || norm(title) !== norm(cur.title)) { cur = {id: nid('r'), title, items: []}; days.push(cur); }
+      cur = tracker.header(title); ordinal = null;
       continue;
     }
     if (head && !d) {
       const restT = line.slice(head[0].length).replace(/^[\s:—–-]+|[\s:—–-]+$/g, '');
       const k = restT.length > 6 ? matchEx(restT, .9)[0] : null;
-      if (!k) { pending = null; open = null; const title = dayTitle(line, days.length + 1); if (cur && norm(title) === norm(cur.title)) continue; cur = {id: nid('r'), title, items: []}; days.push(cur); continue; }
+      if (!k) { pending = null; open = null; ordinal = null; cur = tracker.header(dayTitle(line, days.length + 1)); continue; }
     }
     if (d) {
       let name = cleanName((line.slice(0, d.span[0]) + ' ' + line.slice(d.span[1])).replace(REST_RX, ''));
@@ -1497,57 +1567,71 @@ function parseList(lines) {
       if (wm) name = name.replace(wm[0], '').trim();
       if (norm(name).length >= 3 && /[a-zа-я]{3,}/.test(norm(name))) { tag(add(importItem(name, d, line, wm ? parseNum(wm[1]) : 0), d)); pending = null; continue; }
       if (pending) {
+        pending._photos = [...new Set([...(pending._photos || []), tracker.photo])];
         Object.assign(pending, {s: d.s, lo: d.lo, hi: d.hi}); if (d.sec) pending.sec = true; if (d.rest) pending.rest = d.rest;
         if (wm) pending.w = parseNum(wm[1]);
         pending.inc = guessInc(pending.name, pending.base, !!wm, pending.sec);
-        pending.raw += ' / ' + line; pending = null;
+        pending.raw += ' / ' + line; delete pending._needsDose; pending = null;
       }
+      ordinal = null;
       continue;
     }
     if (NOISE.test(line) || norm(line).length < 4 || !/[a-zа-яё]{3,}/.test(line.toLowerCase())) continue;
     const name = cleanName(line);
-    if (matchEx(name)[0] || name.length >= 6) pending = tag(add(importItem(name, null, line, 0)));
+    if (matchEx(name)[0] || name.length >= 6) { pending = tag(add(importItem(name, null, line, 0))); pending._needsDose = true; }
   }
   return days.filter(x => x.items.length);
 }
-function parseCards(lines) {
-  const days = []; let cur = null, buf = [], bufStatus = false, item = null, freshN = 0;
-  const ensure = () => { if (!cur) { cur = {id: nid('r'), title: `День ${S.program.days.length + days.length + 1}`, items: []}; days.push(cur); } return cur; };
+function parseCards(lines, report = {}) {
+  const tracker = importTracker(report), days = tracker.days; let buf = [], item = null, ordinal = null, bufNumber = null, bufPhoto = 1;
   const nameOf = rows => rows.map((r, i) => i === 0 ? cleanName(r).replace(LEAD_JUNK, '') : cleanName(r)).join(' ').replace(/\s+/g, ' ').replace(/^[ .,:;]+|[ .,:;]+$/g, '').replace(/\(\s+/g, '(');
   const openCard = () => {
-    const name = nameOf(buf), src = buf.join(' / '); buf = []; bufStatus = false;
+    const name = nameOf(buf), src = buf.join(' / '), number = bufNumber, photo = bufPhoto; buf = []; bufNumber = null;
     if (norm(name).length < 3 || !/[a-zа-яё]{3,}/.test(name.toLowerCase())) { item = null; return; }
-    const day = ensure();
-    if (freshN < 4) { const old = day.items.slice(-4).find(o => norm(o.name) === norm(name)); if (old) { freshN++; item = old; return; } }
-    freshN++;
-    item = importItem(name, null, src, 0); day.items.push(item);
+    if (coachNote(name)) { tracker.note(name, item); return; }
+    item = tracker.add(importItem(name, null, src, 0), number, photo);
+    if (!item._reps) item._needsDose = true;
   };
   for (const raw of lines) {
-    if (raw === PHOTO_BREAK) { if (buf.length && bufStatus) openCard(); else { buf = []; bufStatus = false; } freshN = 0; continue; }
-    const line = String(raw || '').trim(); if (!line) continue;
+    if (raw === PHOTO_BREAK) { tracker.nextPhoto(); continue; }
+    const line = fixOcr(String(raw || '').trim()); if (!line) continue;
+    if (coachNote(line)) { if (buf.length) openCard(); tracker.note(line, item); continue; }
+    if (/^\s*(?:№\s*)?\d{1,2}[.)]?\s*$/.test(line)) { if (buf.length) openCard(); ordinal = +line.replace(/\D/g, ''); continue; }
     const wm = line.match(W_ROW), rm = line.match(R_ROW);
     if (wm || rm) {
       if (buf.length) openCard();
       if (item) {
+        item._photos = [...new Set([...(item._photos || []), tracker.photo])];
         if (wm) { const w = cardWeight(wm[2]); if (w) { item.w = w; item.inc = guessInc(item.name, item.base, true, item.sec); } item._wn = Math.max(item._wn || 0, groupsOf(wm[2]).length); }
-        else { const d = cardReps(rm[2]); if (d) { let [s, lo, hi] = d; if (groupsOf(rm[2]).length < 2 && (item._wn || 0) >= 2 && !parseDose(rm[2])) s = Math.max(s, item._wn); item.s = item._reps ? Math.max(s, item.s) : s; item.lo = lo; item.hi = hi; item._reps = true; } }
+        else { const d = cardReps(rm[2]); if (d) { let [s, lo, hi] = d; if (groupsOf(rm[2]).length < 2 && (item._wn || 0) >= 2 && !parseDose(rm[2])) s = Math.max(s, item._wn); item.s = item._reps ? Math.max(s, item.s) : s; item.lo = lo; item.hi = hi; item._reps = true; delete item._needsDose; } }
       }
       continue;
     }
-    if (STATUS.test(line)) { bufStatus = !!buf.length; continue; }
     if (CARD_NOISE.test(line) || NOISE.test(line) || !/[A-Za-zА-Яа-яЁё]{3,}/.test(line)) continue;
     const head = line.match(DAY_HEAD);
-    if (head && !buf.length && line.length <= 40 && !matchEx(line.slice(head[0].length), .9)[0]) {
-      const title = dayTitle(line, days.length + 1);
-      if (cur && !cur.items.length && /^День \d+$/.test(cur.title)) cur.title = title;
-      else if (!cur || norm(title) !== norm(cur.title)) { cur = {id: nid('r'), title, items: []}; days.push(cur); }
-      item = null; continue;
+    if (head && line.length <= 60 && !matchEx(line.slice(head[0].length), .9)[0]) {
+      if (buf.length) openCard();
+      const previous = tracker.current;
+      const day = tracker.header(dayTitle(line, days.length + 1));
+      if (day !== previous) item = null;
+      ordinal = null; continue;
     }
-    if (!buf.length && groupHeading(line)) { const t = line.replace(/^[\s:.\-—–]+|[\s:.\-—–]+$/g, ''); const title = t[0].toUpperCase() + t.slice(1); if (cur && !cur.items.length) cur.title = title; else { cur = {id: nid('r'), title, items: []}; days.push(cur); } continue; }
+    if (groupHeading(line)) { if (buf.length) openCard(); tracker.header(dayTitle(line, days.length + 1)); item = null; ordinal = null; continue; }
+    const inlineDose = parseDose(line);
+    if (inlineDose) {
+      if (buf.length) openCard();
+      const parsed = parseList([line], {notes: [], warnings: []});
+      if (parsed[0] && parsed[0].items[0]) { item = tracker.add(parsed[0].items[0], importOrdinal(line) || ordinal); ordinal = null; continue; }
+    }
+    const number = importOrdinal(line) || ordinal;
     const last = buf[buf.length - 1] || '';
-    const joins = buf.length && (/^[а-яёa-z]/.test(line) || (last.match(/\(/g) || []).length > (last.match(/\)/g) || []).length || /(\s(с|со|на|в|для|и|к)|[-–(])\s*$/.test(last));
-    if (joins && buf.length < 3) buf.push(line); else { buf = [line]; bufStatus = false; item = null; }
+    const sameCard = !number || (bufNumber && number === bufNumber);
+    const joins = buf.length && sameCard && (/^[а-яёa-z]/.test(line) || (last.match(/\(/g) || []).length > (last.match(/\)/g) || []).length || /(\s(с|со|на|в|для|и|к)|[-–(])\s*$/.test(last));
+    if (joins && buf.length < 4) buf.push(line);
+    else { if (buf.length) openCard(); buf = [line]; bufNumber = number; bufPhoto = tracker.photo; }
+    ordinal = null;
   }
+  if (buf.length) openCard();
   for (const d of days) for (const it of d.items) { delete it._reps; delete it._wn; }
   return days.filter(x => x.items.length);
 }
@@ -1840,6 +1924,7 @@ function viewWorkout() {
       </div>`).join('');
     return `${ssHead}<article class="wx open ${fin ? 'done' : ''} ${it.ss ? 'ss' : ''}">${head}<div class="wx-b">
       <p class="coach ${it.up ? 'up' : ''}">${it.hint}</p>
+      ${it.coachNotes && it.coachNotes.length ? `<p class="hint">Заметка тренера: ${it.coachNotes.map(esc).join(' · ')}</p>` : ''}
       ${it.base && CAT[it.base] && CAT[it.base].cue ? `<p class="hint" style="margin:-4px 2px 0">${esc(CAT[it.base].cue)}</p>` : ''}
       <div class="sets"><div class="set set-h"><span>#</span><span>${wcol ? 'кг' : ''}</span><span>${it.sec ? 'секунды' : 'повторы'}</span><span></span></div>${rows}</div>
       <div class="wx-a"><div class="sets-n" role="group" aria-label="Подходы"><button data-act="rmset" data-v="${i}" aria-label="убрать подход" ${it.sets.length <= 1 ? 'disabled' : ''}>−</button><span>${it.sets.length} ${plural(it.sets.length, 'подход', 'подхода', 'подходов')}</span><button data-act="addset" data-v="${i}" aria-label="добавить подход">+</button></div>${camBtn(it, i)}<button class="icon-btn" data-act="wx-menu" data-v="${i}" aria-label="ещё">${DOTS}</button></div>
@@ -1915,6 +2000,8 @@ function viewProgram() {
       <button class="btn ghost" data-act="day-add">${I.plus}Собрать самой</button></section>`];
   return ['Программа', `
     <div class="toolbar"><button class="btn" data-act="import">${I.photo}По фото</button><button class="btn" data-act="wish">${I.spark}Подобрать</button><button class="btn" data-act="day-add">${I.plus}День</button></div>
+    <button class="btn" data-act="program-organize">${I.sliders}Исправить распределение по дням</button>
+    ${P.coachNotes && P.coachNotes.length ? `<details class="card pad"><summary>Заметки из программы</summary>${P.coachNotes.map(note => `<p class="hint">${esc(note)}</p>`).join('')}</details>` : ''}
     <p class="hint" style="margin:0">${P.days.length} ${plural(P.days.length, 'день', 'дня', 'дней')} · ${n} ${plural(n, 'упражнение', 'упражнения', 'упражнений')}. Держи за <span style="display:inline-flex;width:14px;vertical-align:-2px">${GRIP}</span> и перетаскивай — дни и упражнения меняются местами, упражнение можно перенести в другой день.</p>
     <div class="days" id="days">${P.days.map(dayCard).join('')}</div>`];
 }
@@ -1927,7 +2014,7 @@ function dayCard(d) {
     ${first ? `<div class="ss-h">Суперсет ${labs[i]}–${labs[groupOf(d.items, i).slice(-1)[0]]} · по очереди, отдых после круга</div>` : ''}
     <div class="ex ${g ? 'ss' : ''} ${first ? 'ss-first' : ''} ${last ? 'ss-last' : ''}" data-item="${it.id}">
       <span class="grip" data-drag="item" aria-label="перетащить">${GRIP}</span>
-      <button class="ex-m" data-act="ex-dose" data-v="${d.id}:${it.id}"><b>${g ? `<span class="ssl">${labs[i]}</span>` : ''}${esc(it.name)}</b><span class="dz"><u>${dose(it)}${it.w ? ' · ' + fmt(it.w) + ' кг' : ''}</u>${it.cam ? '<span class="badge cam">камера</span>' : ''}</span></button>
+      <button class="ex-m" data-act="ex-dose" data-v="${d.id}:${it.id}"><b>${g ? `<span class="ssl">${labs[i]}</span>` : ''}${esc(it.name)}</b><span class="dz"><u>${dose(it)}${it.w ? ' · ' + fmt(it.w) + ' кг' : ''}</u>${it.cam ? '<span class="badge cam">камера</span>' : ''}</span>${it.coachNotes && it.coachNotes.length ? `<span class="ex-coach-note">Заметка тренера: ${it.coachNotes.map(esc).join(' · ')}</span>` : ''}</button>
       <button class="icon-btn" data-act="ex-menu" data-v="${d.id}:${it.id}" aria-label="действия">${DOTS}</button>
     </div>`; }).join('');
   return `<section class="day ${closed ? 'closed' : ''} ${S.flash === d.id ? 'flash' : ''}" data-day="${d.id}">
@@ -2098,8 +2185,88 @@ function renumber() { S.program.days.forEach((d, i) => { if (/^День \d+( · 
 
 /* ---------- own program by photo or text ---------- */
 let IMP = null;
+function newImportSession() {
+  return {step: 'pick', photos: [], text: '', mode: 'photo', days: [], notes: [], warnings: [], undo: [], expectedDays: 'auto', countConfirmed: null, dest: 'add', toDay: S.program.days.length ? S.program.days[S.program.days.length - 1].id : null, prog: ''};
+}
+const importDayCount = () => IMP.days.filter(d => d.items.length).length;
+function saveImportDraft() {
+  if (!IMP || IMP.step !== 'review') return;
+  S.importDraft = JSON.parse(JSON.stringify({v: 1, days: IMP.days, notes: IMP.notes, warnings: IMP.warnings, expectedDays: IMP.expectedDays, countConfirmed: IMP.countConfirmed, dest: IMP.dest, toDay: IMP.toDay, mode: IMP.mode, existing: IMP.existing, sourceCount: IMP.photos.length || IMP.sourceCount || 0}));
+  save();
+}
+function snapImport() {
+  IMP.undo.push(JSON.stringify({days: IMP.days, notes: IMP.notes, warnings: IMP.warnings, expectedDays: IMP.expectedDays, countConfirmed: IMP.countConfirmed}));
+  if (IMP.undo.length > 20) IMP.undo.shift();
+}
+function setImportDayCount(value) {
+  IMP.expectedDays = value;
+  IMP.countConfirmed = null;
+  if (value !== 'auto') {
+    IMP.days = IMP.days.filter(d => d.items.length);
+    while (IMP.days.length < +value) IMP.days.push({id: nid('r'), title: `День ${IMP.days.length + 1}`, items: [], _reason: 'День добавлен вручную'});
+  }
+}
+function readyImport() {
+  const count = importDayCount();
+  return count > 0 && count === IMP.days.length && !IMP.days.some(d => d.items.some(it => it._needsDose)) && (IMP.expectedDays === 'auto' ? IMP.countConfirmed === count : +IMP.expectedDays === count);
+}
+function reviewImportLines(lines) {
+  const report = {notes: [], warnings: []};
+  IMP.lines = lines; IMP.days = parseImport(lines, report); IMP.notes = report.notes; IMP.warnings = report.warnings; IMP.undo = []; IMP.countConfirmed = null;
+  if (IMP.expectedDays !== 'auto') setImportDayCount(IMP.expectedDays);
+  IMP.dest = 'add'; IMP.step = 'review';
+}
+function splitImportDay(di, ii) {
+  if (ii <= 0 || ii >= IMP.days[di].items.length) return false;
+  snapImport();
+  const source = IMP.days[di], rest = source.items.splice(ii);
+  const empty = IMP.days.findIndex(d => d !== source && !d.items.length);
+  const day = empty >= 0 ? IMP.days.splice(empty, 1)[0] : {id: nid('r'), title: `День ${di + 2}`};
+  Object.assign(day, {items: rest, _reason: 'Начало дня указано вручную'});
+  IMP.days.splice(IMP.days.indexOf(source) + 1, 0, day);
+  IMP.days.forEach((d, index) => { if (/^День \d+( · |$)/.test(d.title)) d.title = d.title.replace(/^День \d+/, `День ${index + 1}`); });
+  return true;
+}
+function moveImportItem(di, ii, target) {
+  const source = IMP.days[di];
+  let dest = IMP.days.find(d => d.id === target);
+  if (dest === source) return false;
+  if (!dest && target !== 'new') return false;
+  snapImport();
+  if (!dest) { dest = {id: nid('r'), title: `День ${IMP.days.length + 1}`, items: [], _reason: 'День добавлен вручную'}; IMP.days.push(dest); }
+  dest.items.push(source.items.splice(ii, 1)[0]);
+  return true;
+}
+function noteImportItem(di, ii) {
+  snapImport();
+  const day = IMP.days[di], it = day.items.splice(ii, 1)[0], owner = day.items[ii - 1];
+  if (owner) { owner.coachNotes = owner.coachNotes || []; owner.coachNotes.push(it.name); }
+  IMP.notes.push({id: nid('note'), text: it.name, ownerId: owner ? owner.id : null, dayId: day.id, original: it, index: ii});
+}
+function restoreImportNote(id) {
+  const index = IMP.notes.findIndex(n => n.id === id); if (index < 0) return;
+  snapImport();
+  const note = IMP.notes.splice(index, 1)[0];
+  const owner = IMP.days.flatMap(d => d.items).find(it => it.id === note.ownerId);
+  if (owner) owner.coachNotes = (owner.coachNotes || []).filter(n => n !== note.text);
+  let day = IMP.days.find(d => d.id === note.dayId) || IMP.days[0];
+  if (!day) { day = {id: nid('r'), title: 'День 1', items: []}; IMP.days.push(day); }
+  const it = note.original || {...importItem(note.text, null, note.text, 0), _needsDose: true};
+  day.items.splice(Math.min(note.index == null ? day.items.length : note.index, day.items.length), 0, it);
+}
+function organizeProgram() {
+  IMP = newImportSession(); IMP.existing = true; IMP.dest = 'replace'; IMP.mode = 'text'; IMP.step = 'review';
+  IMP.days = JSON.parse(JSON.stringify(S.program.days)).map(d => ({...d, items: d.items.map(it => ({...it, st: coachNote(it.name) ? 'check' : it.base ? 'ok' : 'new', raw: it.name}))}));
+  IMP.expectedDays = 'auto'; IMP.countConfirmed = null;
+  sheet('Исправить распределение по дням', '<div id="imp"></div>', '<div id="imp-f" style="display:flex;gap:8px;width:100%"></div>', 'full');
+  renderImport();
+}
 function importSheet() {
-  IMP = {step: 'pick', photos: [], text: '', mode: 'photo', days: [], dest: 'add', toDay: S.program.days.length ? S.program.days[S.program.days.length - 1].id : null, prog: ''};
+  IMP = newImportSession();
+  const draft = S.importDraft;
+  if (draft && draft.v === 1 && validBackup({app: 'ii-trener', v: 1, program: {days: draft.days}, diary: []})) {
+    Object.assign(IMP, JSON.parse(JSON.stringify(draft)), {step: 'review', undo: []});
+  }
   sheet('Своя программа', '<div id="imp"></div>', '<div id="imp-f" style="display:flex;gap:8px;width:100%"></div>', 'full');
   renderImport();
 }
@@ -2116,13 +2283,15 @@ function demoRecognized() {
 function renderImport() {
   const b = $('#imp'), f = $('#imp-f');
   if (!b || !IMP) return;
+  const dayOptions = value => `<option value="auto" ${value === 'auto' ? 'selected' : ''}>Определить автоматически</option>${Array.from({length: 14}, (_, i) => i + 1).map(n => `<option value="${n}" ${+value === n ? 'selected' : ''}>${n} ${plural(n, 'день', 'дня', 'дней')}</option>`).join('')}`;
   if (IMP.step === 'pick') {
-    const thumbs = IMP.photos.map((p, i) => `<div class="thumb">${p.url ? `<img src="${p.url}" alt="скриншот ${i + 1}">` : '<div class="fake">' + '<i></i>'.repeat(14) + '</div>'}<span class="n">${i + 1}</span><button class="x" data-act="imp-rm" data-v="${i}" aria-label="убрать">×</button></div>`).join('');
+    const thumbs = IMP.photos.map((p, i) => `<div class="thumb">${p.url ? `<img src="${p.url}" alt="скриншот ${i + 1}">` : '<div class="fake">' + '<i></i>'.repeat(14) + '</div>'}<span class="n">${i + 1}</span><button class="x" data-act="imp-rm" data-v="${i}" aria-label="Убрать фото ${i + 1}">×</button><div class="photo-order"><button data-act="imp-photo-move" data-v="${i}:-1" aria-label="Фото ${i + 1} раньше" ${i ? '' : 'disabled'}>←</button><button data-act="imp-photo-move" data-v="${i}:1" aria-label="Фото ${i + 1} позже" ${i < IMP.photos.length - 1 ? '' : 'disabled'}>→</button></div></div>`).join('');
     const lft = left('photo');
     b.innerHTML = `
       <div class="seg"><button data-act="imp-mode" data-v="photo" aria-pressed="${IMP.mode === 'photo'}">Скриншоты</button><button data-act="imp-mode" data-v="text" aria-pressed="${IMP.mode === 'text'}">Текстом</button></div>
+      <div class="field"><label for="imp-count">Сколько тренировочных дней в программе?</label><select class="input" id="imp-count">${dayOptions(IMP.expectedDays)}</select><span class="hint">Это число разных тренировок, а не количество фотографий. Один день может занимать несколько скриншотов.</span></div>
       ${IMP.mode === 'photo' ? `
-      <label class="drop-zone" id="dz">${I.photo}<b>Выбери скриншоты</b><span class="hint">Можно сразу несколько, по порядку. Если день не влез на один экран — добавь все его скриншоты: я склею их в один день.</span><span class="btn sm primary">Выбрать фото</span><input type="file" accept="image/*" multiple id="imp-file" hidden></label>
+      <label class="drop-zone" id="dz">${I.photo}<b>Выбери скриншоты</b><span class="hint">Добавь все фото в порядке упражнений. Границы дней ищу по заголовкам и новому началу нумерации. После распознавания их можно поправить.</span><span class="btn sm primary">Выбрать фото</span><input type="file" accept="image/*" multiple id="imp-file" hidden></label>
       ${thumbs ? `<div class="thumbs">${thumbs}</div>` : ''}
       <p class="hint" style="margin:0">Фото читаются прямо на телефоне и никуда не отправляются. ${allowance().photo ? `Распознавание фото — ИИ-функция: осталось ${lft} из ${allowance().photo}.` : 'Распознавание фото — в подписке; текстом — бесплатно.'}</p>
       <button class="btn ghost" data-act="imp-sample">Показать на примере скриншотов «Тренировка 4»</button>`
@@ -2130,6 +2299,7 @@ function renderImport() {
       <p class="hint" style="margin:0">Разбор текста бесплатный и без лимита.</p>`}`;
     f.innerHTML = `<button class="btn" data-act="close">Отмена</button><button class="btn primary" data-act="imp-read" ${(IMP.mode === 'photo' ? IMP.photos.length : IMP.text.trim()) ? '' : 'disabled'}>Распознать</button>`;
     const inp = $('#imp-file'); if (inp) inp.addEventListener('change', () => addPhotos(inp.files));
+    $('#imp-count').addEventListener('change', e => { IMP.expectedDays = e.target.value; });
     const dz = $('#dz');
     if (dz) {
       dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
@@ -2148,33 +2318,51 @@ function renderImport() {
   const flagged = IMP.days.reduce((a, d) => a + d.items.filter(i => i.st !== 'ok').length, 0);
   const dayOpts = P.map(d => `<option value="${d.id}" ${IMP.toDay === d.id ? 'selected' : ''}>${esc(d.title)}</option>`).join('');
   const destOpt = (k, title, sub) => `<button class="opt" role="radio" aria-checked="${IMP.dest === k}" data-act="imp-dest" data-v="${k}"><span class="rd"></span><span class="grow"><b>${title}</b><span>${sub}</span></span></button>`;
+  const sourceInfo = it => {
+    const photo = IMP.mode === 'photo';
+    const source = [it._number ? `№ ${it._number} ${photo ? 'на скриншоте' : 'в исходном тексте'}` : '', photo && it._photos ? 'Фото ' + it._photos.join(', ') : ''].filter(Boolean).join(' · ');
+    return `${source ? `<div class="mt">${esc(source)}</div>` : ''}${it.coachNotes && it.coachNotes.length ? `<div class="mt">Заметка: ${it.coachNotes.map(esc).join(' · ')}</div>` : ''}`;
+  };
   const rdays = IMP.days.map((d, di) => `
-    ${di > 0 ? `<div class="split"><button data-act="imp-merge" data-v="${di}">↑ Это продолжение предыдущего дня — склеить</button></div>` : ''}
-    <section class="rday"><div class="rday-h"><input value="${esc(d.title)}" data-imp-title="${di}" aria-label="название дня"><span class="badge">${d.items.length}</span></div>
+    <section class="rday" data-review-day="${d.id}"><div class="rday-h"><input value="${esc(d.title)}" data-imp-title="${di}" aria-label="Название дня ${di + 1}"><span class="badge">${d.items.length} упр.</span></div>
+    <div class="review-day-tools"><span class="hint">${esc(d._reason || 'День из программы')}</span>${di > 0 ? `<button class="btn sm" data-act="imp-merge" data-v="${di}">Объединить с предыдущим</button>` : ''}${!d.items.length ? `<button class="btn sm danger" data-act="imp-day-delete" data-v="${di}">Удалить пустой день</button>` : ''}</div>
     ${d.items.map((it, ii) => `<div class="rrow"><span class="st ${it.st}" aria-label="${it.st === 'ok' ? 'из справочника' : it.st === 'check' ? 'проверь' : 'своё'}">${it.st === 'ok' ? '✓' : it.st === 'check' ? '?' : '+'}</span>
-      <button class="grow" style="text-align:left" data-act="imp-fix" data-v="${di}:${ii}"><div class="nm">${esc(it.name)}</div><div class="mt">${dose(it)}${it.w ? ' · ' + fmt(it.w) + ' кг' : ''}${it.st === 'check' ? '<span class="badge warn">проверь</span>' : it.st === 'new' ? '<span class="badge new">своё</span>' : it.cam ? '<span class="badge cam">камера</span>' : ''}</div></button>
-      <span class="row" style="gap:0">${ii > 0 ? `<button class="icon-btn" data-act="imp-split" data-v="${di}:${ii}" title="Начать новый день с этого упражнения" aria-label="новый день отсюда">⤵︎</button>` : ''}<button class="icon-btn" data-act="imp-del" data-v="${di}:${ii}" aria-label="убрать">✕</button></span></div>`).join('')}
+      <button class="grow" style="text-align:left" data-act="imp-fix" data-v="${di}:${ii}" aria-label="Изменить ${esc(it.name)}"><div class="nm">${esc(it.name)}</div><div class="mt">${dose(it)}${it.w ? ' · ' + fmt(it.w) + ' кг' : ''}${it._needsDose ? '<span class="badge warn">проверь повторы</span>' : it.st === 'check' ? '<span class="badge warn">проверь название</span>' : it.st === 'new' ? '<span class="badge new">своё</span>' : ''}</div>${sourceInfo(it)}${coachNote(it.name) ? '<div class="hint" style="color:var(--warn)">Похоже на рекомендацию — можно убрать в заметки</div>' : ''}</button>
+      <button class="icon-btn" data-act="imp-row-menu" data-v="${di}:${ii}" aria-label="Действия: ${esc(it.name)}">${DOTS}</button>
+      <div class="review-row-tools">${ii > 0 ? `<button data-act="imp-split" data-v="${di}:${ii}">Новый день отсюда</button>` : ''}<button data-act="imp-move-menu" data-v="${di}:${ii}">Перенести в другой день</button></div></div>`).join('') || '<div class="empty">Пока нет упражнений. Перенеси их из другого дня или добавь вручную.</div>'}
+    <div class="review-day-tools"><button class="btn sm" data-act="imp-add-item" data-v="${di}">${I.plus}Добавить упражнение</button></div>
     </section>`).join('');
   b.innerHTML = `
-    <div class="card pad"><b>Нашла ${nd} ${plural(nd, 'день', 'дня', 'дней')}, ${n} ${plural(n, 'упражнение', 'упражнения', 'упражнений')}</b><div class="hint">${flagged ? `${flagged} ${plural(flagged, 'упражнение', 'упражнения', 'упражнений')} с «?» или «+» — нажми и проверь название. ` : ''}Веса беру как стартовые.</div></div>
-    ${P.length ? `<div class="eyebrow">Куда добавить</div>
+    <div class="card pad"><b>${IMP.existing ? 'Редактирование программы' : 'Результат распознавания'}: ${importDayCount()} ${plural(importDayCount(), 'день', 'дня', 'дней')}, ${n} ${plural(n, 'упражнение', 'упражнения', 'упражнений')}</b><div class="hint">${flagged ? `${flagged} ${plural(flagged, 'название требует', 'названия требуют', 'названий требуют')} проверки. ` : ''}Правки сохраняются в черновик на этом устройстве. Программа изменится после сохранения.</div></div>
+    <section class="import-count card pad"><div class="field"><label for="imp-review-count">На сколько дней нужно разделить?</label><select class="input" id="imp-review-count">${dayOptions(IMP.expectedDays)}</select></div>
+      <span class="hint">Фото не равны дням. Если границ недостаточно, добавлю пустые дни для ручного переноса, а не разделю упражнения поровну.</span>
+      ${IMP.expectedDays === 'auto' ? `<button class="btn" data-act="imp-confirm-days" ${n && nd === importDayCount() ? '' : 'disabled'}>${IMP.countConfirmed === importDayCount() ? '✓ Подтверждено' : 'Верно'}: ${importDayCount()} ${plural(importDayCount(), 'день', 'дня', 'дней')}</button>` : ''}
+      <div class="row" style="flex-wrap:wrap"><button class="btn sm" data-act="imp-day-add">${I.plus}Добавить день</button><button class="btn sm" data-act="imp-undo" ${IMP.undo.length ? '' : 'disabled'}>Отменить правку</button></div></section>
+    ${IMP.warnings.length ? `<div class="note warn">${I.info}<span>${IMP.warnings.map(esc).join('<br>')}</span></div>` : ''}
+    ${P.length && !IMP.existing ? `<div class="eyebrow">Куда добавить</div>
     <div class="dest" role="radiogroup">
       ${destOpt('add', 'Новым днём в мою программу', `${nd > 1 ? 'Станут днями' : 'Станет днём'} ${P.length + 1}${nd > 1 ? '–' + (P.length + nd) : ''}, остальное не изменится`)}
-      ${destOpt('into', 'Дописать в существующий день', 'Упражнения встанут в конец выбранного дня')}
+      ${destOpt('into', 'Дописать в существующий день', 'Все распознанные дни объединятся в один выбранный день')}
       ${IMP.dest === 'into' ? `<select class="input" id="imp-day" aria-label="в какой день">${dayOpts}</select>` : ''}
       ${destOpt('replace', 'Заменить всю программу', `Текущие ${P.length} ${plural(P.length, 'день', 'дня', 'дней')} уйдут`)}
     </div>` : ''}
     <div class="eyebrow">Что распознала</div>
-    <p class="hint" style="margin:0">День разбился неправильно? «Склеить» соединяет соседние дни, ⤵︎ начинает новый день с этого упражнения.</p>
+    <p class="hint" style="margin:0">«Новый день отсюда» переносит это упражнение и все следующие в отдельный день. «Перенести» меняет день одного упражнения. Нажми на название для изменения веса и повторов, ⋯ — для удаления или переноса в заметки.</p>
     <div class="rdays">${rdays}</div>
-    <button class="btn ghost" data-act="imp-back">← Добавить ещё скриншоты</button>`;
+    ${IMP.notes.length ? `<details class="card pad"><summary>Рекомендации тренера — ${IMP.notes.length}</summary><p class="hint">Это заметки, а не упражнения. Если строка попала сюда ошибочно, верни её в список.</p>${IMP.notes.map(note => `<div class="import-note"><p>${esc(note.text)}</p>${note.photo && IMP.mode === 'photo' ? `<small class="hint">Фото ${note.photo}</small>` : ''}<button class="btn sm" data-act="imp-note-restore" data-v="${note.id}">Это упражнение</button></div>`).join('')}</details>` : ''}
+    ${IMP.existing ? '' : '<button class="btn ghost" data-act="imp-back">← Вернуться к фото или тексту</button>'}
+    <button class="btn ghost" data-act="imp-new">Начать новый разбор</button>`;
   renderImportFoot();
-  $$('[data-imp-title]').forEach(i => i.addEventListener('input', () => { IMP.days[+i.dataset.impTitle].title = i.value; }));
-  const sel = $('#imp-day'); if (sel) sel.addEventListener('change', () => { IMP.toDay = sel.value; renderImportFoot(); });
+  $$('[data-imp-title]').forEach(i => i.addEventListener('change', () => { snapImport(); IMP.days[+i.dataset.impTitle].title = i.value; saveImportDraft(); }));
+  $('#imp-review-count').addEventListener('change', e => { snapImport(); setImportDayCount(e.target.value); renderImport(); });
+  const sel = $('#imp-day'); if (sel) sel.addEventListener('change', () => { IMP.toDay = sel.value; renderImportFoot(); saveImportDraft(); });
+  saveImportDraft();
 }
 function renderImportFoot() {
   const f = $('#imp-f'), n = IMP.days.reduce((a, d) => a + d.items.length, 0), into = IMP.dest === 'into' && dayById(IMP.toDay);
-  f.innerHTML = `<button class="btn primary big" data-act="imp-save" ${n ? '' : 'disabled'}>${!S.program.days.length ? 'Сохранить программу' : IMP.dest === 'replace' ? 'Заменить программу' : into ? 'Дописать в «' + esc(into.title.length > 22 ? into.title.slice(0, 21) + '…' : into.title) + '»' : 'Добавить в программу'}</button>`;
+  const empty = IMP.days.length - importDayCount(), missingDose = IMP.days.flatMap(d => d.items).filter(it => it._needsDose).length;
+  const message = empty ? `Заполни или удали пустые дни: ${empty}.` : missingDose ? `Не прочитались подходы и повторы: ${missingDose}. Нажми на названия и проверь значения.` : !readyImport() ? IMP.expectedDays === 'auto' ? 'Сначала подтверди число дней выше.' : `Нужно ${IMP.expectedDays} ${plural(+IMP.expectedDays, 'день', 'дня', 'дней')}, сейчас заполнено ${importDayCount()}. Расставь границы или перенеси упражнения.` : `${importDayCount()} ${plural(importDayCount(), 'день', 'дня', 'дней')} · ${n} ${plural(n, 'упражнение', 'упражнения', 'упражнений')} — готово к сохранению`;
+  f.innerHTML = `<div class="import-save"><span class="hint" role="status">${message}</span><div class="row"><button class="btn" data-act="close">Закрыть</button><button class="btn primary" data-act="imp-save" ${readyImport() ? '' : 'disabled'}>${IMP.existing ? 'Сохранить исправления' : !S.program.days.length ? 'Сохранить программу' : IMP.dest === 'replace' ? 'Заменить программу' : into ? 'Дописать в день' : 'Добавить в программу'}</button></div></div>`;
 }
 function addPhotos(files) {
   [...files].filter(f => f.type.startsWith('image/')).forEach(f => IMP.photos.push({url: URL.createObjectURL(f), name: f.name}));
@@ -2182,9 +2370,9 @@ function addPhotos(files) {
 }
 async function readImport() {
   if (IMP.mode === 'text') {
-    IMP.days = parseImport(IMP.text.split('\n'));
-    if (!IMP.days.length) return toast('Не нашла строк вида «Жим лёжа 3×10»');
-    IMP.dest = 'add'; IMP.step = 'review'; return renderImport();
+    reviewImportLines(IMP.text.split('\n'));
+    if (!IMP.days.some(d => d.items.length)) { IMP.step = 'pick'; return toast('Не нашла строк вида «Жим лёжа 3×10»'); }
+    return renderImport();
   }
   if (IMP.sample) { IMP.days = demoRecognized(); IMP.step = 'read'; IMP.prog = 'Читаю 2 скриншота…'; renderImport(); setTimeout(() => { if (IMP && IMP.step === 'read') { IMP.step = 'review'; renderImport(); } }, 1200); return; }
   const need = IMP.photos.length;
@@ -2201,11 +2389,10 @@ async function readImport() {
       if (bar) bar.style.width = Math.round(IMP.pct * 100) + '%';
     });
     if (IMP !== token || IMP.step !== 'read') return;
-    IMP.lines = lines;
-    IMP.days = parseImport(lines);
-    if (IMP.days.length) for (let k = 0; k < need; k++) spend('photo');
-    if (!IMP.days.length) { IMP.step = 'pick'; renderImport(); return sheet('Не нашла упражнений', `<p class="hint" style="margin:0">Текст на скриншоте прочитался, но строк с упражнениями и подходами я не увидела. Попробуй скриншот крупнее или вставь программу текстом.</p>${lines.length ? `<details><summary class="hint">Что прочиталось</summary><pre style="white-space:pre-wrap;font-size:12px">${esc(lines.filter(l => l !== PHOTO_BREAK).join('\n'))}</pre></details>` : ''}`, `<button class="btn" data-act="close-top">Понятно</button><button class="btn primary" data-act="imp-totext">Вставить текстом</button>`, '', true); }
-    IMP.dest = 'add'; IMP.step = 'review'; renderImport();
+    reviewImportLines(lines);
+    if (IMP.days.some(d => d.items.length)) for (let k = 0; k < need; k++) spend('photo');
+    if (!IMP.days.some(d => d.items.length)) { IMP.step = 'pick'; renderImport(); return sheet('Не нашла упражнений', `<p class="hint" style="margin:0">Текст на скриншоте прочитался, но строк с упражнениями и подходами я не увидела. Попробуй скриншот крупнее или вставь программу текстом.</p>${lines.length ? `<details><summary class="hint">Что прочиталось</summary><pre style="white-space:pre-wrap;font-size:12px">${esc(lines.filter(l => l !== PHOTO_BREAK).join('\n'))}</pre></details>` : ''}`, `<button class="btn" data-act="close-top">Понятно</button><button class="btn primary" data-act="imp-totext">Вставить текстом</button>`, '', true); }
+    renderImport(); scrollSheet();
   } catch (e) {
     console.error(e);
     if (IMP !== token) return;
@@ -2214,27 +2401,49 @@ async function readImport() {
   }
 }
 function fixSheet(di, ii) {
-  const it = IMP.days[di].items[ii];
+  const it = ii == null ? importItem('Новое упражнение', null, '', 0) : IMP.days[di].items[ii];
   const q = norm(it.name).split(' ').filter(w => w.length > 3).map(w => w.slice(0, -2));
   const sug = Object.values(CAT).map(c => [c, q.filter(w => norm(c.n).includes(w)).length + (c.k === it.base ? 5 : 0)]).filter(x => x[1]).sort((a, b) => b[1] - a[1]).slice(0, 5).map(x => x[0]);
   IMP.fix = [di, ii];
+  IMP.fixPick = undefined;
   sheet('Проверь упражнение', `
-    <div class="field"><label for="fx-name">Название</label><input class="input" id="fx-name" value="${esc(it.name)}"></div>
+    <div class="field"><label for="fx-name">Название</label><input class="input" id="fx-name" value="${ii == null ? '' : esc(it.name)}" placeholder="Название упражнения"></div>
     ${it.raw ? `<div class="hint">На скриншоте: «${esc(it.raw)}»</div>` : ''}
-    <div class="grid2"><div class="field"><label for="fx-dose">Подходы × повторы</label><input class="input" id="fx-dose" value="${it.s}×${reps(it)}"></div><div class="field"><label for="fx-w">Вес, кг</label><input class="input" id="fx-w" inputmode="decimal" value="${it.w ? fmt(it.w) : ''}"></div></div>
+    <div class="grid2"><div class="field"><label for="fx-dose">Подходы × повторы или секунды</label><input class="input" id="fx-dose" value="${it.s}×${reps(it)}${it.sec ? ' сек' : ''}"></div><div class="field"><label for="fx-w">Вес, кг</label><input class="input" id="fx-w" inputmode="decimal" value="${it.w ? fmt(it.w) : ''}" placeholder="0"></div></div>
     <div class="eyebrow">Это упражнение из справочника?</div>
     <div class="menu" id="fx-menu">${sug.map(c => `<button data-act="fx-pick" data-v="${c.k}"><span class="ck" ${it.base === c.k ? '' : 'hidden'}>✓</span><span>${esc(c.n)}</span>${c.cam ? '<small>камера</small>' : ''}</button>`).join('')}<button data-act="fx-pick" data-v=""><span class="ck" ${!it.base ? '' : 'hidden'}>✓</span><span>Нет, это моё упражнение</span></button></div>`,
     `<button class="btn" data-act="close-top">Отмена</button><button class="btn primary" data-act="fx-save">Готово</button>`, '', true);
 }
+function closeImportTools() { const top = sheetTop(); if (top && !top.querySelector('#imp')) closeTop(); }
+function importMoveSheet(di, ii) {
+  const it = IMP.days[di].items[ii];
+  sheet('Перенести упражнение', `<p class="hint">${esc(it.name)}</p><div class="menu">${IMP.days.map((d, index) => `<button data-act="imp-move" data-v="${di}:${ii}:${d.id}" ${index === di ? 'disabled' : ''}><span>${esc(d.title)}</span><small>${index === di ? 'сейчас здесь' : d.items.length + ' упр.'}</small></button>`).join('')}<button data-act="imp-move" data-v="${di}:${ii}:new">${I.plus}<span>В новый день</span></button></div>`, '', '', true);
+}
+function importRowMenu(di, ii) {
+  const it = IMP.days[di].items[ii];
+  sheet(it.name, `<div class="menu">
+    ${mi('imp-fix', `${di}:${ii}`, I.edit, 'Изменить название, вес и повторы')}
+    ${mi('imp-move-menu', `${di}:${ii}`, I.arrow, 'Перенести в другой день')}
+    ${ii > 0 ? mi('imp-split', `${di}:${ii}`, I.plus, 'Начать новый день отсюда') : ''}
+    ${mi('imp-row-shift', `${di}:${ii}:-1`, I.up, 'Поставить раньше', ii === 0 ? 'disabled' : '')}
+    ${mi('imp-row-shift', `${di}:${ii}:1`, I.down, 'Поставить позже', ii === IMP.days[di].items.length - 1 ? 'disabled' : '')}
+    ${mi('imp-to-note', `${di}:${ii}`, I.doc, 'Это рекомендация, а не упражнение')}
+    ${mi('imp-del', `${di}:${ii}`, I.trash, 'Удалить строку', 'class="danger"')}</div>`, '', '', true);
+}
 function importSave() {
+  if (!readyImport()) return toast('Сначала проверь число дней и распредели упражнения по ним');
   const P = S.program;
-  const days = IMP.days.filter(d => d.items.length).map(d => ({id: nid('d'), title: d.title.trim() || 'День', items: d.items.map(({st, raw, ...it}) => ({...it, id: nid('i')}))}));
+  const owners = new Set(IMP.days.flatMap(d => d.items.map(it => it.id)));
+  const orphanNotes = IMP.notes.filter(note => !owners.has(note.ownerId)).map(note => note.text);
+  const days = IMP.days.filter(d => d.items.length).map(d => ({id: IMP.existing ? d.id : nid('d'), title: d.title.trim() || 'День', ...(d.coachNotes ? {coachNotes: d.coachNotes} : {}), items: d.items.map(({st, raw, _number, _photos, _needsDose, ...it}) => ({...it, id: IMP.existing ? it.id : nid('i')}))}));
   snap();
   let msg, flashId;
-  if (!P.days.length || IMP.dest === 'replace') { P.days = days; P.at = Date.now(); P.by = 'import'; S.next = days[0].id; msg = `Программа сохранена: ${days.length} ${plural(days.length, 'день', 'дня', 'дней')}`; flashId = days[0].id; }
+  if (!P.days.length || IMP.dest === 'replace') { if (!IMP.existing) { delete P.coachNotes; P.at = Date.now(); P.by = 'import'; } P.days = days; if (!IMP.existing || !days.some(d => d.id === S.next)) S.next = days[0].id; msg = `Программа сохранена: ${days.length} ${plural(days.length, 'день', 'дня', 'дней')}`; flashId = days[0].id; }
   else if (IMP.dest === 'into') { const d = dayById(IMP.toDay); d.items.push(...days.flatMap(x => x.items)); msg = `Дописала в «${d.title}»`; flashId = d.id; }
   else { P.days.push(...days); msg = days.length > 1 ? `Добавила ${days.length} дня в конец программы` : `«${days[0].title}» — теперь день ${P.days.length}`; flashId = days[0].id; }
+  if (orphanNotes.length) P.coachNotes = [...new Set([...(P.coachNotes || []), ...orphanNotes])];
   if (!S.next) S.next = P.days[0].id;
+  S.pick = null; delete S.importDraft;
   IMP = null; closeSheet();
   S.stage = 'app'; S.tab = 'program'; S.flash = flashId; S.open[flashId] = true;
   render(); S.flash = null;
@@ -2894,8 +3103,15 @@ const A = {
 
   /* own program by photo or text */
   import: () => importSheet(),
+  'program-organize': () => organizeProgram(),
+  'imp-new': () => { delete S.importDraft; save(); IMP = newImportSession(); renderImport(); scrollSheet(); },
+  'imp-undo': () => { const previous = IMP.undo.pop(); if (!previous) return; Object.assign(IMP, JSON.parse(previous)); renderImport(); },
+  'imp-confirm-days': () => { if (importDayCount() && IMP.days.length === importDayCount()) { IMP.countConfirmed = importDayCount(); renderImport(); } },
+  'imp-day-add': () => { snapImport(); IMP.days.push({id: nid('r'), title: `День ${IMP.days.length + 1}`, items: [], _reason: 'День добавлен вручную'}); renderImport(); },
+  'imp-day-delete': v => { const index = +v; if (IMP.days[index].items.length) return; snapImport(); IMP.days.splice(index, 1); renderImport(); },
+  'imp-photo-move': v => { const [index, direction] = v.split(':').map(Number), target = index + direction; if (target < 0 || target >= IMP.photos.length) return; [IMP.photos[index], IMP.photos[target]] = [IMP.photos[target], IMP.photos[index]]; renderImport(); },
   'imp-mode': v => { IMP.mode = v; IMP.sample = false; renderImport(); },
-  'imp-rm': v => { IMP.photos.splice(+v, 1); if (!IMP.photos.length) IMP.sample = false; renderImport(); },
+  'imp-rm': v => { const photo = IMP.photos.splice(+v, 1)[0]; if (photo && photo.url) URL.revokeObjectURL(photo.url); if (!IMP.photos.length) IMP.sample = false; renderImport(); },
   'imp-sample': () => { IMP.mode = 'photo'; IMP.sample = true; IMP.photos = [{url: '', name: 'Скриншот 1'}, {url: '', name: 'Скриншот 2'}]; renderImport(); },
   'imp-read': () => readImport(),
   'imp-back': () => { IMP.step = 'pick'; renderImport(); scrollSheet(); },
@@ -2906,19 +3122,32 @@ const A = {
     renderImport();
   },
   'imp-dest': v => { IMP.dest = v; renderImport(); },
-  'imp-merge': v => { const i = +v, a = IMP.days; a[i - 1].items.push(...a[i].items); a.splice(i, 1); renderImport(); toast('Склеила в один день'); },
-  'imp-split': v => { const [di, ii] = v.split(':').map(Number), a = IMP.days, d = a[di], rest = d.items.splice(ii); a.splice(di + 1, 0, {id: nid('r'), title: `День ${S.program.days.length + di + 2}`, items: rest}); renderImport(); toast('Разделила на два дня'); },
-  'imp-del': v => { const [di, ii] = v.split(':').map(Number); IMP.days[di].items.splice(ii, 1); if (!IMP.days[di].items.length) IMP.days.splice(di, 1); renderImport(); },
-  'imp-fix': v => { const [di, ii] = v.split(':').map(Number); fixSheet(di, ii); },
+  'imp-merge': v => { const i = +v, a = IMP.days; if (i <= 0 || i >= a.length) return; snapImport(); a[i - 1].items.push(...a[i].items); a[i - 1].coachNotes = [...(a[i - 1].coachNotes || []), ...(a[i].coachNotes || [])]; a.splice(i, 1); renderImport(); toast('Дни объединены. Правку можно отменить'); },
+  'imp-split': v => { const [di, ii] = v.split(':').map(Number); if (!splitImportDay(di, ii)) return; closeImportTools(); renderImport(); toast('Новый день начинается с выбранного упражнения'); },
+  'imp-del': v => { const [di, ii] = v.split(':').map(Number); snapImport(); IMP.days[di].items.splice(ii, 1); closeImportTools(); renderImport(); toast('Строка удалена. Правку можно отменить'); },
+  'imp-row-menu': v => { const [di, ii] = v.split(':').map(Number); importRowMenu(di, ii); },
+  'imp-move-menu': v => { const [di, ii] = v.split(':').map(Number); closeImportTools(); importMoveSheet(di, ii); },
+  'imp-move': v => { const [di, ii, target] = v.split(':'); if (!moveImportItem(+di, +ii, target)) return; closeImportTools(); renderImport(); toast('Упражнение перенесено'); },
+  'imp-row-shift': v => { const [di, ii, direction] = v.split(':').map(Number), items = IMP.days[di].items, target = ii + direction; if (target < 0 || target >= items.length) return; snapImport(); [items[ii], items[target]] = [items[target], items[ii]]; closeImportTools(); renderImport(); },
+  'imp-to-note': v => { const [di, ii] = v.split(':').map(Number); noteImportItem(di, ii); closeImportTools(); renderImport(); toast('Рекомендация сохранится как заметка'); },
+  'imp-note-restore': v => { restoreImportNote(v); renderImport(); },
+  'imp-add-item': v => fixSheet(+v, null),
+  'imp-fix': v => { const [di, ii] = v.split(':').map(Number); closeImportTools(); fixSheet(di, ii); },
   'fx-pick': (v, el) => { IMP.fixPick = v; $$('#fx-menu .ck').forEach(c => { c.hidden = true; }); $('.ck', el).hidden = false; },
   'fx-save': () => {
-    const [di, ii] = IMP.fix, it = IMP.days[di].items[ii];
-    it.name = $('#fx-name').value.trim() || it.name;
-    const m = $('#fx-dose').value.match(/(\d+)\D+(\d+)(?:\D+(\d+))?/);
-    if (m) { it.s = +m[1]; it.lo = +m[2]; it.hi = Math.max(+m[2], +(m[3] || m[2])); }
-    it.w = parseNum($('#fx-w').value);
-    if (IMP.fixPick !== undefined) { const c = CAT[IMP.fixPick]; it.base = c ? c.k : null; it.cam = !!(c && c.cam); if (c) { it.inc = c.inc; it.sec = c.inc === 'time'; } }
+    const [di, ii] = IMP.fix, name = $('#fx-name').value.trim(), d = parseDose($('#fx-dose').value);
+    const w = $('#fx-w').value.trim() ? inputNumber($('#fx-w')) : 0;
+    if (name.length < 2) return toast('Напиши название упражнения');
+    if (!d) return toast('Укажи подходы и повторы, например 3×8–12 или 3×30 сек');
+    if (w === null) return toast('Вес должен быть числом от 0');
+    snapImport();
+    const it = ii == null ? importItem(name, d, '', w) : IMP.days[di].items[ii];
+    const renamed = it.name !== name;
+    it.name = name.slice(0, 60); Object.assign(it, {s: d.s, lo: d.lo, hi: d.hi, sec: d.sec, w}); delete it._needsDose;
+    const picked = IMP.fixPick !== undefined ? IMP.fixPick : renamed ? resolve(name)[0] || '' : it.base;
+    const c = CAT[picked]; it.base = c ? c.k : null; it.cam = !!(c && c.cam); it.inc = guessInc(it.name, it.base, !!w, it.sec);
     it.st = it.base ? 'ok' : 'new';
+    if (ii == null) IMP.days[di].items.push(it);
     IMP.fixPick = undefined;
     closeTop(); renderImport();
   },
