@@ -119,6 +119,83 @@ test('test mode offers access without payment buttons or paid add-ons', () => {
     if (!subCard().includes('Тестовый доступ включён')) throw Error('Missing active access');`);
 });
 
+test('personal access has no quotas or expiry, persists on reload, and preserves training data', () => {
+  const a = app();
+  a.run(`S.user = {email:'test@example.invalid',at:Date.now()-365*DAY};
+    S.program = demoProgram(); S.diary = demoDiary(S.program); S.importDraft = {v:1,days:[]};
+    S.sub.promo = 'TEST2026'; S.usage = {m:'expired',prog:1000000,photo:1000000,ask:1000000};
+    const before = JSON.stringify({program:S.program,diary:S.diary,draft:S.importDraft,usage:S.usage});
+    if (!applyPromo('AKOBROVA2026')) throw Error('Personal code rejected');
+    save(); S = load();
+    if (!access().unlimited || !canCamera() || period().end !== null) throw Error('Personal access expires');
+    for (const [k] of AI_KINDS) {
+      if (allowance()[k] !== Infinity || left(k) !== Infinity) throw Error('Quota remained: '+k);
+      spend(k);
+    }
+    if (JSON.stringify({program:S.program,diary:S.diary,draft:S.importDraft,usage:S.usage}) !== before) throw Error('Existing data changed');
+    const personalCard = subCard();
+    if (!personalCard.includes('Без лимитов') || !personalCard.includes('без лимита') || /Infinity|NaN|осталось|Оформить за|Обновятся/.test(personalCard)) throw Error('Misleading personal access UI');`);
+});
+
+test('personal exemption does not change regular trial and test quotas or accept unknown codes', () => {
+  const a = app();
+  a.run(`S.user = {email:'test@example.invalid',at:Date.now()};
+    if (allowance().prog !== 1 || allowance().photo !== 0) throw Error('Trial changed');
+    S.sub.promo = 'TEST2026';
+    if (access().unlimited || allowance().photo !== 10 || allowance().prog !== 3) throw Error('Regular test changed');
+    const before = JSON.stringify(S.sub);
+    if (applyPromo('UNKNOWN') || JSON.stringify(S.sub) !== before) throw Error('Unknown code granted access');
+    if (!subCard().includes('data-act="promo"')) throw Error('Cannot upgrade existing test access');`);
+});
+
+test('personal access opens the actual importer for a batch exceeding the old 10 photo limit', async () => {
+  const a = app();
+  a.nodes.set('#sheets', {lastElementChild:null});
+  a.run(`applyPromo('AKOBROVA2026');
+    S.usage = {m:'old',prog:999,photo:999,ask:999};
+    renderImport = () => {}; paywallSheet = () => { window.blocked = true; };
+    ocrPhotos = async photos => { window.ocrCount = photos.length; return ['Жим лёжа 3×10 40 кг','Тяга блока 3×12 35 кг']; };
+    IMP = newImportSession(); IMP.photos = Array.from({length:15},(_,i) => ({url:'test-'+i}));`);
+  await a.run('readImport()');
+  assert.equal(a.run('window.blocked'), undefined);
+  assert.equal(a.run('window.ocrCount'), 15);
+  assert.equal(a.run('IMP.step'), 'review');
+  assert.equal(a.run('IMP.days[0].items.length'), 2);
+  assert.equal(a.run('S.usage.photo'), 999, 'unlimited imports do not consume a finite quota');
+});
+
+test('repeated actual program builds stay available with personal access after old quota is exhausted', () => {
+  const a = app();
+  a.nodes.set('#sheets', {lastElementChild:null});
+  a.run(`applyPromo('AKOBROVA2026'); S.usage = {m:'old',prog:999,photo:999,ask:999};
+    renderWizard = () => {}; paywallSheet = () => { throw Error('Quota blocked program building'); };
+    for (let i=0; i<4; i++) {
+      S.wiz = {spent:false,P:parseWishes('Мне 30 лет, вес 65 кг, 3 дня в неделю, хожу в зал, хочу силу'),open:{}};
+      A['wiz-build']();
+      if (S.wiz.step !== 3 || !S.wiz.res.days.length) throw Error('Build failed');
+    }
+    if (S.usage.prog !== 999) throw Error('Personal build spent a finite quota');`);
+});
+
+test('personal code can be activated through the existing promo form and survives leaving demo', () => {
+  const a = app();
+  a.nodes.set('#promo', {value:'  akobrova2026  '});
+  a.nodes.set('#sheets', {lastElementChild:null});
+  a.run(`S.program = demoProgram(); const own = JSON.stringify(S.program); A.demo();
+    paywallSheet = () => {}; A['promo-go'](); save(); S = load(); A['demo-off']();
+    if (!access().unlimited || S.sub.promo !== 'AKOBROVA2026') throw Error('Personal access lost');
+    if (JSON.stringify(S.program) !== own) throw Error('Program changed');`);
+});
+
+test('unlimited import UI shows a readable status instead of numeric infinity', () => {
+  const a = app();
+  for (const key of ['#imp','#imp-f','#imp-count']) a.nodes.set(key, {innerHTML:'',addEventListener() {}});
+  a.run(`applyPromo('AKOBROVA2026'); IMP = newImportSession(); renderImport();`);
+  const content = a.nodes.get('#imp').innerHTML;
+  assert.match(content, /Распознавание фото доступно без лимита/);
+  assert.doesNotMatch(content, /Infinity|NaN|осталось/);
+});
+
 test('camera preparation requires visible head, body, suitable angle and starting position', () => {
   const camera = fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
   const checkSource = camera.split('/* Setup check: pure pose visibility and analyzer-state checks, also covered by tests. */')[1].split('/* End setup check. */')[0];

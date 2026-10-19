@@ -738,7 +738,7 @@ const CAT = {};
 for (const [k, n, g, c, i, cue, p] of CAT_DATA.ex) CAT[k] = {k, n, g: g || 'legs', cam: !!c, inc: i, cue: cue || '', p: p || ''};
 const SYN = CAT_DATA.syn || {};
 
-const APP_VERSION = '2.4 · тест';
+const APP_VERSION = '2.4.1 · тест';
 const KEY = 'ai-trainer-app-1';
 const INBOX = 'aitrainer.inbox';
 const STEP = {bb_lower: 5, bb_upper: 2.5, machine: 2.5, db: 1, bw: 0, time: 0};
@@ -759,8 +759,11 @@ const PRICING = {
   aiOnce: {price: 199, days: 30, ai: {prog: 5, photo: 10, ask: 50}},
 };
 const AI_KINDS = [['prog', 'Подборы программы'], ['photo', 'Фото программ'], ['ask', 'Вопросы тренеру']];
-/* testing: TEST2026 gives the «Подписка» level with its AI limits for the whole test, free */
-const PROMOS = {TEST2026: {grants: 'sub', text: 'доступ как в подписке на всё время тестирования'}};
+/* Test access is stored locally until server accounts are available. */
+const PROMOS = {
+  TEST2026: {grants: 'sub', text: 'доступ как в подписке на всё время тестирования'},
+  AKOBROVA2026: {grants: 'sub', unlimited: true, text: 'личный доступ без лимитов и срока окончания'},
+};
 const rub = n => `${n} ₽`;
 const DAY = 864e5;
 
@@ -875,15 +878,26 @@ const nextDay = () => dayById(S.next) || S.program.days[0];
 /* free: own program, diary, progress · trial: 14 days of everything, AI — 1 program · sub: camera + AI 3/10/30 a period */
 function access() {
   const now = Date.now(), reg = S.user ? S.user.at : now, sb = S.sub;
-  if (sb.promo && PROMOS[sb.promo]) return {level: 'sub', since: sb.since || reg, test: true};
+  if (sb.promo && PROMOS[sb.promo]) return {level: 'sub', since: sb.since || reg, test: true, unlimited: !!PROMOS[sb.promo].unlimited};
   if (sb.paidUntil > now) return {level: 'sub', since: sb.since || reg};
   const end = reg + PRICING.trialDays * DAY;
   if (now < end) return {level: 'trial', since: reg, until: end, days: Math.max(1, Math.ceil((end - now) / DAY))};
   return {level: 'free'};
 }
 const canCamera = () => access().level !== 'free';
+function applyPromo(code) {
+  if (!PROMOS[code]) return false;
+  const grant = state => {
+    if (state.sub.promo !== code) { state.sub.promo = code; state.sub.since = Date.now(); }
+  };
+  grant(S);
+  // Activating access while previewing the example must also survive leaving it.
+  if (S.demo && S.demoReturn) { const own = JSON.parse(S.demoReturn); grant(own); S.demoReturn = JSON.stringify(own); }
+  return true;
+}
 function period() {
   const a = access();
+  if (a.unlimited) return {key: 'unlimited', end: null};
   if (a.level === 'trial') return {key: 'trial', end: a.until};
   if (a.level !== 'sub') return {key: 'free', end: null};
   const len = PRICING.periodDays * DAY, n = Math.max(0, Math.floor((Date.now() - a.since) / len));
@@ -896,6 +910,7 @@ function usage() {
 }
 function allowance() {
   const a = access(), z = {prog: 0, photo: 0, ask: 0};
+  if (a.unlimited) return {prog: Infinity, photo: Infinity, ask: Infinity};
   if (a.level === 'trial') return {...PRICING.trialAi};
   if (a.level !== 'sub') return z;
   const r = {...PRICING.sub.ai};
@@ -903,8 +918,8 @@ function allowance() {
   for (const p of S.sub.packs || []) if (p.until > Date.now()) for (const k in r) r[k] += PRICING.aiOnce.ai[k];
   return r;
 }
-const left = k => Math.max(0, allowance()[k] - usage()[k]);
-function spend(k) { usage()[k]++; save(); }
+const left = k => access().unlimited ? Infinity : Math.max(0, allowance()[k] - usage()[k]);
+function spend(k) { if (access().unlimited) return; usage()[k]++; save(); }
 
 /* ---------- theme ---------- */
 function applyTheme() {
@@ -1760,7 +1775,7 @@ function renderWizard() {
         <textarea id="wish-t" rows="8" placeholder="Например: вес 62 кг, рост 168. Хожу в зал около двух лет, 3 раза в неделю по часу. Хочу подкачать ягодицы и заднюю поверхность бедра, подтянуть спину. Иногда побаливает колено — глубокие приседы не люблю.">${esc(W.text)}</textarea>
         <div class="row"><span class="hint" id="wish-n">${W.text.length} ${plural(W.text.length, 'знак', 'знака', 'знаков')}</span>${hasSpeech() ? `<button class="mic" data-act="mic" id="mic">${I.mic}Надиктовать</button>` : ''}</div></div>
       <div class="eyebrow">Что уже есть в тексте</div><div class="found" id="wish-found">${foundChips(P)}</div>
-      ${youngProgram() ? `<div class="note warn">${I.info}<span>Твоей программе ${youngProgram()} ${plural(youngProgram(), 'день', 'дня', 'дней')}. Программу стоит вести 4–6 недель, чтобы вес успевал расти. Пересобрать можно — это 1 подбор из лимита.</span></div>` : ''}
+      ${youngProgram() ? `<div class="note warn">${I.info}<span>Твоей программе ${youngProgram()} ${plural(youngProgram(), 'день', 'дня', 'дней')}. Программу стоит вести 4–6 недель, чтобы вес успевал расти. ${access().unlimited ? 'Пересборка доступна без лимита.' : 'Пересобрать можно — это 1 подбор из лимита.'}</span></div>` : ''}
       <p class="hint">Подбор идёт по правилам тренера прямо на телефоне: текст никуда не отправляется.</p>`;
     f.innerHTML = `<button class="btn" data-act="close">Отмена</button><button class="btn primary" data-act="wiz-next" id="wiz-next" ${W.text.trim().length >= 12 ? '' : 'disabled'}>Дальше</button>`;
     const ta = $('#wish-t');
@@ -1799,7 +1814,7 @@ function renderWizard() {
         ${P.flags && (P.flags.pregnant || P.flags.medical) ? `<div class="note warn">${I.warn}<span><b>Сначала согласуй нагрузку с врачом.</b> Программа будет щадящей, без максимальных весов.</span></div>` : ''}
       </div>`;
     const lft = left('prog'), all = allowance().prog;
-    b.insertAdjacentHTML('beforeend', `<p class="hint" style="margin:0">${W.spent ? 'Пересборка в этом окне не тратит лимит.' : all ? `Это 1 подбор из лимита ИИ: осталось ${lft} из ${all}.` : 'Подбор программы — в подписке; покажу варианты.'}</p>`);
+    b.insertAdjacentHTML('beforeend', `<p class="hint" style="margin:0">${access().unlimited ? 'Подбор и пересборка программы доступны без лимита.' : W.spent ? 'Пересборка в этом окне не тратит лимит.' : all ? `Это 1 подбор из лимита ИИ: осталось ${lft} из ${all}.` : 'Подбор программы — в подписке; покажу варианты.'}</p>`);
     f.innerHTML = `<button class="btn" data-act="wiz-back">Назад</button><button class="btn primary" data-act="wiz-build">${W.spent ? 'Пересобрать' : 'Составить программу'}</button>`;
     $$('[data-wz]', b).forEach(i => i.addEventListener('input', () => { P[i.dataset.wz] = parseNum(i.value); }));
     return;
@@ -2293,7 +2308,7 @@ function renderImport() {
       ${IMP.mode === 'photo' ? `
       <label class="drop-zone" id="dz">${I.photo}<b>Выбери скриншоты</b><span class="hint">Добавь все фото в порядке упражнений. Границы дней ищу по заголовкам и новому началу нумерации. После распознавания их можно поправить.</span><span class="btn sm primary">Выбрать фото</span><input type="file" accept="image/*" multiple id="imp-file" hidden></label>
       ${thumbs ? `<div class="thumbs">${thumbs}</div>` : ''}
-      <p class="hint" style="margin:0">Фото читаются прямо на телефоне и никуда не отправляются. ${allowance().photo ? `Распознавание фото — ИИ-функция: осталось ${lft} из ${allowance().photo}.` : 'Распознавание фото — в подписке; текстом — бесплатно.'}</p>
+      <p class="hint" style="margin:0">Фото читаются прямо на телефоне и никуда не отправляются. ${access().unlimited ? 'Распознавание фото доступно без лимита.' : allowance().photo ? `Распознавание фото — ИИ-функция: осталось ${lft} из ${allowance().photo}.` : 'Распознавание фото — в подписке; текстом — бесплатно.'}</p>
       <button class="btn ghost" data-act="imp-sample">Показать на примере скриншотов «Тренировка 4»</button>`
       : `<div class="field"><label for="imp-text">Вставь программу — по строке на упражнение</label><textarea class="input" id="imp-text" placeholder="День 3 · Верх&#10;Жим гантелей на наклонной 3×10 12 кг&#10;Тяга верхнего блока 3×12 35 кг&#10;Планка 3×45 сек">${esc(IMP.text)}</textarea></div>
       <p class="hint" style="margin:0">Разбор текста бесплатный и без лимита.</p>`}`;
@@ -2676,23 +2691,29 @@ function videoSheet(id) {
 /* ---------- profile ---------- */
 function subStatus() {
   const a = access(), p = period();
+  if (a.unlimited) return {title: 'Личный доступ без лимитов', note: 'Подбор программ, распознавание фото, камера и разбор видео открыты без срока окончания.'};
   if (a.level === 'sub' && a.test) return {title: 'Тестирование: всё открыто', note: `Промокод ${esc(S.sub.promo)} — ${PROMOS[S.sub.promo].text}. Оплата отключена.`};
   if (a.level === 'sub') return {title: 'Подписка оформлена', note: `Следующий период — с ${ruDate(p.end)}.`};
   if (a.level === 'trial') return {title: `Пробный период: ещё ${a.days} ${plural(a.days, 'день', 'дня', 'дней')}`, note: `До ${ruDate(a.until)} открыто всё; из ИИ — ${PRICING.trialAi.prog} подбор программы. Потом ${rub(PRICING.sub.price)} в месяц.`};
   return {title: 'Бесплатный доступ', note: `Своя программа, дневник и прогресс работают всегда. Камера-тренер, разбор видео и ИИ — в подписке.`};
 }
 function limRows() {
-  const a = allowance(), u = usage();
-  return AI_KINDS.filter(([k]) => PRICING.payments || k !== 'ask').map(([k, l]) => `<div class="lim"><span>${l}</span><small>${!a[k] ? PRICING.payments ? 'после оформления' : 'по промокоду' : k === 'ask' ? `${a[k]} · скоро` : `осталось ${Math.max(0, a[k] - u[k])} из ${a[k]}`}</small></div>`).join('');
+  const a = allowance(), u = access().unlimited ? S.usage : usage();
+  return AI_KINDS.filter(([k]) => PRICING.payments || k !== 'ask').map(([k, l]) => `<div class="lim"><span>${l}</span><small>${!Number.isFinite(a[k]) ? `без лимита${k === 'ask' ? ' · скоро' : ''}` : !a[k] ? PRICING.payments ? 'после оформления' : 'по промокоду' : k === 'ask' ? `${a[k]} · скоро` : `осталось ${Math.max(0, a[k] - u[k])} из ${a[k]}`}</small></div>`).join('');
 }
 function subCard(inSheet) {
   const st = subStatus(), P = PRICING, a = access(), p = period();
+  if (a.unlimited) return `<section class="card sub"><div class="eyebrow">Личный доступ</div>
+    <b class="big">Без лимитов</b><span>${st.note}</span>
+    <div class="lims" aria-label="Доступные функции">${limRows()}</div>
+    <span class="hint" style="color:inherit">Доступ сохранён на этом устройстве. Оплата не требуется.</span>
+    ${!inSheet ? '<button class="btn" data-act="promo">Ввести промокод</button>' : ''}</section>`;
   if (!P.payments) return `<section class="card sub"><div class="eyebrow">Бесплатное тестирование</div>
     <b class="big">${a.test ? 'Тестовый доступ включён' : 'Попробуй возможности тренера'}</b>
     <span>Оплата отключена. Своя программа, дневник и прогресс доступны бесплатно.</span>
     <span class="hint" style="color:inherit">${a.test ? 'Камера и разбор видео открыты. Доступные подборы и распознавания указаны ниже.' : a.level === 'trial' ? `Камера и разбор видео открыты ещё ${a.days} ${plural(a.days, 'день', 'дня', 'дней')}. Для полного тестового доступа введи TEST2026.` : 'Для камеры, разбора видео и подбора программы активируй бесплатный промокод TEST2026.'}</span>
     <div class="lims" aria-label="Доступные функции">${limRows()}</div>
-    ${!inSheet && !a.test ? '<button class="btn primary" data-act="promo">Активировать бесплатный доступ</button>' : ''}</section>`;
+    ${!inSheet ? `<button class="btn ${a.test ? '' : 'primary'}" data-act="promo">${a.test ? 'Ввести промокод' : 'Активировать бесплатный доступ'}</button>` : ''}</section>`;
   const total = P.sub.price + (S.sub.plusPick ? P.aiPlus.price : 0);
   return `<section class="card sub"><div class="eyebrow">Подписка</div><b class="big">${st.title}</b>
     <div class="price"><b>${rub(P.sub.price)}</b><span>в месяц · ${P.trialDays} дней бесплатно новым</span></div>
@@ -2764,16 +2785,16 @@ function supportText() {
   return `${t}\n\n— ИИ Тренер ${APP_VERSION} · ${access().level} · ${innerWidth}×${innerHeight} · ${ua}`;
 }
 function paywallSheet(reason) {
-  const lvl = access().level;
+  const a = access(), lvl = a.level;
   const promo = `<section class="card pad" style="display:flex;flex-direction:column;gap:8px"><label class="eyebrow" for="promo">Промокод</label>
       <div class="row"><input class="input grow" id="promo" placeholder="Например, TEST2026" autocomplete="off" value="${esc(S.sub.promo)}" style="text-transform:uppercase"><button class="btn primary" data-act="promo-go">Применить</button></div>
       ${S.sub.promo && PROMOS[S.sub.promo] ? `<span class="hint" style="color:var(--good-text);font-weight:700">✓ ${PROMOS[S.sub.promo].text}</span>` : ''}</section>`;
   /* limits ran out while subscribed: offer ИИ+ or the one-off pack first */
-  sheet(PRICING.payments ? 'Подписка' : 'Тестовый доступ', `
+  sheet(a.unlimited ? 'Личный доступ' : PRICING.payments ? 'Подписка' : 'Тестовый доступ', `
     ${reason ? `<div class="note warn">${I.info}<span>${esc(reason)}</span></div>` : ''}
     ${lvl === 'sub' ? addonCards() + subCard(true) : subCard(true) + addonCards()}
     ${promo}
-    ${PRICING.payments ? '' : `<div class="note blue">${I.info}<span>Сейчас тестирование: оплата отключена. Промокод TEST2026 открывает всё бесплатно.</span></div>`}`,
+    ${PRICING.payments || a.unlimited ? '' : `<div class="note blue">${I.info}<span>Сейчас тестирование: оплата отключена. Промокод TEST2026 открывает всё бесплатно.</span></div>`}`,
     '', 'full', $('#sheets').children.length > 0);
 }
 
@@ -2928,7 +2949,7 @@ const A = {
     if (pc && !PROMOS[pc]) { toast('Такого промокода нет — проверь или оставь поле пустым'); pi && pi.focus(); return; }
     const at = Date.now();
     S.user = {email, at, consent: {pd: {v: CONSENT_V, at}, terms: {v: CONSENT_V, at}, news: REG.news}};
-    if (pc) { S.sub.promo = pc; S.sub.since = at; }
+    if (pc) applyPromo(pc);
     S.stage = 'start'; render(); window.scrollTo({top: 0});
   },
   doc: v => docSheet(v),
@@ -3188,7 +3209,7 @@ const A = {
     if (!c) return toast('Введи промокод');
     const p = PROMOS[c];
     if (!p) return toast('Такого промокода нет — проверь написание');
-    if (S.sub.promo !== c) { S.sub.promo = c; S.sub.since = Date.now(); }
+    applyPromo(c);
     save(); closeTop(); paywallSheet(); render(); if (S.wiz) renderWizard();
     toast(`Промокод принят: ${p.text}`);
   },
