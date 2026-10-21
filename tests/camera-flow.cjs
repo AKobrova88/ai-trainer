@@ -239,3 +239,58 @@ test('technical inference errors produce an error message rather than zero-repet
   assert.match(el.msgText.textContent,/технической ошибки/);
   URL.revokeObjectURL(state.file);
 });
+
+test('video result explicitly reports 13 repetitions in one set, excluding earlier history',async()=>{
+  const {pose,workingLegOnly,legExtension}=require('./helpers/pose-fixtures.cjs');
+  const c=camera({videoTimers:true}),{state,el,analyzeVideo,cueState}=c.api;
+  state.ex='leg_ext';el.vid.duration=31;
+  state.sets=[{r:8,n:0,c:0,f:{},g:[],w:null,countOnly:true,note:''}];
+  state.detector={estimatePoses:async(v,opts,ms)=>{
+    const t=ms/1000;
+    let x=0;
+    if(t<24){const n=Math.floor(t/2),u=t%2;x=u<.8?(n?0:-30)+(70-(n?0:-30))*u/.8:70*(2-u)/1.2;}
+    else if(t>=27&&t<30){const u=t-27;x=u<1?u*70:u<2?70+5*Math.sin(t*17):(3-u)*70;}
+    return [pose(workingLegOnly(legExtension(x)),Math.PI/6)];
+  }};
+  await analyzeVideo(new Blob(['manufactured trajectory; video decoding stubbed']),'upload');
+  assert.equal(state.sets.length,2);assert.equal(state.sets[1].r,13);
+  assert.equal(state.videoSummary.reps,13);assert.equal(state.videoSummary.sets,1);
+  assert.match(cueState().text,/повторов — 13 · подходов — 1/);
+  c.time(90000);assert.match(cueState().text,/повторов — 13/);
+  URL.revokeObjectURL(state.file);
+});
+
+test('video totals include both sets when the analyzer ends a set during a rest',async()=>{
+  const {pose,workingLegOnly,legExtension}=require('./helpers/pose-fixtures.cjs');
+  for(const imageOnly of [false,true]) {
+  const c=camera({videoTimers:true}),{state,el,analyzeVideo,cueState}=c.api;
+  state.ex='leg_ext';el.vid.duration=17;
+  state.detector={estimatePoses:async(v,opts,ms)=>{
+    const t=ms/1000,u=t<3?t:t-12,x=u>=0&&u<=2?(u<1?70*u:70*(2-u)):0;
+    const p=pose(workingLegOnly(legExtension(x)),Math.PI/6);
+    if(imageOnly)p.keypoints3D.forEach(k=>k.score=.1);
+    return [p];
+  }};
+  await analyzeVideo(new Blob(['manufactured two-set clip']),'upload');
+  assert.equal(state.sets.length,2);assert.equal(state.videoSummary.reps,2);
+  assert.match(cueState().text,/повторов — 2 · подходов — 2/);
+  assert.equal(state.sets[0].countOnly,imageOnly);assert.equal(state.sets[1].countOnly,imageOnly);
+  URL.revokeObjectURL(state.file);
+  }
+});
+
+test('a partial success keeps a persistent warning when valid image cycles exceed tracked 3D cycles',async()=>{
+  const {pose,workingLegOnly,legExtension}=require('./helpers/pose-fixtures.cjs');
+  const c=camera({videoTimers:true}),{state,el,analyzeVideo,cueState}=c.api;
+  state.ex='leg_ext';el.vid.duration=7;
+  state.detector={estimatePoses:async(v,opts,ms)=>{
+    const t=ms/1000,u=t%2,x=t<6?(u<1?70*u:70*(2-u)):0;
+    const p=pose(workingLegOnly(legExtension(x)),Math.PI/6);
+    if(t>=2&&t<6)p.keypoints3D.forEach(k=>k.score=.1);
+    return [p];
+  }};
+  await analyzeVideo(new Blob(['manufactured world-loss clip']),'upload');
+  assert.equal(state.sets[0].r,1);assert.match(cueState().text,/Результат может быть неполным/);
+  c.time(90000);assert.match(cueState().text,/Проверь и исправь/);
+  URL.revokeObjectURL(state.file);
+});

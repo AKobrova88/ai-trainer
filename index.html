@@ -943,6 +943,75 @@ class GenericAnalyzer extends BaseAnalyzer {
   }
 }
 
+/* Seated extensions often start below the working range. Track successive extrema
+   on the same leg instead of requiring a still frame or a return to the first angle. */
+class LegExtensionAnalyzer extends GenericAnalyzer {
+  constructor(level = 'normal', imageOnly = false) { super('leg_ext', level); this.imageOnly = imageOnly; }
+  reset() { super.reset(); this.smoothed = null; this.low = null; this.lowT = null; this.chosenSide = null; }
+  update(kp, t) {
+    if (this.prevT != null && t-this.prevT > .5) this.recalibrate();
+    if (this.imageOnly && kp) kp = kp.map(p => ({ x:p.x, y:p.y, z:p.z, score:p.score }));
+    kp = this.prepare(kp, t, 'joints');
+    const dt = this.tick(t), joints = ANGLES.knee;
+    if (!kp) return this.lost(t);
+    if (!this.chosenSide) {
+      const sides = ['l','r'].filter(s => this.sideOk(kp,s,joints));
+      if (!sides.length) return this.lost(t);
+      const confidence = s => Math.min(...joints.map(j => sc(kp[SIDE[s][j]])));
+      this.chosenSide = sides.sort((a,b) => confidence(b)-confidence(a))[0];
+    }
+    // A different leg has a different estimated angle. Never splice it into a cycle.
+    this.side = this.chosenSide;
+    if (!this.sideOk(kp,this.side,joints)) return this.lost(t);
+    this.lostSince = null; this.kp = kp; this.view = 'side';
+    const raw = this.ang(kp,'knee',this.side);
+    if (!Number.isFinite(raw)) return this.lost(t);
+    this.smoothed = this.smoothed == null ? raw : lerp(this.smoothed,raw,1-Math.exp(-dt/.06));
+    const sig = this.smoothed, minAmp = this.spec.amp * .55;
+    if (this.low == null) { this.low = sig; this.lowT = t; }
+    if (!this.cal) { this.cal = {s0:sig}; this.emit({type:'status',id:'ready'}); }
+    this.status = 'track'; this.m = {sig,x:sig-this.low};
+    if (this.phase === 'setup') this.phase = 'top';
+    if (this.phase === 'top') {
+      if (sig <= this.low) this.low = sig;
+      if (sig <= this.low+4) this.lowT = t;
+      this.cal.s0 = this.low;
+      if (sig-this.low >= 12 && t-this.lowT >= .12) {
+        this.startRep(this.lowT,{ext:sig-this.low,ext_sig:sig,t_ext:t,low:this.low,sec0:{},sec_dev:{},near_ext:0,t_leave:t});
+        this.secStart(kp);
+      }
+    } else if (this.rep) {
+      const R = this.rep.extra;
+      if (sig >= R.ext_sig) {
+        R.ext_sig = sig; R.ext = sig-R.low; R.t_ext = t; this.rep.tBottom = t; this.phase = 'down';
+      }
+      this.secTrack(kp);
+      if (sig >= R.ext_sig-6) { R.near_ext += dt; R.t_leave = t; }
+      const returned = R.ext_sig-sig;
+      if (returned >= Math.max(12,R.ext*.25)) {
+        if (R.ext < minAmp) {
+          this.rep = null; this.phase = 'top'; this.clearLive(); this.low = sig; this.lowT = t;
+        } else {
+          if (this.phase === 'down') { this.phase = 'up'; this.atExtreme(kp); }
+          if (returned >= Math.max(minAmp,R.ext*.55)) {
+            // A single bad landmark can jump out and back. Time spent waiting
+            // after that spike must not turn it into a valid repetition.
+            if (R.t_ext-this.rep.t0 >= .16 && t-R.t_ext >= .16 && t-this.rep.t0 >= .6) this.complete(t);
+            else { this.rep = null; this.phase = 'top'; this.clearLive(); }
+            this.low = sig; this.lowT = t;
+          }
+        }
+      }
+    }
+    this.idleCheck(t); return this.snapshot();
+  }
+  lost(t) {
+    // A gap cannot prove the hidden return. Keep completed reps, discard the candidate.
+    if (this.cal || this.rep || this.chosenSide) this.recalibrate();
+    return super.lost(t);
+  }
+}
+
 /* Any other exercise (machines, own exercises): no technique rules, a rep counter. It watches the big joints,
    takes the one that moves the most away from the starting position and counts full there-and-back cycles of it;
    it also notices when the range gets shorter than in the first reps or a rep is rushed. Phone only. */
@@ -1058,6 +1127,7 @@ function requiredChains(key) {
   return ['knee','hip','elbow','shoulder'].flatMap(j=>perSide(ANGLES[j]));
 }
 function analyzerFor(key, depth = 'parallel', level = 'normal') {
+  if (key === 'leg_ext') return new LegExtensionAnalyzer(level);
   if (key in D.squat) return new SquatAnalyzer(D.squat[key] === 'parallel' ? depth : 'half', level);
   if (key in D.pushup) { const a = new PushupAnalyzer(depth, level); a.incline = D.pushup[key]; return a; }
   if (key in D.specs) return new GenericAnalyzer(key, level, depth);
@@ -1067,7 +1137,7 @@ function viewOf(key) { return key in D.squat ? 'any' : key in D.pushup ? 'side' 
 function isHold(key) { return !!(D.specs[key] && D.specs[key].hold); }
 function family(key) { return key in D.squat ? 'squat' : key in D.pushup ? 'pushup' : 'generic'; }
 
-return { setData(d) { D = d; }, data: () => D, analyzerFor, viewOf, isHold, family, requiredChains, SIDE, poseToKeypoints, projectWorld, angle, BaseAnalyzer, SquatAnalyzer, PushupAnalyzer, GenericAnalyzer, FreeAnalyzer };
+return { setData(d) { D = d; }, data: () => D, analyzerFor, viewOf, isHold, family, requiredChains, SIDE, poseToKeypoints, projectWorld, angle, BaseAnalyzer, SquatAnalyzer, PushupAnalyzer, GenericAnalyzer, LegExtensionAnalyzer, FreeAnalyzer };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = AT;
 </script>
@@ -1237,7 +1307,8 @@ function setExercise(key) {
 }
 function newAnalyzer() {
   state.revision++;
-  state.analyzer = isFree() || state.fallback ? new AT.FreeAnalyzer(state.level, state.ex, !!state.fallback) : AT.analyzerFor(state.ex, state.depth, state.level);
+  state.analyzer = state.fallback && state.ex === 'leg_ext' ? new AT.LegExtensionAnalyzer(state.level,true)
+    : isFree() || state.fallback ? new AT.FreeAnalyzer(state.level, state.ex, !!state.fallback) : AT.analyzerFor(state.ex, state.depth, state.level);
   state.snap = null; state.flash = null;
   state.preflightReady = false; state.preflightSince = null;
   resetDet();
@@ -1593,7 +1664,10 @@ function missingHint(kp) {
 }
 function cueState() {
   const snap = state.snap, now = performance.now(), A = state.analyzer;
-  if (state.on && state.file && !state.analyzing && state.snap) return state.flash && state.flash.until > now ? state.flash : { cls: 'info', text: 'Видео разобрано. Можно снять следующий подход' };
+  if (state.on && state.file && !state.analyzing && state.snap) {
+    const r = state.videoSummary;
+    return {cls:'info',text:r ? 'Видео: '+(isHold()?'секунд':'повторов')+' — '+r.reps+' · подходов — '+r.sets+(r.warning ? '. '+r.warning : '. Проверь результат ниже') : 'Видео обработано. Проверь результат ниже'};
+  }
   if (state.on && state.file && state.analyzing) return { cls: 'info', text: 'Разбираю видео · ' + (state.prog || 0) + '%' + (snap && snap.reps ? ' · повторов: ' + snap.reps : '') };
   if (state.on && state.recOnly) { const s = Math.round(Rec.secs()); return { cls: 'info', text: '● Запись ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' · ' + (!snap || snap.status === 'nobody' ? 'встань в кадр целиком' : 'вижу тебя целиком') }; }
   if (!state.on) return state.flash && state.flash.until > now ? state.flash : { cls: 'tip', text: info().tips[0] };
@@ -1671,10 +1745,10 @@ function renderLive() {
   el.cue.className = 'cue ' + cs.cls;
   if (el.cueText.textContent !== cs.text) el.cueText.textContent = cs.text;
   const snap = state.snap, hold = isHold();
-  const analysisText = state.fallback ? 'Версия 2.5.2 · Только счёт повторов по видимому движению. Техника не оценивается'
+  const analysisText = state.fallback ? 'Версия 2.5.3 · Только счёт повторов по видимому движению. Техника не оценивается'
     : snap && snap.analysisMode === '2d'
-    ? 'Версия 2.5.2 · 2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
-    : 'Версия 2.5.2 · 3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
+    ? 'Версия 2.5.3 · 2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
+    : 'Версия 2.5.3 · 3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
   const analysisInfo = $('#analysisInfo');
   if (analysisInfo.textContent !== analysisText) analysisInfo.textContent = analysisText;
   el.hud.hidden = !state.on || !!state.recOnly || state.preflight;
@@ -1963,7 +2037,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 function seekTo(v, t) { return new Promise(res => { let to = 0; const done = () => { v.removeEventListener('seeked', done); clearTimeout(to); res(); }; to = setTimeout(done, 1500); v.addEventListener('seeked', done); v.currentTime = t; }); }
 function stopFile() {
   fileToken++;
-  state.analyzing=false;
+  state.analyzing=false; state.videoSummary=null;
   if (state.file) { try { el.vid.pause(); } catch (e) { /* fine */ } el.vid.removeAttribute('src'); el.vid.load(); URL.revokeObjectURL(state.file); state.file = null; }
 }
 $('#fileInput').addEventListener('change', e => {
@@ -1997,8 +2071,8 @@ async function analyzeVideo(blob, from) {
   const modelReady=await loadModelWithUi();
   if (token!==fileToken) return;
   if (!modelReady) return stopCamera();
-  const st = { n: 0, miss: {}, errors:0, consecutiveErrors:0 };
-  const shadow = isFree() || state.fallback ? null : new AT.FreeAnalyzer(state.level,state.ex,true);   // Independent image-based counter when world landmarks are unreliable.
+  const st = { n: 0, miss: {}, errors:0, consecutiveErrors:0, shadowGroups:[[]] }, setStart = state.sets.length;
+  const shadow = isFree() || state.fallback ? null : state.ex === 'leg_ext' ? new AT.LegExtensionAnalyzer(state.level,true) : new AT.FreeAnalyzer(state.level,state.ex,true);
   resetDet(); state.analyzing = true; state.prog = 0;
   try { await v.play(); v.pause(); } catch (err) { /* priming */ }
   const step = 1 / (dur > 60 ? 8 : dur > 20 ? 10 : 15);   // a long recording: fewer frames, still enough to see every rep
@@ -2012,7 +2086,13 @@ async function analyzeVideo(blob, from) {
       if (token!==fileToken) return;
       state.frame = { kp, W: v.videoWidth, H: v.videoHeight };
       const snap = state.analyzer.update(kp, t); handleSnap(snap);
-      if (shadow) { shadow.update(kp, t); shadow.drain(); }
+      if (shadow) {
+        shadow.update(kp, t);
+        for (const e of shadow.drain()) {
+          if (e.type === 'newSet') st.shadowGroups.push([]);
+          else if (e.type === 'rep') st.shadowGroups[st.shadowGroups.length-1].push(e.rep);
+        }
+      }
       st.n++; st[snap.status] = (st[snap.status] || 0) + 1;
       st.consecutiveErrors=0;
       if (snap.status === 'nobody') { const m = missingHint(kp); st.miss[m] = (st.miss[m] || 0) + 1; }
@@ -2022,27 +2102,36 @@ async function analyzeVideo(blob, from) {
   }
   if (token !== fileToken) return;
   state.analyzing = false;
-  const A = state.analyzer, found = A.reps.length;
+  const A = state.analyzer;
   A.endSet(); processEvents(A.drain());
+  const videoSets = state.sets.slice(setStart), found = videoSets.reduce((sum,s)=>sum+s.r,0);
+  state.videoSummary = {reps:found,sets:videoSets.length,warning:found?'':'Повторы не распознаны; можно записать вручную'};
   try { v.pause(); } catch (e) { /* fine */ }
   videoVerdict(st, found, shadow, from);
 }
 function videoVerdict(st, found, shadow, from) {
   const n = Math.max(1, st.n), share = k => (st[k] || 0) / n, turn = share('turn') + share('turn_front'), nobody = share('nobody'), lost3d = share('world_lost');
+  const shadowGroups = st.shadowGroups.filter(g=>g.length), shadowTotal = shadowGroups.reduce((sum,g)=>sum+g.length,0);
   const name = info().name, miss = Object.keys(st.miss).sort((a, b) => st.miss[b] - st.miss[a])[0];
   const again = [{ label: from === 'rec' ? 'Снять ещё раз' : 'Снять на камеру', primary: true, run: () => { hideMsg(); startRecordMode(); } },
     { label: 'Другое видео', run: () => { hideMsg(); pickVideo(); } }, { label: 'Записать вручную', run: () => { hideMsg(); manualSet(); } }];
   const tell = (title, text, acts, say) => { state.flash = null; showMsg(title, text, acts); Voice.say(say || title, 'verdict', true); };
-  if (!found && st.errors>=3 && st.errors>st.n) return tell('Не удалось обработать видео',
-    'Модель не смогла прочитать кадры из-за технической ошибки. Это не означает, что ты сделала ноль повторов. Попробуй загрузить запись ещё раз или сохрани подход вручную.',again);
+  if (!found && st.errors>=3 && st.errors>st.n) {
+    state.videoSummary.warning = 'Техническая ошибка обработки. Повторы не удалось определить';
+    return tell('Не удалось обработать видео',
+      'Модель не смогла прочитать кадры из-за технической ошибки. Это не означает, что ты сделала ноль повторов. Попробуй загрузить запись ещё раз или сохрани подход вручную.',again);
+  }
   if (found) {
-    if (lost3d > .15) state.flash = { cls: 'info', text: 'Часть видео пропущена: 3D-точки терялись. Число повторов может быть неполным', until: performance.now() + 8000 };
-    else if (turn > 0.35) state.flash = { cls: 'info', text: 'Часть видео снята с неудобного ракурса — в следующий раз встань ' + viewWord(), until: performance.now() + 8000 };
+    const disagreement = state.ex === 'leg_ext' && shadow && Math.abs(shadowTotal-found) >= 2;
+    if (st.errors || lost3d > .15 || share('calib') > .35 || disagreement) state.videoSummary.warning = 'Результат может быть неполным: часть кадров не разобрана или счётчики расходятся. Проверь и исправь число повторов ниже';
+    else if (turn > .35) state.videoSummary.warning = 'Часть видео пропущена из-за ракурса. Проверь число повторов';
     return;
   }
-  if (shadow && shadow.reps.length >= 2 && nobody < 0.5) {
-    state.fallback = true; state.analyzer = shadow; shadow.endSet(); processEvents(shadow.drain());
-    return tell('Повторы посчитала, технику — нет', 'По видимым движениям нашла ' + shadow.reps.length + ' повторов. Проверь число и при необходимости исправь его в подходе. Для оценки техники данных недостаточно: суставы могли быть закрыты тренажёром или 3D-точки были неустойчивы.',
+  if (shadow && shadowTotal >= 2 && nobody < 0.5) {
+    state.fallback = true; state.analyzer = shadow; shadow.setEnded = true;
+    for (const group of shadowGroups) { shadow.reps = group; recordSet(); }
+    state.videoSummary = {reps:shadowTotal,sets:shadowGroups.length,warning:'Техника не оценивалась. Проверь число повторов'};
+    return tell('Повторы посчитала, технику — нет', 'По видимым движениям нашла ' + shadowTotal + ' повторов. Проверь число и при необходимости исправь его в подходе. Для оценки техники данных недостаточно: суставы могли быть закрыты тренажёром или 3D-точки были неустойчивы.',
       [{ label: 'Проверить повторы', primary: true, run: hideMsg }, again[0]], 'Повторы посчитаны без оценки техники. Проверь число');
   }
   if (lost3d > .35) return tell('Недостаточно надёжных 3D-точек',
