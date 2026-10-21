@@ -1154,7 +1154,7 @@ const state = {
   level: pickOpt(qp.get('l'), ['novice', 'normal', 'pro'], pickOpt(prefs.level, ['novice', 'normal', 'pro'], 'normal')),
   urlW: num(qp.get('w')), fromBot: qp.has('ex'),
   analyzer: null, snap: null, frame: null, flash: null, sets: [], view: null,
-  preflight: false, preflightReady: false, preflightSince: null,
+  preflight: false, preflightReady: false, preflightSince: null, revision: 0,
   detector: null, detectorLoading: null, stream: null, facing: FACING[qp.get('cam')] || (['user', 'environment'].includes(prefs.facing) ? prefs.facing : 'user'), on: false, busy: false, file: null
 };
 store.set('aitrainer.v2', Object.assign(prefs, { depth: state.depth, level: state.level }));
@@ -1214,6 +1214,7 @@ function fillSelect() {
   el.sel.value = state.ex;
 }
 function setExercise(key) {
+  if (state.file) stopCamera();
   if (state.on && !state.preflight && state.analyzer && state.analyzer.reps.length && !state.analyzer.setEnded) {
     state.analyzer.endSet(); processEvents(state.analyzer.drain());
   }
@@ -1235,6 +1236,7 @@ function setExercise(key) {
   renderSets(); renderMain();
 }
 function newAnalyzer() {
+  state.revision++;
   state.analyzer = isFree() || state.fallback ? new AT.FreeAnalyzer(state.level, state.ex, !!state.fallback) : AT.analyzerFor(state.ex, state.depth, state.level);
   state.snap = null; state.flash = null;
   state.preflightReady = false; state.preflightSince = null;
@@ -1331,12 +1333,15 @@ function syncSize(v) { if (v.videoWidth && (v.width !== v.videoWidth || v.height
 const toKp = AT.poseToKeypoints; // One adapter for live inference and uploaded video frames.
 async function infer() {
   const v = el.vid;
-  if (state.busy || !state.detector || v.readyState < 2 || !v.videoWidth) return;
+  if (!state.on || state.file || state.busy || !state.detector || v.readyState < 2 || !v.videoWidth) return;
+  const revision=state.revision,detector=state.detector,analyzer=state.analyzer,stream=state.stream;
+  const current=()=>state.on && !state.file && state.revision===revision && state.detector===detector && state.analyzer===analyzer && state.stream===stream;
   state.busy = true;
   try {
     const t = performance.now() / 1000;
     syncSize(v);
-    const t0 = performance.now(), kp = toKp(await state.detector.estimatePoses(v, { maxPoses: 1, flipHorizontal: false }, t * 1000)), dt = performance.now() - t0;
+    const t0 = performance.now(), kp = toKp(await detector.estimatePoses(v, { maxPoses: 1, flipHorizontal: false }, t * 1000)), dt = performance.now() - t0;
+    if (!current()) return; // A late camera frame must never enter another exercise or a closed session.
     H.ms = H.ms == null ? dt : H.ms + (dt - H.ms) * 0.05; H.nInf = (H.nInf || 0) + 1;
     state.frame = { kp, W: v.videoWidth, H: v.videoHeight };
     H.ok++; H.noPose = kp ? 0 : H.noPose + 1;
@@ -1351,6 +1356,7 @@ async function infer() {
       if (state.preflightReady) beginPreparedSet();
     } else handleSnap(state.analyzer.update(kp, t));
   } catch (e) {
+    if (!current()) return;
     console.error(e); H.errors++; H.lastErr = String((e && e.message) || e);
     if (state.engine && state.engine !== 'tfjs' && H.errors > 10 && !H.ok) swapEngine('tfjs');
   }
@@ -1665,10 +1671,10 @@ function renderLive() {
   el.cue.className = 'cue ' + cs.cls;
   if (el.cueText.textContent !== cs.text) el.cueText.textContent = cs.text;
   const snap = state.snap, hold = isHold();
-  const analysisText = state.fallback ? 'Версия 2.5.1 · Только счёт повторов по видимому движению. Техника не оценивается'
+  const analysisText = state.fallback ? 'Версия 2.5.2 · Только счёт повторов по видимому движению. Техника не оценивается'
     : snap && snap.analysisMode === '2d'
-    ? 'Версия 2.5.1 · 2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
-    : 'Версия 2.5.1 · 3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
+    ? 'Версия 2.5.2 · 2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
+    : 'Версия 2.5.2 · 3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
   const analysisInfo = $('#analysisInfo');
   if (analysisInfo.textContent !== analysisText) analysisInfo.textContent = analysisText;
   el.hud.hidden = !state.on || !!state.recOnly || state.preflight;
@@ -1957,6 +1963,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 function seekTo(v, t) { return new Promise(res => { let to = 0; const done = () => { v.removeEventListener('seeked', done); clearTimeout(to); res(); }; to = setTimeout(done, 1500); v.addEventListener('seeked', done); v.currentTime = t; }); }
 function stopFile() {
   fileToken++;
+  state.analyzing=false;
   if (state.file) { try { el.vid.pause(); } catch (e) { /* fine */ } el.vid.removeAttribute('src'); el.vid.load(); URL.revokeObjectURL(state.file); state.file = null; }
 }
 $('#fileInput').addEventListener('change', e => {
@@ -1978,14 +1985,19 @@ function fixDuration(v) {
 async function analyzeVideo(blob, from) {
   stopStream(); stopFile(); state.recOnly = false; state.fallback = false; hideMsg();
   state.file = URL.createObjectURL(blob); state.usedFile = true;
+  const token=++fileToken;
   const v = el.vid; v.srcObject = null; v.src = state.file; v.muted = true; v.classList.remove('mirror');
   const ok = await metaOf(v);
+  if (token!==fileToken) return;
   let dur = ok ? v.duration : NaN;
   if (ok && !isFinite(dur)) dur = await fixDuration(v);
+  if (token!==fileToken) return;
   if (!ok || !v.videoWidth || !isFinite(dur) || dur <= 0) { stopFile(); showCameraMode(false); return showMsg('Видео не открылось', 'Попробуй другой файл: MP4 или MOV, снятый на телефон.', [{ label: 'Понятно', primary: true, run: hideMsg }]); }
   setAspect(v.videoWidth, v.videoHeight); newAnalyzer(); showCameraMode(true);
-  if (!(await loadModelWithUi())) return stopCamera();
-  const token = ++fileToken, st = { n: 0, miss: {} };
+  const modelReady=await loadModelWithUi();
+  if (token!==fileToken) return;
+  if (!modelReady) return stopCamera();
+  const st = { n: 0, miss: {}, errors:0, consecutiveErrors:0 };
   const shadow = isFree() || state.fallback ? null : new AT.FreeAnalyzer(state.level,state.ex,true);   // Independent image-based counter when world landmarks are unreliable.
   resetDet(); state.analyzing = true; state.prog = 0;
   try { await v.play(); v.pause(); } catch (err) { /* priming */ }
@@ -1997,17 +2009,19 @@ async function analyzeVideo(blob, from) {
     try {
       syncSize(v);
       const kp = toKp(await state.detector.estimatePoses(v, { maxPoses: 1, flipHorizontal: false }, t * 1000));
+      if (token!==fileToken) return;
       state.frame = { kp, W: v.videoWidth, H: v.videoHeight };
       const snap = state.analyzer.update(kp, t); handleSnap(snap);
       if (shadow) { shadow.update(kp, t); shadow.drain(); }
       st.n++; st[snap.status] = (st[snap.status] || 0) + 1;
+      st.consecutiveErrors=0;
       if (snap.status === 'nobody') { const m = missingHint(kp); st.miss[m] = (st.miss[m] || 0) + 1; }
       state.prog = Math.min(99, Math.round(t / dur * 100));
-    } catch (err) { console.error(err); }
+    } catch (err) { if(token!==fileToken)return; console.error(err); st.errors++; if(++st.consecutiveErrors>=3)break; }
     const wait = 1000 / 30 - (performance.now() - w0); if (wait > 0) await sleep(wait);
   }
-  state.analyzing = false;
   if (token !== fileToken) return;
+  state.analyzing = false;
   const A = state.analyzer, found = A.reps.length;
   A.endSet(); processEvents(A.drain());
   try { v.pause(); } catch (e) { /* fine */ }
@@ -2019,6 +2033,8 @@ function videoVerdict(st, found, shadow, from) {
   const again = [{ label: from === 'rec' ? 'Снять ещё раз' : 'Снять на камеру', primary: true, run: () => { hideMsg(); startRecordMode(); } },
     { label: 'Другое видео', run: () => { hideMsg(); pickVideo(); } }, { label: 'Записать вручную', run: () => { hideMsg(); manualSet(); } }];
   const tell = (title, text, acts, say) => { state.flash = null; showMsg(title, text, acts); Voice.say(say || title, 'verdict', true); };
+  if (!found && st.errors>=3 && st.errors>st.n) return tell('Не удалось обработать видео',
+    'Модель не смогла прочитать кадры из-за технической ошибки. Это не означает, что ты сделала ноль повторов. Попробуй загрузить запись ещё раз или сохрани подход вручную.',again);
   if (found) {
     if (lost3d > .15) state.flash = { cls: 'info', text: 'Часть видео пропущена: 3D-точки терялись. Число повторов может быть неполным', until: performance.now() + 8000 };
     else if (turn > 0.35) state.flash = { cls: 'info', text: 'Часть видео снята с неудобного ракурса — в следующий раз встань ' + viewWord(), until: performance.now() + 8000 };

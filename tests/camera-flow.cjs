@@ -24,7 +24,7 @@ function camera(options={}) {
     nodes.set(id,el); return el;
   }
   const context = vm.createContext({
-    URL,URLSearchParams,Date,console,performance:{now:()=>time},
+    URL,URLSearchParams,Date,console:options.quietErrors?{...console,error(){}}:console,performance:{now:()=>time},
     location:{href:'http://localhost/?ex=bw_squat&src=app&ret=%2Fapp%2F',hostname:'localhost',protocol:'http:',origin:'http://localhost',search:'?ex=bw_squat&src=app&ret=%2Fapp%2F',hash:''},
     navigator:{userAgent:'Unit test'},
     document:{querySelector:node,querySelectorAll:()=>[],createElement:()=>node(Symbol()),documentElement:node('html'),addEventListener(){}},
@@ -95,6 +95,7 @@ test('live inference keeps metric world coordinates and pixel coordinates separa
   const {pose,standing}=require('./helpers/pose-fixtures.cjs');
   const c=camera(),{state,infer}=c.api;let received;
   const raw=pose(standing(),Math.PI/4);
+  state.on=true;
   state.detector={estimatePoses:async()=>[raw]};
   state.analyzer={update(kp){received=kp;return {status:'track',phase:'top',live:[]};},drain:()=>[]};
   await infer();
@@ -196,5 +197,45 @@ test('video with unusable world points falls back to a focused 2D count without 
   assert.equal(state.sets.length,1);assert.equal(state.sets[0].r,2);
   assert.equal(state.sets[0].countOnly,true);assert.equal(state.sets[0].n,0);assert.equal(state.sets[0].c,0);
   assert.match(el.msgText.textContent,/Проверь число/);
+  URL.revokeObjectURL(state.file);
+});
+
+test('a camera frame resolved after closing cannot restore the frame or update the analyzer',async()=>{
+  const c=camera(),{state,infer,stopCamera}=c.api;let resolveFrame,updates=0;
+  const pending=new Promise(resolve=>{resolveFrame=resolve;});
+  state.on=true;state.detector={estimatePoses:()=>pending};
+  state.analyzer={reps:[],update(){updates++;},drain:()=>[]};
+  const work=infer();stopCamera();resolveFrame([]);await work;
+  assert.equal(state.on,false);assert.equal(state.frame,null);assert.equal(updates,0);assert.equal(state.busy,false);
+});
+
+test('a camera frame from the previous exercise cannot calibrate the newly selected exercise',async()=>{
+  const c=camera(),{state,infer,setExercise}=c.api;let resolveFrame;
+  state.on=true;state.detector={estimatePoses:()=>new Promise(resolve=>{resolveFrame=resolve;})};
+  state.analyzer={reps:[],drain:()=>[]};
+  const work=infer();setExercise('leg_ext');resolveFrame([]);await work;
+  assert.equal(state.ex,'leg_ext');assert.equal(state.frame,null);assert.equal(state.snap,null);
+  assert.equal(state.analyzer.cal,null);assert.equal(state.analyzer.reps.length,0);
+});
+
+test('cancelled video inference cannot resurrect analysis or save a late set',async()=>{
+  const c=camera({videoTimers:true}),{state,el,analyzeVideo,stopCamera}=c.api;let resolveFrame,entered;
+  const started=new Promise(resolve=>{entered=resolve;});
+  state.ex='leg_ext';el.vid.duration=5;
+  state.detector={estimatePoses:()=>{entered();return new Promise(resolve=>{resolveFrame=resolve;});}};
+  const work=analyzeVideo(new Blob(['synthetic video']),'upload');
+  await started;stopCamera();resolveFrame([]);await work;
+  assert.equal(state.on,false);assert.equal(state.file,null);assert.equal(state.frame,null);
+  assert.equal(state.analyzing,false);assert.equal(state.sets.length,0);
+});
+
+test('technical inference errors produce an error message rather than zero-repetition advice',async()=>{
+  const c=camera({videoTimers:true,quietErrors:true}),{state,el,analyzeVideo}=c.api;let calls=0;
+  state.ex='leg_ext';el.vid.duration=5;
+  state.detector={estimatePoses:async()=>{calls++;throw Error('Synthetic decoder/model failure');}};
+  await analyzeVideo(new Blob(['synthetic video']),'upload');
+  assert.equal(calls,3);assert.equal(state.sets.length,0);assert.equal(state.analyzing,false);
+  assert.match(el.msgTitle.textContent,/Не удалось обработать видео/);
+  assert.match(el.msgText.textContent,/технической ошибки/);
   URL.revokeObjectURL(state.file);
 });

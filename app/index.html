@@ -738,7 +738,7 @@ const CAT = {};
 for (const [k, n, g, c, i, cue, p] of CAT_DATA.ex) CAT[k] = {k, n, g: g || 'legs', cam: !!c, inc: i, cue: cue || '', p: p || ''};
 const SYN = CAT_DATA.syn || {};
 
-const APP_VERSION = '2.5.1 · тест';
+const APP_VERSION = '2.5.2 · тест';
 const KEY = 'ai-trainer-app-1';
 const INBOX = 'aitrainer.inbox';
 const STEP = {bb_lower: 5, bb_upper: 2.5, machine: 2.5, db: 1, bw: 0, time: 0};
@@ -750,13 +750,13 @@ const SAME_SITE = OWN_DOMAIN || (['akobrova88.github.io', 'localhost', '127.0.0.
 const CAM_URL = SAME_SITE && /\/app\/?/.test(location.pathname) ? new URL('../', location.href).href : OWN_DOMAIN ? new URL('/camera/', location.href).href : CAM_ABS;   // on GitHub Pages (also with the own domain) the camera is one level up
 /* who runs the service — goes into the consent text; fill in before payments are switched on */
 const OPERATOR = {name: 'Индивидуальный предприниматель Коброва Анастасия', ogrnip: '', inn: '', address: '', email: ''};
-/* prices and AI limits — one source: claude/pricing-v1.md (16.10.2026). With the server these come from its config. */
+/* One base plan. Payment details are planning metadata; acquiring is not connected. */
 const PRICING = {
   trialDays: 14, periodDays: 30, payments: false,
+  paymentProvider: 'tbank', taxRegime: 'usn_income', taxRatePercent: 6, addonsEnabled: false,
   trialAi: {prog: 1, photo: 0, ask: 0},
   sub: {price: 490, ai: {prog: 3, photo: 10, ask: 30}},
   aiPlus: {price: 290, ai: {prog: 10, photo: 30, ask: 100}},
-  aiOnce: {price: 199, days: 30, ai: {prog: 5, photo: 10, ask: 50}},
 };
 const AI_KINDS = [['prog', 'Подборы программы'], ['photo', 'Фото программ'], ['ask', 'Вопросы тренеру']];
 /* Test access is stored locally until server accounts are available. */
@@ -914,8 +914,7 @@ function allowance() {
   if (a.level === 'trial') return {...PRICING.trialAi};
   if (a.level !== 'sub') return z;
   const r = {...PRICING.sub.ai};
-  if (S.sub.aiPlus && !a.test) for (const k in r) r[k] += PRICING.aiPlus.ai[k];
-  for (const p of S.sub.packs || []) if (p.until > Date.now()) for (const k in r) r[k] += PRICING.aiOnce.ai[k];
+  if (PRICING.addonsEnabled && S.sub.aiPlus && !a.test) for (const k in r) r[k] += PRICING.aiPlus.ai[k];
   return r;
 }
 const left = k => access().unlimited ? Infinity : Math.max(0, allowance()[k] - usage()[k]);
@@ -2722,10 +2721,10 @@ function subCard(inSheet) {
     <span class="hint" style="color:inherit">${a.test ? 'Камера и разбор видео открыты. Доступные подборы и распознавания указаны ниже.' : a.level === 'trial' ? `Камера и разбор видео открыты ещё ${a.days} ${plural(a.days, 'день', 'дня', 'дней')}. Для полного тестового доступа введи TEST2026.` : 'Для камеры, разбора видео и подбора программы активируй бесплатный промокод TEST2026.'}</span>
     <div class="lims" aria-label="Доступные функции">${limRows()}</div>
     ${!inSheet ? `<button class="btn ${a.test ? '' : 'primary'}" data-act="promo">${a.test ? 'Ввести промокод' : 'Активировать бесплатный доступ'}</button>` : ''}</section>`;
-  const total = P.sub.price + (S.sub.plusPick ? P.aiPlus.price : 0);
+  const total = P.sub.price + (P.addonsEnabled && S.sub.plusPick ? P.aiPlus.price : 0);
   return `<section class="card sub"><div class="eyebrow">Подписка</div><b class="big">${st.title}</b>
     <div class="price"><b>${rub(P.sub.price)}</b><span>в месяц · ${P.trialDays} дней бесплатно новым</span></div>
-    <span class="hint" style="color:inherit;opacity:.85">Камера-тренер и разбор видео без лимитов. ИИ на каждый месяц: ${P.sub.ai.prog} подбора программы, ${P.sub.ai.photo} фото, ${P.sub.ai.ask} вопросов. Своя программа, дневник и прогресс — бесплатно всегда.</span>
+    <span class="hint" style="color:inherit;opacity:.85">Все доступные функции входят в одну подписку: камера, разбор видео, подбор и распознавание программ. Камера и разбор видео без лимитов; доступное число подборов и фото указано ниже. Своя программа, дневник и прогресс — бесплатно всегда.</span>
     <div class="lims" aria-label="ИИ сейчас">${limRows()}</div>
     ${a.level !== 'free' && p.end ? `<span class="hint" style="color:inherit;opacity:.85">${a.level === 'trial' ? `Пробный период до ${ruDate(p.end)}` : `Лимиты обновятся ${ruDate(p.end)}`}. Неиспользованные сгорают.</span>` : ''}
     <span class="hint" style="color:inherit;opacity:.85">${st.note}</span>
@@ -2733,11 +2732,10 @@ function subCard(inSheet) {
 }
 function addonCards() {
   const P = PRICING;
-  if (!P.payments) return '';
+  if (!P.payments || !P.addonsEnabled) return '';
   return `<section class="addon"><div class="row"><span class="grow"><b style="font-size:17px">ИИ+</b> · +${rub(P.aiPlus.price)} в месяц</span><button class="switch" role="switch" aria-checked="${!!S.sub.plusPick}" aria-label="Добавить ИИ+ к подписке" data-act="ai-plus"><i></i></button></div>
       <span class="hint">Ещё +${P.aiPlus.ai.prog} подборов, +${P.aiPlus.ai.photo} фото и +${P.aiPlus.ai.ask} вопросов каждый месяц. Вместе с подпиской — ${rub(P.sub.price + P.aiPlus.price)} в месяц.</span></section>
-    <section class="card pad row"><div class="grow"><b>Разовый пакет ИИ</b><span class="hint" style="display:block">+${P.aiOnce.ai.prog} подборов, +${P.aiOnce.ai.photo} фото, +${P.aiOnce.ai.ask} вопросов на ${P.aiOnce.days} дней</span></div><button class="btn sm" data-act="ai-once">${rub(P.aiOnce.price)}</button></section>
-    <p class="hint" style="margin:-4px 2px 0">ИИ+ и разовый пакет добавляются к оформленной подписке. Неиспользованные лимиты в конце периода сгорают.</p>`;
+    <p class="hint" style="margin:-4px 2px 0">Расширенный блок добавляется к оформленной подписке. Неиспользованные лимиты в конце периода сгорают.</p>`;
 }
 function viewProfile() {
   const P = S.profile;
@@ -2797,7 +2795,7 @@ function paywallSheet(reason) {
   const promo = `<section class="card pad" style="display:flex;flex-direction:column;gap:8px"><label class="eyebrow" for="promo">Промокод</label>
       <div class="row"><input class="input grow" id="promo" placeholder="Например, TEST2026" autocomplete="off" value="${esc(S.sub.promo)}" style="text-transform:uppercase"><button class="btn primary" data-act="promo-go">Применить</button></div>
       ${S.sub.promo && PROMOS[S.sub.promo] ? `<span class="hint" style="color:var(--good-text);font-weight:700">✓ ${PROMOS[S.sub.promo].text}</span>` : ''}</section>`;
-  /* limits ran out while subscribed: offer ИИ+ or the one-off pack first */
+  /* One plan; the extended block stays hidden until explicitly enabled. */
   sheet(a.unlimited ? 'Личный доступ' : PRICING.payments ? 'Подписка' : 'Тестовый доступ', `
     ${reason ? `<div class="note warn">${I.info}<span>${esc(reason)}</span></div>` : ''}
     ${lvl === 'sub' ? addonCards() + subCard(true) : subCard(true) + addonCards()}
@@ -2824,13 +2822,13 @@ const DOCS = {
     <h3>4. Кому поручается обработка</h3><p>Хостинг-провайдеру (сервер в России), ИИ-сервису (подбор и распознавание программы), платёжному сервису и оператору фискальных данных (после включения оплаты). Реквизиты публикуются в политике обработки данных. При подключении Telegram-бота сообщения проходят через серверы Telegram за пределами России — на это берётся отдельное согласие. Другим лицам данные не передаются и не продаются, кроме случаев, прямо предусмотренных законом.</p>
     <h3>5. Срок, отзыв и права</h3><p>Согласие действует до удаления аккаунта или отзыва. Отозвать: «Профиль → Удалить все мои данные» или письмом оператору. Данные уничтожаются не позднее 30 дней; сведения о платежах хранятся столько, сколько требует налоговое законодательство. Я вправе узнать, какие данные обрабатываются, потребовать их уточнения, блокирования или уничтожения, обжаловать действия оператора в Роскомнадзоре или суде. Ответ на запрос — в течение 10 рабочих дней.</p>
     ${OPERATOR.ogrnip ? '' : '<p class="meta">Тестовая версия: реквизиты оператора будут указаны до запуска сервера и оплаты. Сейчас данные хранятся только на этом телефоне.</p>'}`; }},
-  terms: {title: 'Пользовательское соглашение', body: `
+  terms: {title: 'Пользовательское соглашение', get body() { return `
     <p class="meta">Тестовая версия. Полная редакция с реквизитами — до включения оплаты.</p>
     <h3>Что это</h3><p>«ИИ Тренер» помогает составить программу тренировок, вести дневник и подсказывает по технике через камеру. Это не медицинская услуга и не замена очного тренера или врача.</p>
     <h3>Кто может пользоваться</h3><p>Совершеннолетние (18+), которые приняли это соглашение и дали согласие на обработку данных.</p>
-    <h3>Тестовый период</h3><p>Пока идёт тестирование, всё бесплатно, оплата отключена. Промокоды тестирования действуют до его окончания. После теста — 14 дней бесплатно, затем подписка 990 ₽ в месяц; дополнительные пакеты ИИ — по желанию.</p>
+    <h3>Тестовый период</h3><p>Пока идёт тестирование, всё бесплатно, оплата отключена. Промокоды тестирования действуют до его окончания. После теста — ${PRICING.trialDays} дней бесплатно, затем один тариф ${rub(PRICING.sub.price)} в месяц со всеми доступными функциями приложения. Подключение оплаты через Т-Банк запланировано после проверки работоспособности.</p>
     <h3>Лимиты ИИ</h3><p>Подбор программы и распознавание фото ограничены числом в месяц (видно в профиле). Камера, разбор видео, дневник — без лимитов.</p>
-    <h3>Ответственность</h3><p>Рекомендации носят справочный характер. Пользователь сам решает, выполнять ли упражнение, и прекращает его при боли или плохом самочувствии.</p>`},
+    <h3>Ответственность</h3><p>Рекомендации носят справочный характер. Пользователь сам решает, выполнять ли упражнение, и прекращает его при боли или плохом самочувствии.</p>`; }},
   health: {title: 'Здоровье и безопасность', body: `
     <p><b>Тренер в приложении — не врач.</b> Подсказки и программа не учитывают диагнозы, которых ты не указала.</p>
     <ul><li>Если есть болезни сердца, давление, травмы, беременность или недавние операции — сначала согласуй нагрузку с врачом.</li>
@@ -3002,7 +3000,7 @@ const A = {
   'wiz-build': () => {
     const W = S.wiz; if (!W) return;
     if (!W.spent) {
-      if (left('prog') <= 0) { const al = allowance().prog, lv = access().level; return paywallSheet(!al ? 'Подбор программы по пожеланиям — в подписке.' : lv === 'trial' ? `В пробный период — ${al} подбор программы, он уже использован. Дальше — с подпиской.` : `Подборы на этот период закончились (${al} из ${al}). Обновятся ${ruDate(period().end)} — или добавь ИИ+ либо разовый пакет.`); }
+      if (left('prog') <= 0) { const al = allowance().prog, lv = access().level; return paywallSheet(!al ? 'Подбор программы по пожеланиям — в подписке.' : lv === 'trial' ? `В пробный период — ${al} подбор программы, он уже использован. Дальше — с подпиской.` : `Подборы на этот период закончились (${al} из ${al}). Обновятся ${ruDate(period().end)}.`); }
       spend('prog'); W.spent = true;
     }
     W.res = buildProgram(W.P); W.open = {}; W.step = 3; renderWizard(); scrollSheet();
@@ -3223,12 +3221,13 @@ const A = {
   },
   subscribe: () => toast(PRICING.payments ? '' : access().test ? 'Сейчас тестирование: всё уже открыто бесплатно' : 'На время теста оплата отключена — введи промокод TEST2026'),
   'ai-plus': () => {
+    if (!PRICING.addonsEnabled) return;
     S.sub.plusPick = !S.sub.plusPick; save();
     $$('[data-act="ai-plus"]').forEach(b => b.setAttribute('aria-checked', S.sub.plusPick));
     $$('[data-act="subscribe"]').forEach(b => { b.textContent = `Оформить за ${rub(PRICING.sub.price + (S.sub.plusPick ? PRICING.aiPlus.price : 0))}`; });
     toast(S.sub.plusPick ? `С ИИ+ — ${rub(PRICING.sub.price + PRICING.aiPlus.price)} в месяц` : `Без ИИ+ — ${rub(PRICING.sub.price)} в месяц`);
   },
-  'ai-once': () => toast(access().level === 'sub' && !access().test ? 'Оплата пока отключена' : 'Разовый пакет добавляется к оформленной подписке; на время теста оплата отключена'),
+  'ai-once': () => toast('Сейчас предусмотрен один тариф — ' + rub(PRICING.sub.price) + ' в месяц. Оплата пока отключена'),
   backup: () => backupFile(),
   'bk-copy': async () => { const t = $('#bk-text'); try { await navigator.clipboard.writeText(t.value); toast('Скопировано'); } catch (e) { t.focus(); t.select(); toast('Выдели текст и скопируй вручную'); } },
   restore: () => restoreSheet(),

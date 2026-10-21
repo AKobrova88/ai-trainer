@@ -136,6 +136,15 @@ test('test mode offers access without payment buttons or paid add-ons', () => {
     if (!subCard().includes('Тестовый доступ включён')) throw Error('Missing active access');`);
 });
 
+test('the single plan stays at 490, including in terms and with legacy add-on state',()=>{
+  const a=app();
+  const result=a.run(`PRICING.payments=true;S.sub.plusPick=true;
+    ({card:subCard(),addons:addonCards(),terms:DOCS.terms.body,provider:PRICING.paymentProvider,tax:PRICING.taxRatePercent,regime:PRICING.taxRegime});`);
+  assert.match(result.card,/Оформить за 490 ₽/);assert.doesNotMatch(result.card,/780|290|199|990/);
+  assert.equal(result.addons,'');assert.match(result.terms,/490 ₽/);assert.doesNotMatch(result.terms,/990|дополнительные пакеты/);
+  assert.equal(result.provider,'tbank');assert.equal(result.tax,6);assert.equal(result.regime,'usn_income');
+});
+
 test('personal access has no quotas or expiry, persists on reload, and preserves training data', () => {
   const a = app();
   a.run(`S.user = {email:'test@example.invalid',at:Date.now()-365*DAY};
