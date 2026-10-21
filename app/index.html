@@ -738,7 +738,7 @@ const CAT = {};
 for (const [k, n, g, c, i, cue, p] of CAT_DATA.ex) CAT[k] = {k, n, g: g || 'legs', cam: !!c, inc: i, cue: cue || '', p: p || ''};
 const SYN = CAT_DATA.syn || {};
 
-const APP_VERSION = '2.4.1 · тест';
+const APP_VERSION = '2.5.1 · тест';
 const KEY = 'ai-trainer-app-1';
 const INBOX = 'aitrainer.inbox';
 const STEP = {bb_lower: 5, bb_upper: 2.5, machine: 2.5, db: 1, bw: 0, time: 0};
@@ -2488,7 +2488,12 @@ function viewDiary() {
 }
 function logCard(w) {
   const d = new Date(w.date), open = S.open[w.id], nSets = w.items.reduce((a, e) => a + e.sets.length, 0);
-  const body = open ? `<div class="log-b">${w.items.map((e, ei) => { const cam = e.sets.filter(s => s.n); return `<div class="log-ex"><b>${esc(e.name)}</b><div class="sets-chips">${e.sets.map((s, si) => `<button class="sc" data-act="set-edit" data-v="${w.id}:${ei}:${si}">${s.w ? fmt(s.w) + ' × ' : ''}${s.r}${e.sec ? ' с' : ''}</button>`).join('')}<button class="sc add" data-act="set-add" data-v="${w.id}:${ei}">＋ подход</button></div>${cam.length ? `<div class="hint" style="margin-top:6px">${I.camera.replace('<svg', '<svg width="14" height="14" style="vertical-align:-2px"')} Камера: чисто ${cam.reduce((a, s) => a + s.c, 0)} из ${cam.reduce((a, s) => a + s.n, 0)}</div>` : ''}</div>`; }).join('')}</div>` : '';
+  const body = open ? `<div class="log-b">${w.items.map((e, ei) => {
+    const cam = e.sets.filter(s => s.n), partial = e.sets.some(s => s.partial);
+    const cameraNote = partial ? '3D: предварительные подсказки по видимым суставам, без общей оценки техники.'
+      : cam.length ? `Камера: чисто ${cam.reduce((a, s) => a + s.c, 0)} из ${cam.reduce((a, s) => a + s.n, 0)}` : '';
+    return `<div class="log-ex"><b>${esc(e.name)}</b><div class="sets-chips">${e.sets.map((s, si) => `<button class="sc" data-act="set-edit" data-v="${w.id}:${ei}:${si}">${s.w ? fmt(s.w) + ' × ' : ''}${s.r}${e.sec ? ' с' : ''}</button>`).join('')}<button class="sc add" data-act="set-add" data-v="${w.id}:${ei}">＋ подход</button></div>${cameraNote ? `<div class="hint" style="margin-top:6px">${I.camera.replace('<svg', '<svg width="14" height="14" style="vertical-align:-2px"')} ${cameraNote}</div>` : ''}</div>`;
+  }).join('')}</div>` : '';
   return `<article class="log" id="log-${w.id}"><button class="log-h" data-act="log-toggle" data-v="${w.id}" aria-expanded="${!!open}"><span class="log-d"><b>${d.getDate()}</b><span>${WD[d.getDay()]}</span></span><span class="grow"><b style="display:block">${esc(w.title)}</b><span class="hint">${w.dur ? w.dur + ' мин · ' : ''}${w.items.length} ${plural(w.items.length, 'упражнение', 'упражнения', 'упражнений')} · ${nSets} ${plural(nSets, 'подход', 'подхода', 'подходов')}</span></span><span style="width:20px;color:var(--muted);transform:rotate(${open ? 90 : 0}deg);transition:transform .15s">${CHEV}</span></button>${body}</article>`;
 }
 function setSheet(wid, ei, si) {
@@ -2622,7 +2627,7 @@ function viewCamera() {
       <span class="hint">Видео разбирается на телефоне и никуда не загружается — сохраняется только итог: повторы и ошибки.</span>
     </section>
     ${SAME_SITE ? '' : `<div class="note blue">${I.info}<span>Здесь, в предпросмотре, камера откроется в новой вкладке, и подходы оттуда нужно будет записать вручную. В установленной версии они вернутся сюда сами.</span></div>`}
-    ${vlog.length ? `<div class="eyebrow">Недавние разборы</div><div class="vlog">${vlog.map(v => `<button class="vrow" data-act="vres" data-v="${v.id}"><span class="grow"><b>${esc(v.name)}</b><small>${ruDate(v.at)} · ${v.reps} ${plural(v.reps, 'повтор', 'повтора', 'повторов')}${v.mode === 'video' ? ' · видео' : ''}</small></span>${v.n ? `<span class="q ${q(v)}">чисто ${v.c} из ${v.n}</span>` : ''}</button>`).join('')}</div>` : ''}`];
+    ${vlog.length ? `<div class="eyebrow">Недавние разборы</div><div class="vlog">${vlog.map(v => `<button class="vrow" data-act="vres" data-v="${v.id}"><span class="grow"><b>${esc(v.name)}</b><small>${ruDate(v.at)} · ${v.reps} ${plural(v.reps, 'повтор', 'повтора', 'повторов')}${v.mode === 'video' ? ' · видео' : ''}${v.partial ? ' · 3D, предварительно' : ''}</small></span>${v.n && !v.partial ? `<span class="q ${q(v)}">чисто ${v.c} из ${v.n}</span>` : ''}</button>`).join('')}</div>` : ''}`];
 }
 function camPickSheet() {
   const ch = camChoices();
@@ -2647,18 +2652,19 @@ function processInbox() {
 }
 function applyCamResult(m) {
   if (!m || !Array.isArray(m.sets)) return null;
-  const sets = m.sets.filter(s => s && s.r > 0).map(s => ({w: s.w || 0, r: s.r, n: s.n || 0, c: s.c || 0, g: s.g || [], cue: s.cue || '', ft: s.ft || []}));
+  const sets = m.sets.filter(s => s && s.r > 0).map(s => ({w: s.w || 0, r: s.r, n: s.partial ? 0 : (s.n || 0), c: s.partial ? 0 : (s.c || 0), g: s.partial ? [] : (s.g || []), cue: s.cue || '', ft: s.ft || [], partial: !!s.partial, analysisMode: s.analysisMode === '3d' ? '3d' : '2d', note: s.note || ''}));
   if (!sets.length) return null;
   const name = m.name || (CAT[m.ex] ? CAT[m.ex].n : 'Упражнение');
   const faults = {};
   for (const s of sets) for (const f of s.ft) { const k = f.t || f.id; faults[k] = faults[k] || {t: f.t, c: f.c, n: 0}; faults[k].n += f.n || 1; }
-  const v = {id: nid('v'), at: m.at || Date.now(), ex: m.ex, pos: Number.isInteger(m.pos) ? m.pos : null, name, mode: m.mode || 'live', sets, reps: sets.reduce((a, s) => a + (s.n || s.r), 0), n: sets.reduce((a, s) => a + s.n, 0), c: sets.reduce((a, s) => a + s.c, 0), g: sets.flatMap(s => s.g), faults: Object.values(faults).sort((a, b) => b.n - a.n), logged: false};
+  const partial = sets.some(s => s.partial);
+  const v = {id: nid('v'), at: m.at || Date.now(), ex: m.ex, pos: Number.isInteger(m.pos) ? m.pos : null, name, mode: m.mode || 'live', sets, reps: sets.reduce((a, s) => a + (s.n || s.r), 0), n: sets.reduce((a, s) => a + s.n, 0), c: sets.reduce((a, s) => a + s.c, 0), g: partial ? [] : sets.flatMap(s => s.g), faults: Object.values(faults).sort((a, b) => b.n - a.n), partial, logged: false};
   S.videoLog.unshift(v); S.videoLog = S.videoLog.slice(0, 30);
-  if (m.mode === 'video' && !S.workout) return `Разбор видео готов: чисто ${v.c} из ${v.n}`;
+  if (m.mode === 'video' && !S.workout) return partial ? `3D-разбор готов: ${v.reps} повторов, предварительные подсказки` : v.n ? `Разбор видео готов: чисто ${v.c} из ${v.n}` : `Посчитано повторов: ${v.reps}, без оценки техники`;
   return logCamSets(v);
 }
 function logCamSets(v) {
-  const sets = v.sets.map(s => ({w: s.w, r: s.r, c: s.c, n: s.n}));
+  const sets = v.sets.map(s => ({w: s.w, r: s.r, c: s.c, n: s.n, partial: !!s.partial, analysisMode: s.analysisMode, note: s.note || ''}));
   v.logged = true;
   if (S.workout) {
     const W = S.workout, at = v.pos != null && W.items[v.pos], same = at && (norm(at.name) === norm(v.name) || (v.ex && at.base === v.ex));
@@ -2666,7 +2672,7 @@ function logCamSets(v) {
     if (i >= 0) {
       const it = W.items[i];
       let k = 0;
-      for (const s of sets) { const slot = it.sets.find(x => !x.done); if (slot) Object.assign(slot, {w: s.w || slot.w, r: s.r, c: s.c, n: s.n, done: true}); else it.sets.push({...s, w: s.w || (it.sets[0] && it.sets[0].w) || 0, done: true}); k++; }
+      for (const s of sets) { const slot = it.sets.find(x => !x.done); if (slot) Object.assign(slot, {...s, w: s.w || slot.w, done: true}); else it.sets.push({...s, w: s.w || (it.sets[0] && it.sets[0].w) || 0, done: true}); k++; }
       W.active = i; S.tab = 'today';
       return `Из камеры: ${k} ${plural(k, 'подход', 'подхода', 'подходов')} — «${it.name}»`;
     }
@@ -2680,11 +2686,13 @@ function logCamSets(v) {
 }
 function videoSheet(id) {
   const v = S.videoLog.find(x => x.id === id); if (!v) return;
-  const g = v.g.length ? v.g : v.sets.flatMap(s => Array.from({length: s.n}, (_, i) => i < s.c ? 0 : 1));
+  const partial = v.partial || v.sets.some(s => s.partial);
+  const g = partial ? [] : v.g.length ? v.g : v.sets.flatMap(s => Array.from({length: s.n}, (_, i) => i < s.c ? 0 : 1));
   sheet(v.name, `<div class="hint">${ruDate(v.at, {day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'})} · ${v.mode === 'video' ? 'разбор видео' : 'камера онлайн'}</div>
-    <div class="kpis"><div class="stat"><b>${v.reps}</b><span>повторов</span></div><div class="stat"><b>${v.c}</b><span>чистых</span></div><div class="stat"><b>${v.sets.length}</b><span>${plural(v.sets.length, 'подход', 'подхода', 'подходов')}</span></div></div>
+    <div class="kpis"><div class="stat"><b>${v.reps}</b><span>повторов</span></div>${v.n && !partial ? `<div class="stat"><b>${v.c}</b><span>чистых</span></div>` : '<div class="stat"><b>—</b><span>без общей оценки</span></div>'}<div class="stat"><b>${v.sets.length}</b><span>${plural(v.sets.length, 'подход', 'подхода', 'подходов')}</span></div></div>
+    ${partial ? '<p class="hint">3D: предварительные подсказки по видимым суставам. Скрытые части тела и контакт с полом не проверены.</p>' : ''}
     ${g.length ? `<div class="card pad"><div class="eyebrow" style="margin-bottom:8px">Повторы по порядку</div><div class="stripe" role="img" aria-label="${g.filter(x => !x).length} чистых из ${g.length}">${g.map(x => `<i class="${x === 2 ? 'b' : x === 1 ? 'w' : ''}"></i>`).join('')}</div><div class="legend" style="margin-top:8px"><span><i style="background:var(--good-strong)"></i>чисто</span><span><i style="background:var(--warn)"></i>поправить</span><span><i style="background:var(--bad)"></i>грубая ошибка</span></div></div>` : ''}
-    ${v.faults.length ? `<div class="card pad">${v.faults.map(f => `<div class="fault"><span class="n">${f.n} ${plural(f.n, 'повтор', 'повтора', 'повторов')}</span><span><b>${esc(f.t || 'Техника')}</b>${f.c ? `<span class="hint">${esc(f.c)}</span>` : ''}</span></div>`).join('')}</div>` : '<p class="coach up">Ошибок не нашла — чистая техника.</p>'}`,
+    ${v.faults.length ? `<div class="card pad">${v.faults.map(f => `<div class="fault"><span class="n">${f.n} ${plural(f.n, 'повтор', 'повтора', 'повторов')}</span><span><b>${esc(f.t || 'Техника')}</b>${f.c ? `<span class="hint">${esc(f.c)}</span>` : ''}</span></div>`).join('')}</div>` : `<p class="coach up">${partial ? 'В доступных проверках замечаний нет.' : v.n ? 'Ошибок не нашла — чистая техника.' : 'Повторы посчитаны. Техника не оценивалась.'}</p>`}`,
     `<button class="btn" data-act="close">Закрыть</button>${v.logged ? '<button class="btn" disabled>Уже в дневнике</button>' : `<button class="btn primary" data-act="vres-log" data-v="${v.id}">Записать в дневник</button>`}`);
 }
 

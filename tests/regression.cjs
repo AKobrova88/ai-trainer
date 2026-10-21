@@ -24,6 +24,23 @@ function app() {
   return {run: source => vm.runInContext(source, context), events, nodes};
 }
 
+test('3D camera results preserve limitations in video history and diary without clean-technique claims',()=>{
+  const a=app();
+  const result=a.run(`
+    const msg=applyCamResult({ex:'bw_squat',name:'Приседания',mode:'video',sets:[{r:8,n:8,c:8,g:[0],partial:true,analysisMode:'3d',note:'3D: предварительные подсказки',ft:[]}]});
+    const result=S.videoLog[0];
+    if(result.n || result.c || result.g.length || !result.partial)throw Error('Misleading grade');
+    sheet=(title,body)=>{window.resultSheet=body;};videoSheet(result.id);
+    logCamSets(result);
+    const saved=S.diary[0].items[0].sets[0];
+    if(!saved.partial || saved.analysisMode!=='3d' || !saved.note)throw Error('Lost limitations');
+    S.open[S.diary[0].id]=true;
+    ({msg,body:window.resultSheet,diary:logCard(S.diary[0])});`);
+  assert.match(result.msg,/предварительные/);assert.match(result.body,/Скрытые части тела/);
+  assert.doesNotMatch(result.body,/чистая техника|<span>чистых<\/span>/);
+  assert.match(result.diary,/3D: предварительные/);
+});
+
 test('demo exit restores own program, diary and active workout, including after reload', () => {
   const a = app();
   a.run(`S.stage = 'app'; S.user = {email:'test@example.invalid',at:Date.now()};

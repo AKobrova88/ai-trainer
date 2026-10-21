@@ -217,7 +217,7 @@ body{font:400 16px/1.45 var(--f-body)}
       <video id="howto" muted loop playsinline autoplay preload="auto"></video>
       <video id="vid" playsinline muted autoplay></video>
       <canvas id="cv"></canvas>
-      <div class="stage-note" id="stageNote" hidden><div><b>Считаю повторы</b><span>Для этого упражнения тренер считает повторы и следит, чтобы амплитуда и темп не проседали. Полный разбор техники — у упражнений с 🎥.</span></div></div>
+      <div class="stage-note" id="stageNote" hidden><div><b>Считаю повторы</b><span>Для этого упражнения доступен счёт повторов без оценки техники.</span></div></div>
       <button class="flip" id="flipBtn" type="button" hidden aria-label="Сменить камеру">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5A6.5 6.5 0 0 1 15 5.2L16.5 7"/><path d="M16.5 3.5V7H13"/><path d="M16.5 11.5A6.5 6.5 0 0 1 5 14.8L3.5 13"/><path d="M3.5 16.5V13H7"/></svg>
       </button>
@@ -225,14 +225,15 @@ body{font:400 16px/1.45 var(--f-body)}
       <div class="stage-msg" id="stageMsg" hidden><div class="msg-card"><div class="spin" id="msgSpin" hidden></div><h3 id="msgTitle"></h3><p id="msgText"></p><div class="msg-actions" id="msgActions"></div></div></div>
     </div>
     <div class="cue info" id="cue" role="status" aria-live="polite"><i></i><span id="cueText"></span></div>
+    <button class="sub-btn" id="setupCount" type="button" disabled hidden>Только счёт повторов, без оценки техники</button>
   </section>
   <p class="camtip" id="camTip"></p>
+  <p class="camtip" id="analysisInfo" role="status">3D-анализ на устройстве · видео не отправляется на сервер. Скрытые суставы могут не распознаваться.</p>
   <section class="setup-check" id="setupCheck" aria-labelledby="setupTitle" hidden>
     <h2 id="setupTitle">Подготовка к подходу</h2>
-    <ul><li data-setup="body">Всё тело в кадре</li><li data-setup="angle">Подходящий ракурс</li><li data-setup="position">Исходное положение</li></ul>
-    <p id="setupStatus" role="status">Встань в кадр и замри на секунду. Счёт пока не идёт.</p>
+    <ul><li data-setup="body">Рабочие суставы в кадре</li><li data-setup="angle">Суставы распознаются</li><li data-setup="position">Исходное положение</li></ul>
+    <p id="setupStatus" role="status">Замри в исходном положении. После проверки счёт включится автоматически.</p>
     <button class="main-btn" id="setupStart" type="button" disabled>Начать подход</button>
-    <button class="sub-btn" id="setupCount" type="button" disabled>Только счёт повторов, без оценки техники</button>
   </section>
   <div class="camsel" role="group" aria-label="Какой камерой снимать">
     <span>Камера</span>
@@ -258,9 +259,9 @@ body{font:400 16px/1.45 var(--f-body)}
   <input class="vh" id="fileInput" type="file" accept="video/*">
 </div>
 
-<script>/* Technique analyzers for every exercise: a line-by-line port of trainer/analysis/rules.py and generic.py
-   (the Telegram bot), so the phone and the bot judge a set the same way. Exercise specs and fault texts come
-   from the bot as one JSON blob (AT.setData). Runs in the browser and in Node (parity tests). */
+<script>/* Technique analyzers for every exercise. The original 2D state machines and exercise specs come
+   from the Telegram bot; the phone also supports metric MediaPipe world landmarks, body-frame signals
+   and deliberately limited 3D assessments. Runs in the browser and in Node. */
 const AT = (() => {
 'use strict';
 const DEG = 180 / Math.PI;
@@ -270,14 +271,92 @@ const SIDE = {
   l: { ear: 7, sh: 11, el: 13, wr: 15, hip: 23, kn: 25, an: 27, heel: 29, toe: 31 },
   r: { ear: 8, sh: 12, el: 14, wr: 16, hip: 24, kn: 26, an: 28, heel: 30, toe: 32 }
 };
-const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: ((a.z || 0) + (b.z || 0)) / 2, score: Math.min(a.score, b.score) });
-function angle(a, b, c) {
-  const ux = a.x - b.x, uy = a.y - b.y, vx = c.x - b.x, vy = c.y - b.y;
-  const d = Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1;
-  return Math.acos(clamp((ux * vx + uy * vy) / d, -1, 1)) * DEG;
+// Image x/y stay in pixels for the overlay. Only keypoints3D is metric; the z
+// in image keypoints is normalized and must never be mixed with pixel x/y.
+const finite3 = p => p && [p.x, p.y, p.z].every(Number.isFinite);
+function poseToKeypoints(poses) {
+  const p = poses && poses[0];
+  if (!p || !Array.isArray(p.keypoints) || p.keypoints.length !== 33) return null;
+  const hasWorld = Array.isArray(p.keypoints3D);
+  const kp = p.keypoints.map((k, i) => {
+    const w = hasWorld && p.keypoints3D[i];
+    const score = Number.isFinite(k.score) ? clamp(k.score, 0, 1) : 0;
+    return { x: k.x, y: k.y, z: k.z, score: Number.isFinite(k.x) && Number.isFinite(k.y) ? score : 0,
+      world: finite3(w) ? { x: w.x, y: w.y, z: w.z,
+        score: Math.min(score, Number.isFinite(w.score) ? clamp(w.score, 0, 1) : score) } : null };
+  });
+  kp.hasWorld = hasWorld;
+  return kp;
 }
-const fromVertical = (lower, upper) => Math.atan2(Math.abs(upper.x - lower.x), Math.max(1e-6, lower.y - upper.y)) * DEG;
+const dist = (a, b) => {
+  const world = a.world && b.world; if (world) { a = a.world; b = b.world; }
+  return Math.hypot(a.x - b.x, a.y - b.y, world ? a.z - b.z : 0);
+};
+function mid(a, b) {
+  const p = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: ((a.z || 0) + (b.z || 0)) / 2, score: Math.min(a.score, b.score) };
+  if (a.world && b.world) p.world = { x: (a.world.x + b.world.x) / 2, y: (a.world.y + b.world.y) / 2, z: (a.world.z + b.world.z) / 2 };
+  return p;
+}
+function angle(a, b, c) {
+  const world = a.world && b.world && c.world; if (world) { a = a.world; b = b.world; c = c.world; }
+  const ux = a.x - b.x, uy = a.y - b.y, uz = world ? a.z - b.z : 0;
+  const vx = c.x - b.x, vy = c.y - b.y, vz = world ? c.z - b.z : 0;
+  const d = Math.hypot(ux, uy, uz) * Math.hypot(vx, vy, vz);
+  return d > 1e-8 ? Math.acos(clamp((ux * vx + uy * vy + uz * vz) / d, -1, 1)) * DEG : NaN;
+}
+const fromVertical = (lower, upper) => {
+  const world = lower.world && upper.world; if (world) { lower = lower.world; upper = upper.world; }
+  return Math.atan2(Math.hypot(upper.x - lower.x, world ? upper.z - lower.z : 0), Math.max(1e-6, lower.y - upper.y)) * DEG;
+};
+// Resolve camera yaw in a body coordinate frame. Angles still use the complete
+// 3D vectors, not this projection. Y assumes a level phone; no floor is inferred.
+const validWorld = p => p && p.score > .55 && finite3(p.world) && p.world.score > .55;
+function worldKeypoints(kp) {
+  const out = kp.map(p => validWorld(p) ? { x:p.world.x*1000, y:p.world.y*1000, z:p.world.z*1000,
+    score:Math.min(p.score,p.world.score), world:{x:p.world.x*1000,y:p.world.y*1000,z:p.world.z*1000} }
+    : {x:0,y:0,z:0,score:0});
+  for (const [i,j] of [[11,23],[12,24],[11,13],[12,14],[13,15],[14,16],[23,25],[24,26],[25,27],[26,28]]) {
+    if (!validWorld(kp[i]) || !validWorld(kp[j])) continue;
+    const a=kp[i].world,b=kp[j].world,d=Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
+    if (d < .015 || d > 1.2) {out[i].score=0;out[j].score=0;}
+  }
+  return out;
+}
+function projectWorld(kp, plane, independent = false) {
+  const out = worldKeypoints(kp), ok = i => out[i] && out[i].score > .55;
+  const pair = [23, 24].every(ok) ? [23, 24] : [11, 12].every(ok) ? [11, 12] : null;
+  // A 3D joint angle needs its three landmarks, not both shoulders / both hips.
+  // Machines often hide the far side of the body; those angles remain usable.
+  if (!pair) return independent ? out : null;
+  const a = kp[pair[0]].world, b = kp[pair[1]].world;
+  const len = Math.hypot(b.x - a.x, b.z - a.z), width = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+  if (width < .06 || width > .85) return independent ? out : null;
+  let lateral;
+  if (len >= .06) lateral = { x: (b.x - a.x) / len, z: (b.z - a.z) / len };
+  else {
+    // In a side plank the hips can be stacked vertically. The horizontal
+    // trunk direction defines the sagittal plane in that specific position.
+    const s = ['l','r'].map(s => SIDE[s]).find(S => ok(S.sh) && ok(S.hip));
+    if (!s) return independent ? out : null;
+    const sh = kp[s.sh].world, h = kp[s.hip].world, trunk = Math.hypot(sh.x - h.x, sh.z - h.z);
+    if (trunk < .15 || plane === 'front') return independent ? out : null;
+    lateral = { x: (sh.z - h.z) / trunk, z: -(sh.x - h.x) / trunk };
+  }
+  const axis = plane === 'front' ? lateral : { x: -lateral.z, z: lateral.x };
+  const origin = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 };
+  // World landmarks are hip-centred. Anchoring Y to the feet recovers squat
+  // descent; using hip-centred Y alone would make the pelvis almost stationary.
+  const feet = [27, 28].filter(ok);
+  const groundY = feet.length ? feet.reduce((s, i) => s + kp[i].world.y, 0) / feet.length : origin.y;
+  return out.map((point,i) => {
+    if (!ok(i)) return point;
+    const p=kp[i];
+    const w = p.world, dx = w.x - origin.x, dz = w.z - origin.z;
+    return { x: (dx * axis.x + dz * axis.z) * 1000, y: (w.y - groundY) * 1000, z: w.z * 1000,
+      lateral: (dx * lateral.x + dz * lateral.z) * 1000, score: Math.min(p.score, w.score),
+      world: { x: w.x * 1000, y: w.y * 1000, z: w.z * 1000 } };
+  });
+}
 const LEVEL_TOL = { novice: 1.25, normal: 1.0, pro: 0.8 };
 const SQUAT_DEPTH = { half: -0.45, parallel: -0.06, deep: 0.12 };
 const PUSH_DEPTH = { half: 118, parallel: 98, deep: 86 };
@@ -294,12 +373,33 @@ class BaseAnalyzer {
     this.side = 'l'; this.sideScore = { l: 0.5, r: 0.5 }; this.zDiff = 0; this.cal = null; this.standSince = null;
     this.rep = null; this.lock = null; this.hold = {}; this.live = new Set(); this.pulses = {}; this.events = [];
     this.prevT = null; this.velS = null; this.lostSince = null; this.lastRepEnd = null; this.setEnded = false;
-    this.now = 0; this.kp = null; this.m = null;
+    this.now = 0; this.kp = null; this.m = null; this.analysisMode = null; this.worldExpected = false; this.lastTrackedT = null;
+  }
+  prepare(kp, t, plane = 'side') {
+    if (!kp) return null;
+    const hasWorld = kp.hasWorld || kp.some(p => p && p.world);
+    const mode = hasWorld || this.worldExpected ? '3d' : '2d';
+    if (this.analysisMode && this.analysisMode !== mode) this.recalibrate();
+    this.analysisMode = mode;
+    if (mode === '2d') return kp;
+    this.worldExpected = true;
+    if (this.prevT != null && t - this.prevT > .5) {
+      if (this.spec && this.spec.hold && this.holdState === 'on') this.endHold(this.lastTrackedT ?? this.prevT);
+      this.recalibrate();
+    }
+    if (!hasWorld) return null; // Never switch units or fall back in the middle of a rep.
+    return projectWorld(kp, plane === 'joints' ? 'side' : plane, plane === 'joints');
+  }
+  recalibrate() {
+    const keep = { reps: this.reps, events: this.events, lastRepEnd: this.lastRepEnd, setEnded: this.setEnded,
+      analysisMode: this.analysisMode, worldExpected: this.worldExpected };
+    this.reset(); Object.assign(this, keep);
   }
   emit(e) { this.events.push(e); }
   drain() { const e = this.events; this.events = []; return e; }
   tick(t) { const dt = this.prevT == null ? 1 / 30 : clamp(t - this.prevT, 1 / 240, 0.5); this.prevT = t; this.now = t; return dt; }
   updateView(kp) {
+    if (this.analysisMode === '3d') { this.view = this.spec && this.spec.view === 'front' ? 'front' : 'side'; return false; }
     const ls = kp[11], rs = kp[12], lh = kp[23], rh = kp[24];
     const torso = dist(mid(ls, rs), mid(lh, rh)) || 1;
     const span = Math.max(Math.abs(ls.x - rs.x), Math.abs(lh.x - rh.x) * 1.3);
@@ -312,6 +412,10 @@ class BaseAnalyzer {
     return before != null && before !== this.view;
   }
   updateSide(kp, keys) {
+    if (this.analysisMode === '3d') {
+      const complete = s => keys.every(k => sc(kp[SIDE[s][k]]) > .55);
+      if (complete('l') !== complete('r')) { this.side = complete('l') ? 'l' : 'r'; return; }
+    }
     const mean = (s, f) => keys.reduce((a, k) => a + f(kp[SIDE[s][k]]), 0) / keys.length;
     for (const s of ['l', 'r']) this.sideScore[s] = lerp(this.sideScore[s], mean(s, p => p.score || 0), 0.2);
     this.zDiff = lerp(this.zDiff, mean('l', p => p.z || 0) - mean('r', p => p.z || 0), 0.2);
@@ -340,6 +444,9 @@ class BaseAnalyzer {
     rep.faultList = Object.keys(rep.faults).sort((a, b) => this.meta(b).pen - this.meta(a).pen);
     rep.score = Math.max(0, 100 - rep.faultList.reduce((a, id) => a + this.meta(id).pen, 0));
     rep.grade = !rep.faultList.length ? 'good' : rep.faultList.some(id => this.meta(id).pen >= 25) ? 'bad' : 'fair';
+    rep.analysisMode = rep.analysisMode || this.analysisMode || '2d';
+    rep.partial = rep.analysisMode === '3d';
+    if (rep.partial) rep.score = null; // Monocular estimates have no validated overall technique grade.
   }
   finishRep(rep) { this.score(rep); this.reps.push(rep); this.lastRepEnd = rep.t1; this.emit({ type: 'rep', rep }); }
   addLate(rep, id) { if (rep.faults[id]) return; rep.faults[id] = true; this.score(rep); this.emit({ type: 'repUpdate', rep }); this.pulse(id); }
@@ -355,6 +462,11 @@ class BaseAnalyzer {
   }
   idleCheck(t) { if (this.lastRepEnd != null && !this.setEnded && !this.rep && t - this.lastRepEnd > 7) this.endSet(); }
   lost(t) {
+    if (this.analysisMode === '3d') {
+      if (this.cal || this.rep || this.lock) this.recalibrate();
+      this.tick(t); this.status = 'world_lost'; this.standSince = null; this.clearLive(); this.m = null;
+      this.idleCheck(t); return this.snapshot();
+    }
     if (this.lostSince == null) this.lostSince = t;
     if (t - this.lostSince > 0.7) {
       this.status = 'nobody';
@@ -367,7 +479,8 @@ class BaseAnalyzer {
   }
   snapshot() {
     return { status: this.status, phase: this.phase, view: this.view, side: this.side, reps: this.reps.length,
-      live: this.liveList(), setEnded: this.setEnded, kneeMode: !!(this.m && this.m.kneeMode), held: null };
+      live: this.liveList(), setEnded: this.setEnded, kneeMode: !!(this.m && this.m.kneeMode), held: null,
+      analysisMode: this.analysisMode, partial: this.analysisMode === '3d' };
   }
   closeLock() { this.lock = null; }
   joints(id) {
@@ -385,6 +498,7 @@ class SquatAnalyzer extends BaseAnalyzer {
   }
   reset() { super.reset(); this.prevHipY = null; }
   update(kp, t) {
+    kp = this.prepare(kp, t);
     const dt = this.tick(t);
     if (!kp || !this.visible(kp)) return this.lost(t);
     this.lostSince = null; this.kp = kp;
@@ -408,16 +522,19 @@ class SquatAnalyzer extends BaseAnalyzer {
     this.prevHipY = hip.y;
     this.velS = this.velS == null ? vel : lerp(this.velS, vel, 0.3);
     const stable = this.velS < 0.35;
-    const footOk = !front && heel && toe && sc(heel) > 0.5 && sc(toe) > 0.5;
-    const kneeSpan = front ? Math.abs(kp[25].x - kp[26].x) : 0;
-    const ankleSpan = front ? Math.max(1, Math.abs(kp[27].x - kp[28].x)) : 1;
+    const footOk = this.analysisMode !== '3d' && !front && heel && toe && sc(heel) > 0.5 && sc(toe) > 0.5;
+    const frontal = front || this.analysisMode === '3d' && [23,24,25,26,27,28].every(i => sc(kp[i]) > .55);
+    const lateral = p => this.analysisMode === '3d' ? p.lateral : p.x;
+    const kneeSpan = frontal ? Math.abs(lateral(kp[25]) - lateral(kp[26])) : 0;
+    const ankleSpan = frontal ? Math.max(1, Math.abs(lateral(kp[27]) - lateral(kp[28]))) : 1;
+    const hipShift = frontal ? ((lateral(kp[23]) + lateral(kp[24]) - lateral(kp[27]) - lateral(kp[28])) / 2) / ankleSpan : 0;
     if (!this.cal) {
       this.status = 'calib'; this.phase = 'setup';
       if (straight && stable) {
         if (this.standSince == null) this.standSince = t;
         if (t - this.standSince > 0.5) {
           this.cal = { hipY: hip.y, thigh: thighNow, heelY: footOk ? heel.y : null, toeY: footOk ? toe.y : null,
-            footLen: footOk ? dist(heel, toe) : null, kneeRatio: front ? kneeSpan / ankleSpan : null, shift0: front ? (hip.x - an.x) / ankleSpan : null };
+            footLen: footOk ? dist(heel, toe) : null, kneeRatio: frontal ? Math.max(.05, kneeSpan / ankleSpan) : null, shift0: frontal ? hipShift : null };
           this.phase = 'top'; this.standSince = null;
           this.emit({ type: 'status', id: 'ready' });
         }
@@ -436,7 +553,7 @@ class SquatAnalyzer extends BaseAnalyzer {
         c.toeY = c.toeY == null ? toe.y : lerp(c.toeY, toe.y, 0.08);
         c.footLen = c.footLen == null ? fl : lerp(c.footLen, fl, 0.05);
       }
-      if (front) { c.kneeRatio = lerp(c.kneeRatio, kneeSpan / ankleSpan, 0.08); c.shift0 = lerp(c.shift0, (hip.x - an.x) / ankleSpan, 0.08); }
+      if (frontal) { c.kneeRatio = c.kneeRatio == null ? Math.max(.05, kneeSpan / ankleSpan) : lerp(c.kneeRatio, Math.max(.05, kneeSpan / ankleSpan), 0.08); c.shift0 = c.shift0 == null ? hipShift : lerp(c.shift0, hipShift, 0.08); }
     }
     const d = (hip.y - kn.y) / c.thigh;
     const lean = front ? null : fromVertical(hip, sh);
@@ -444,8 +561,8 @@ class SquatAnalyzer extends BaseAnalyzer {
     const diff = front ? null : lean - shin;
     const heelLift = footOk && c.heelY != null && c.footLen ? (c.heelY - heel.y) / c.footLen : null;
     const toeMove = footOk && c.toeY != null && c.footLen ? Math.abs(toe.y - c.toeY) / c.footLen : null;
-    const kneeR = front ? (kneeSpan / ankleSpan) / c.kneeRatio : null;
-    const shift = front ? (hip.x - an.x) / ankleSpan - c.shift0 : null;
+    const kneeR = frontal && c.kneeRatio != null ? (kneeSpan / ankleSpan) / c.kneeRatio : null;
+    const shift = frontal && c.shift0 != null ? hipShift - c.shift0 : null;
     this.m = { hip, kn, an, sh, front, d, p, lean, shin, diff, heelLift, kneeR, shift, kneeAng };
     if (this.lock) {
       this.lock.minP = Math.min(this.lock.minP, p);
@@ -470,7 +587,8 @@ class SquatAnalyzer extends BaseAnalyzer {
         R.maxDiff = Math.max(R.maxDiff, diff);
         this.flag('lean', diff > 22 * tol || lean > 60 * tol);
         if (heelLift != null) { R.maxLift = Math.max(R.maxLift, heelLift); this.flag('heels', heelLift > 0.13 * tol && (toeMove == null || toeMove < 0.15)); }
-      } else {
+      }
+      if (kneeR != null && shift != null) {
         R.minKneeR = Math.min(R.minKneeR, kneeR); R.maxShift = Math.max(R.maxShift, Math.abs(shift));
         this.flag('valgus', p > 0.35 && kneeR < 1 - 0.17 * tol);
         this.flag('shift', Math.abs(shift) > 0.16 * tol);
@@ -502,6 +620,7 @@ class PushupAnalyzer extends BaseAnalyzer {
   }
   reset() { super.reset(); this.prevE = null; }
   update(kp, t) {
+    kp = this.prepare(kp, t);
     const dt = this.tick(t);
     if (!kp || !this.visible(kp)) return this.lost(t);
     this.lostSince = null; this.kp = kp;
@@ -617,23 +736,27 @@ class GenericAnalyzer extends BaseAnalyzer {
     if (kind === 'incline') {
       const S = SIDE[this.side], sh = kp[S.sh], hip = kp[S.hip];
       if (sc(sh) <= 0.5 || sc(hip) <= 0.5) return null;
-      return Math.atan2(hip.y - sh.y, Math.abs(sh.x - hip.x) + 1e-6) * DEG;
+      const horizontal = sh.world && hip.world ? Math.hypot(sh.world.x - hip.world.x, sh.world.z - hip.world.z) : Math.abs(sh.x - hip.x);
+      return Math.atan2(hip.y - sh.y, horizontal + 1e-6) * DEG;
     }
     if (kind === 'gap') {
       const j = J[sig[1]], a = kp[SIDE.l[j]], b = kp[SIDE.r[j]], s1 = kp[11], s2 = kp[12];
       if (sc(a) <= 0.5 || sc(b) <= 0.5 || sc(s1) <= 0.5 || sc(s2) <= 0.5) return null;
-      return Math.abs(a.x - b.x) / Math.max(1.0, Math.abs(s1.x - s2.x));
+      return this.analysisMode === '3d' ? dist(a, b) / Math.max(1, dist(s1, s2)) : Math.abs(a.x - b.x) / Math.max(1.0, Math.abs(s1.x - s2.x));
     }
     throw new Error(kind);
   }
-  trunkLen(kp) { const S = SIDE[this.side]; return Math.max(1.0, dist(kp[S.sh], kp[S.hip])); }
-  visible(kp) { return ['l', 'r'].some(s => ['sh', 'hip'].every(j => sc(kp[SIDE[s][j]]) > 0.5)); }
+  trunkLen(kp) { const S = SIDE[this.side]; return this.sideOk(kp,this.side,['sh','hip']) ? Math.max(1.0, dist(kp[S.sh], kp[S.hip])) : null; }
+  visible(kp) { return requiredChains(this.key).some(chain => chain.every(i => sc(kp[i]) > .5)); }
   update(kp, t) {
+    const kind = this.spec.sig && this.spec.sig[0];
+    kp = this.prepare(kp, t, kind && (kind.startsWith('angle') || kind === 'abd') ? 'joints' : this.spec.view);
     const dt = this.tick(t);
     if (!kp || !this.visible(kp)) return this.lost(t);
     this.lostSince = null; this.kp = kp;
     this.updateView(kp);
-    this.updateSide(kp, ['sh', 'hip', 'el', 'kn']);
+    const primary = kind && kind.startsWith('angle') ? ANGLES[this.spec.sig[1]] : kind === 'abd' ? ['hip','sh','el'] : [];
+    this.updateSide(kp, primary.length ? primary : ['sh', 'hip', 'el', 'kn']);
     const want = this.spec.view;
     if ((want === 'side' || want === 'front') && this.view && this.view !== want) {
       this.status = want === 'front' ? 'turn_front' : 'turn';
@@ -718,7 +841,7 @@ class GenericAnalyzer extends BaseAnalyzer {
       else if (c[0] === 'max') fid = val > c[1] ? 'max' : null;
       else if (c[0] === 'sym') {
         const L = this.trunkLen(kp);
-        const dy = sc(kp[15]) > 0.5 && sc(kp[16]) > 0.5 ? Math.abs(kp[15].y - kp[16].y) / L : 0.0;
+        const dy = L && sc(kp[15]) > 0.5 && sc(kp[16]) > 0.5 ? Math.abs(kp[15].y - kp[16].y) / L : 0.0;
         fid = dy > c[1] * tolK ? 'sym' : null;
       }
       if (fid) { this.rep.faults[fid] = true; this.pulse(fid); }
@@ -742,6 +865,7 @@ class GenericAnalyzer extends BaseAnalyzer {
     const S = SIDE[this.side], sh = kp[S.sh], hip = kp[S.hip];
     const foot = sc(kp[S.an]) > 0.5 ? kp[S.an] : kp[S.kn];
     if (sc(foot) <= 0.5) return this.lost(t);
+    this.lastTrackedT = t;
     const horiz = Math.atan2(Math.abs(sh.y - foot.y), Math.abs(sh.x - foot.x) + 1e-6) * DEG < 40;
     const line = angle(sh, hip, foot);
     const dx = (sh.x - foot.x) || 1e-6;
@@ -790,6 +914,7 @@ class GenericAnalyzer extends BaseAnalyzer {
   }
   endSet() { if (this.spec.hold && this.holdState === 'on') this.endHold(this.now); super.endSet(); }
   lost(t) {
+    if (this.analysisMode === '3d' && this.spec.hold && this.holdState === 'on') this.endHold(this.lastTrackedT ?? t);
     if (this.spec.hold && this.holdState === 'on' && this.lostSince != null && t - this.lostSince > 0.7) this.endHold(t);
     return super.lost(t);
   }
@@ -831,12 +956,14 @@ const FREE_META = {
   fast: { title: 'Темп', cue: 'Медленнее, под контролем', pen: 10 }
 };
 class FreeAnalyzer extends BaseAnalyzer {
-  constructor(level = 'normal') { super('parallel', level); }
+  constructor(level = 'normal', key = null, imageOnly = false) { super('parallel', level); this.key = key; this.imageOnly = imageOnly; }
   reset() { super.reset(); this.sm = {}; this.prevV = {}; this.vel = 0; this.active = null; this.ref = null; this.amps = []; }
   meta(fid) { return FREE_META[fid] || { title: 'Техника', cue: '', pen: 10 }; }
   values(kp) {
     const out = {}, ok = i => sc(kp[i]) > 0.5;
     for (const [name, s] of Object.entries(FREE_SIGS)) {
+      const spec = D.specs[this.key], sig = spec && spec.sig;
+      if (sig && sig[0].startsWith('angle') && s[0] !== sig[1]) continue;
       if (s[0] === 'thighs') {
         if ([23, 24, 25, 26].every(ok)) out[name] = angle(kp[25], mid(kp[23], kp[24]), kp[26]);
         continue;
@@ -848,6 +975,8 @@ class FreeAnalyzer extends BaseAnalyzer {
   }
   minMove(name) { return name.startsWith('ankle') ? 12 : 20; }
   update(kp, t) {
+    if (this.imageOnly && kp) kp = kp.map(p=>({x:p.x,y:p.y,z:p.z,score:p.score}));
+    kp = this.prepare(kp, t, 'joints');
     const dt = this.tick(t);
     const raw = kp ? this.values(kp) : {};
     if (!Object.keys(raw).length || (this.active && raw[this.active] == null)) return this.lost(t);
@@ -913,6 +1042,21 @@ class FreeAnalyzer extends BaseAnalyzer {
   }
 }
 
+function requiredChains(key) {
+  const spec=D.specs[key], perSide=names => ['l','r'].map(s=>names.map(j=>SIDE[s][j]));
+  if (key in D.squat) return perSide(['sh','hip','kn','an']);
+  if (key in D.pushup) return ['an','kn'].flatMap(foot=>perSide(['sh','el','wr','hip',foot]));
+  if (spec) {
+    if (spec.hold) return ['an','kn'].flatMap(foot=>perSide(['sh','hip',foot]));
+    const [kind,joint]=spec.sig;
+    if (kind.startsWith('angle')) return perSide(ANGLES[joint]);
+    if (kind==='abd') return perSide(['hip','sh','el']);
+    if (kind==='gap') return [[11,12,SIDE.l[J[joint]],SIDE.r[J[joint]]]];
+    if (kind==='height') return perSide(['sh','hip','kn','an']);
+    return perSide(['sh','hip']);
+  }
+  return ['knee','hip','elbow','shoulder'].flatMap(j=>perSide(ANGLES[j]));
+}
 function analyzerFor(key, depth = 'parallel', level = 'normal') {
   if (key in D.squat) return new SquatAnalyzer(D.squat[key] === 'parallel' ? depth : 'half', level);
   if (key in D.pushup) { const a = new PushupAnalyzer(depth, level); a.incline = D.pushup[key]; return a; }
@@ -923,7 +1067,7 @@ function viewOf(key) { return key in D.squat ? 'any' : key in D.pushup ? 'side' 
 function isHold(key) { return !!(D.specs[key] && D.specs[key].hold); }
 function family(key) { return key in D.squat ? 'squat' : key in D.pushup ? 'pushup' : 'generic'; }
 
-return { setData(d) { D = d; }, data: () => D, analyzerFor, viewOf, isHold, family, SIDE, BaseAnalyzer, SquatAnalyzer, PushupAnalyzer, GenericAnalyzer, FreeAnalyzer };
+return { setData(d) { D = d; }, data: () => D, analyzerFor, viewOf, isHold, family, requiredChains, SIDE, poseToKeypoints, projectWorld, angle, BaseAnalyzer, SquatAnalyzer, PushupAnalyzer, GenericAnalyzer, FreeAnalyzer };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = AT;
 </script>
@@ -1070,11 +1214,14 @@ function fillSelect() {
   el.sel.value = state.ex;
 }
 function setExercise(key) {
+  if (state.on && !state.preflight && state.analyzer && state.analyzer.reps.length && !state.analyzer.setEnded) {
+    state.analyzer.endSet(); processEvents(state.analyzer.drain());
+  }
   state.ex = key; el.sel.value = key;
   if (key !== FREE) store.set('aitrainer.v2', Object.assign(prefs, { ex: key }));
-  const view = AT.viewOf(key);
   el.camTip.textContent = '📱 ' + (isFree() ? 'Поставь телефон в 2–3 м так, чтобы работающий сустав было хорошо видно (лучше сбоку)'
-    : view === 'front' ? EX.cam.front : view === 'any' ? 'Поставь телефон сбоку или спереди в 2–3 м, всё тело в кадре' : EX.cam.side);
+    : state.ex === 'leg_ext' ? '📍 Разгибания ног: нужны таз, колено и стопа одной ноги. Голова и руки для подсчёта не обязательны. Телефон можно поставить под углом'
+    : 'Поставь телефон ровно в 2–3 м. Можно спереди, сбоку, сзади или под углом, если рабочие суставы видны');
   if (isFree()) { el.howto.removeAttribute('src'); try { el.howto.load(); } catch (e) { /* fine */ } }
   else {
     if (HOWTO_HAVE.has(key)) el.howto.src = 'howto/' + key + '.mp4'; else { el.howto.removeAttribute('src'); try { el.howto.load(); } catch (e) { /* fine */ } }
@@ -1088,7 +1235,7 @@ function setExercise(key) {
   renderSets(); renderMain();
 }
 function newAnalyzer() {
-  state.analyzer = isFree() || state.fallback ? new AT.FreeAnalyzer(state.level) : AT.analyzerFor(state.ex, state.depth, state.level);
+  state.analyzer = isFree() || state.fallback ? new AT.FreeAnalyzer(state.level, state.ex, !!state.fallback) : AT.analyzerFor(state.ex, state.depth, state.level);
   state.snap = null; state.flash = null;
   state.preflightReady = false; state.preflightSince = null;
   resetDet();
@@ -1181,7 +1328,7 @@ function tapToStart() {
   } }]);
 }
 function syncSize(v) { if (v.videoWidth && (v.width !== v.videoWidth || v.height !== v.videoHeight)) { v.width = v.videoWidth; v.height = v.videoHeight; } }
-const toKp = poses => { const p = poses && poses[0]; return p && p.keypoints && p.keypoints.length === 33 ? p.keypoints.map(k => ({ x: k.x, y: k.y, z: k.z, score: k.score ?? 0 })) : null; };
+const toKp = AT.poseToKeypoints; // One adapter for live inference and uploaded video frames.
 async function infer() {
   const v = el.vid;
   if (state.busy || !state.detector || v.readyState < 2 || !v.videoWidth) return;
@@ -1197,10 +1344,11 @@ async function infer() {
     else if (state.preflight) {
       state.snap = state.analyzer.update(kp, t);
       state.analyzer.drain(); // Preparation movements never become recorded sets.
-      const checks = checkSetup(kp, v.videoWidth, v.videoHeight, state.snap);
+      const checks = checkSetup(kp, v.videoWidth, v.videoHeight, state.snap, state.ex);
       if (!checks.ready) state.preflightSince = null;
       else if (state.preflightSince == null) state.preflightSince = t;
       state.preflightReady = checks.ready && t - state.preflightSince >= .7;
+      if (state.preflightReady) beginPreparedSet();
     } else handleSnap(state.analyzer.update(kp, t));
   } catch (e) {
     console.error(e); H.errors++; H.lastErr = String((e && e.message) || e);
@@ -1218,6 +1366,7 @@ function processEvents(evts) {
       if (isHold()) continue;
       state.flash = isFree() || state.fallback ? { cls: 'info', text: 'Повтор ' + r.n + ' · без оценки техники', until: now + 1400 } : r.faultList.length
         ? { cls: r.grade === 'bad' ? 'bad' : 'warn', text: 'Повтор ' + r.n + ': ' + A.meta(r.faultList[0]).cue.toLowerCase(), until: now + 1800 }
+        : r.partial ? { cls: 'info', text: 'Повтор ' + r.n + ' · 3D: в доступных проверках замечаний нет', until: now + 1800 }
         : { cls: 'good', text: 'Повтор ' + r.n + ' — ' + (Math.random() < 0.3 ? pick(T.praise).toLowerCase() : 'чисто'), until: now + 1400 };
       if (!state.file) Voice.say(String(r.n), 'rep' + r.n, false, true);
     } else if (e.type === 'setEnd') recordSet();
@@ -1230,16 +1379,20 @@ function processEvents(evts) {
 /* ---------- sets ---------- */
 function recordSet() {
   const A = state.analyzer; if (!A || !A.reps.length) return;
-  const reps = A.reps, hold = isHold(), countOnly = isFree() || !!state.fallback;
+  const reps = A.reps, hold = isHold(), countOnly = isFree() || !!state.fallback, partial = !countOnly && reps.some(r => r.partial);
+  const graded = !countOnly && !partial;
   const faults = {}; for (const r of reps) for (const id of r.faultList) faults[id] = (faults[id] || 0) + 1;
   const top = Object.keys(faults).sort((a, b) => faults[b] * A.meta(b).pen - faults[a] * A.meta(a).pen)[0];
   const prevW = state.sets.length ? state.sets[state.sets.length - 1].w : urlW();
   const set = {
     r: hold ? Math.round(reps.reduce((a, r) => a + (r.extra.secs || 0), 0)) : reps.length,
-    n: countOnly ? 0 : reps.length, c: countOnly ? 0 : reps.filter(r => !r.faultList.length).length, f: countOnly ? {} : faults, w: weighted() ? prevW : null, cue: countOnly ? '' : top ? A.meta(top).cue : '',
-    g: countOnly ? [] : reps.map(r => !r.faultList.length ? 0 : r.grade === 'bad' ? 2 : 1), file: !!state.usedFile, countOnly
+    n: graded ? reps.length : 0, c: graded ? reps.filter(r => !r.faultList.length).length : 0, f: countOnly ? {} : faults, w: weighted() ? prevW : null, cue: countOnly ? '' : top ? A.meta(top).cue : '',
+    g: graded ? reps.map(r => !r.faultList.length ? 0 : r.grade === 'bad' ? 2 : 1) : [], file: !!state.usedFile, countOnly,
+    partial, analysisMode: reps.some(r => r.analysisMode === '3d') ? '3d' : '2d'
   };
-  set.note = countOnly ? 'Повторы посчитаны. Техника не оценивалась.' : setVerdict(set, set.cue);
+  set.note = countOnly ? 'Повторы посчитаны. Техника не оценивалась.' : partial
+    ? '3D: предварительные подсказки по видимым суставам. ' + (set.cue || 'В доступных проверках замечаний нет.') + (AT.family(state.ex) === 'squat' ? ' Контакт пяток с полом не проверен.' : '')
+    : setVerdict(set, set.cue);
   state.sets.push(set); state.view = A.view || state.view; saveSets();
   if (!state.file) { Rec.restart(); attemptT0 = performance.now(); helperAt = 25000; }
   state.flash = { cls: set.c / set.n >= 0.8 ? 'good' : 'info', text: 'Подход ' + state.sets.length + ' · ' + set.note, until: performance.now() + 6000 };
@@ -1375,7 +1528,8 @@ function toApp() {
     const wtd = !['bw', 'time'].includes(EX.ex[k].inc), p = PLAN.find(x => x.k === k);
     const sets = ss.map(s => {
       const ft = free ? [] : Object.keys(s.f || {}).sort((a, b) => s.f[b] - s.f[a]).slice(0, 3).map(id => { const m = A ? A.meta(id) : { title: 'Техника', cue: '' }; return { id, t: m.title, c: m.cue, n: s.f[id] }; });
-      return { w: wtd ? (s.w || 0) : 0, r: s.r, n: free ? 0 : (s.n || 0), c: free ? 0 : (s.c || 0), g: free ? [] : (s.g || []), cue: free ? '' : (s.cue || ''), ft };
+      return { w: wtd ? (s.w || 0) : 0, r: s.r, n: free ? 0 : (s.n || 0), c: free ? 0 : (s.c || 0), g: free ? [] : (s.g || []), cue: free ? '' : (s.cue || ''), ft,
+        partial: !!s.partial, analysisMode: s.analysisMode, note: s.note || '' };
     });
     entries.push({ id: 'c' + Date.now().toString(36) + entries.length, at: Date.now(), ex: k, name: p ? p.n : EX.ex[k].name, pos: p ? p.pos : null, free, mode: ss.some(s => s.file) ? 'video' : 'live', sets });
   }
@@ -1393,7 +1547,7 @@ el.sendBox.addEventListener('click', async e => {
     const W = tg(), A = state.analyzer;
     const sets = state.sets.filter(s => s.r > 0).map(s => {
       const f = {}; Object.keys(s.f || {}).sort((a, b) => s.f[b] - s.f[a]).slice(0, 3).forEach(k => { f[k] = s.f[k]; });
-      return isFree() ? { w: weighted() ? s.w : null, r: s.r, n: 0, c: 0, f: {} } : { w: weighted() ? s.w : null, r: s.r, n: s.n, c: s.c, f };
+      return isFree() || s.partial || s.countOnly ? { w: weighted() ? s.w : null, r: s.r, n: 0, c: 0, f: {} } : { w: weighted() ? s.w : null, r: s.r, n: s.n, c: s.c, f };
     });
     const payload = JSON.stringify({ v: 2, ex: state.ex, view: (A && A.view) || state.view, sets });
     try { W.sendData(payload); state.sets = []; saveSets(); }
@@ -1408,9 +1562,10 @@ el.sendBox.addEventListener('click', async e => {
 /* ---------- live UI ---------- */
 const STATUS_TEXT = {
   nobody: 'Встань в кадр целиком — от головы до стоп',
+  world_lost: 'Недостаточно надёжных 3D-точек. Открой суставы и замри в исходном положении',
   turn: 'Повернись к камере боком',
   turn_front: 'Встань к камере лицом',
-  plank: 'Прими упор лёжа боком к камере'
+  plank: 'Прими упор лёжа, чтобы были видны плечи, таз и ноги'
 };
 function calibText() {
   const fam = AT.family(state.ex);
@@ -1421,12 +1576,14 @@ function calibText() {
 }
 /* Say what exactly is missing, so the person knows whether to step back, lower the phone or turn. */
 function missingHint(kp) {
-  if (!kp) return 'Не вижу человека: отойди на 2–3 м, чтобы было видно всё тело, и включи свет поярче';
-  const ok = i => kp[i] && kp[i].score > 0.5, any = (a, b) => ok(a) || ok(b);
-  if (!any(11, 12) || !any(23, 24)) return 'Вижу тебя не целиком — отойди подальше от телефона';
-  if (!any(25, 26) || !any(27, 28)) return 'Не видно ног — отойди дальше или поставь телефон ниже';
-  if (!any(13, 14) || !any(15, 16)) return 'Не видно рук — повернись к камере боком';
-  return STATUS_TEXT.nobody;
+  if (!kp) return 'Не вижу человека. Проверь свет и направь камеру на рабочие суставы';
+  const f = state.frame;
+  const visible = i => {const p=kp[i];return p && p.score>.5 && Number.isFinite(p.x) && Number.isFinite(p.y) && (!f || (p.x>=0 && p.y>=0 && p.x<=f.W && p.y<=f.H));};
+  const chain=AT.requiredChains(state.ex).slice().sort((a,b)=>b.filter(visible).length/b.length-a.filter(visible).length/a.length)[0] || [];
+  const names={11:'плечо',12:'плечо',13:'локоть',14:'локоть',15:'кисть',16:'кисть',23:'таз',24:'таз',25:'колено',26:'колено',27:'стопа',28:'стопа',31:'носок стопы',32:'носок стопы'};
+  const missing=[...new Set(chain.filter(i=>!visible(i)).map(i=>names[i]||'сустав'))];
+  return missing.length ? 'Закрыты или вне кадра: ' + missing.join(', ') + '. Открой обзор рабочей стороны'
+    : 'Рабочие суставы видны, но положение пока не распознано';
 }
 function cueState() {
   const snap = state.snap, now = performance.now(), A = state.analyzer;
@@ -1435,12 +1592,16 @@ function cueState() {
   if (state.on && state.recOnly) { const s = Math.round(Rec.secs()); return { cls: 'info', text: '● Запись ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' · ' + (!snap || snap.status === 'nobody' ? 'встань в кадр целиком' : 'вижу тебя целиком') }; }
   if (!state.on) return state.flash && state.flash.until > now ? state.flash : { cls: 'tip', text: info().tips[0] };
   if (!snap) return { cls: 'info', text: state.detector ? 'Включаю камеру…' : 'Готовлю тренера…' };
+  if (state.preflight) {
+    const f=state.frame,checks=checkSetup(f&&f.kp,f&&f.W,f&&f.H,snap,state.ex);
+    return {cls:'info',text:'Счёт пока не включён. '+setupReason(checks,snap)};
+  }
   if (snap.status === 'nobody') return { cls: 'info', text: missingHint(state.frame && state.frame.kp) };
   if (snap.live.length) { const m = A.meta(snap.live[0]); return { cls: m.pen >= 25 ? 'bad' : 'warn', text: m.cue }; }
   if (state.flash && state.flash.until > now) return state.flash;
   if (STATUS_TEXT[snap.status]) return { cls: 'info', text: STATUS_TEXT[snap.status] };
   if (snap.status === 'calib') return { cls: 'info', text: calibText() };
-  if (snap.phase === 'hold') return { cls: 'good', text: 'Держи! Ровно, дыши' };
+  if (snap.phase === 'hold') return { cls: snap.partial ? 'info' : 'good', text: snap.partial ? 'Держи! 3D-оценка по видимым суставам' : 'Держи! Ровно, дыши' };
   if (snap.phase === 'top') return { cls: 'info', text: snap.reps && !snap.setEnded ? 'Следующий повтор' : 'Готово. Начинай' };
   return { cls: 'info', text: 'Под контролем' };
 }
@@ -1462,6 +1623,7 @@ function speakStatus() {
   if (!isFree() && !state.fallback && (s === 'turn' || s === 'turn_front')) {
     if (turnSince == null) turnSince = now;
     else if (now - turnSince > 5000) {
+      if (state.analyzer.reps.length && !state.analyzer.setEnded) {state.analyzer.endSet();processEvents(state.analyzer.drain());}
       turnSince = null; state.fallback = true; newAnalyzer(); renderMain();
       const msg = 'Считаю повторы. Для разбора техники поставь телефон ' + (s === 'turn' ? 'сбоку' : 'спереди');
       state.flash = { cls: 'info', text: msg, until: now + 6000 }; Voice.say(msg, 'fallback', true);
@@ -1469,23 +1631,31 @@ function speakStatus() {
   } else turnSince = null;
 }
 /* Setup check: pure pose visibility and analyzer-state checks, also covered by tests. */
-function checkSetup(kp, width, height, snap) {
+function checkSetup(kp, width, height, snap, key = null) {
   const visible = i => { const p = kp && kp[i]; return !!(p && p.score > .5 && Number.isFinite(p.x) && Number.isFinite(p.y) && width > 0 && height > 0 && p.x >= 0 && p.x <= width && p.y >= 0 && p.y <= height); };
-  const body = [[0,7,8],[11,12],[13,14],[15,16],[23,24],[25,26],[27,28]].every(pair => pair.some(visible));
-  const angle = body && !!snap && !['nobody','turn','turn_front'].includes(snap.status);
+  const body = key ? AT.requiredChains(key).some(chain=>chain.every(visible))
+    : [[0,7,8],[11,12],[13,14],[15,16],[23,24],[25,26],[27,28]].every(pair => pair.some(visible));
+  const angle = body && !!snap && !['nobody','world_lost','turn','turn_front'].includes(snap.status);
   const position = angle && snap.status === 'track' && ['top','hold'].includes(snap.phase);
   return {body, angle, position, ready: body && angle && position};
 }
 /* End setup check. */
+function setupReason(checks,snap) {
+  if (!checks.body) return missingHint(state.frame&&state.frame.kp);
+  if (!checks.angle) return snap && snap.status==='world_lost' ? '3D-точки неустойчивы. Открой суставы или выбери «Только счёт повторов» ниже' : STATUS_TEXT[snap&&snap.status] || 'Не удалось распознать рабочие суставы';
+  if (!checks.position) return calibText();
+  return 'Замри ещё на мгновение — начну автоматически';
+}
 function renderSetup() {
   const panel = $('#setupCheck'), active = state.on && state.preflight && !state.file && !state.recOnly;
   panel.hidden = !active;
+  $('#setupCount').hidden = !active;
   if (!active) return;
-  const f = state.frame, checks = checkSetup(f && f.kp, f && f.W, f && f.H, state.snap);
+  const f = state.frame, checks = checkSetup(f && f.kp, f && f.W, f && f.H, state.snap, state.ex);
   for (const item of panel.querySelectorAll('[data-setup]')) item.dataset.ok = String(checks[item.dataset.setup]);
   $('#setupStart').disabled = !state.preflightReady;
   $('#setupCount').disabled = !checks.body;
-  const text = state.preflightReady ? 'Кадр готов. Нажми «Начать подход» — включится счёт.' : 'Встань в кадр и замри на секунду. Счёт пока не идёт.';
+  const text = setupReason(checks,state.snap) + '. Счёт включится после проверки автоматически.';
   if ($('#setupStatus').textContent !== text) $('#setupStatus').textContent = text;
 }
 function renderLive() {
@@ -1495,6 +1665,12 @@ function renderLive() {
   el.cue.className = 'cue ' + cs.cls;
   if (el.cueText.textContent !== cs.text) el.cueText.textContent = cs.text;
   const snap = state.snap, hold = isHold();
+  const analysisText = state.fallback ? 'Версия 2.5.1 · Только счёт повторов по видимому движению. Техника не оценивается'
+    : snap && snap.analysisMode === '2d'
+    ? 'Версия 2.5.1 · 2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
+    : 'Версия 2.5.1 · 3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
+  const analysisInfo = $('#analysisInfo');
+  if (analysisInfo.textContent !== analysisText) analysisInfo.textContent = analysisText;
   el.hud.hidden = !state.on || !!state.recOnly || state.preflight;
   if (snap) {
     const n = hold ? Math.floor(snap.held || 0) : (snap.setEnded ? 0 : snap.reps);
@@ -1520,20 +1696,25 @@ el.main.addEventListener('click', () => {
   if (state.preflight) return stopCamera();
   if (state.recOnly) return finishRecording();
   if (A && A.reps.length && !A.setEnded) { A.endSet(); processEvents(A.drain()); return; }
-  if (!state.file && A && !A.reps.length && Rec.secs() >= 12 && el.msg.hidden) return showLiveHelp('Подход не посчитан', 'Я не увидела ни одного повтора.');
+  if (!state.file && A && !A.reps.length && el.msg.hidden) return showLiveHelp('Подход не распознан', 'Повторы не удалось определить. ' + (state.snap && state.snap.status==='world_lost' ? STATUS_TEXT.world_lost : missingHint(state.frame&&state.frame.kp)));
   stopCamera();
 });
 $('#recBtn').addEventListener('click', () => startRecordMode());
 function beginPreparedSet(countOnly = false) {
   if (!state.on || !state.preflight) return;
   const f = state.frame;
-  if (countOnly ? !checkSetup(f && f.kp, f && f.W, f && f.H, state.snap).body : !state.preflightReady) return;
+  if (countOnly ? !checkSetup(f && f.kp, f && f.W, f && f.H, state.snap, state.ex).body : !state.preflightReady) return;
+  const previous=state.analyzer;
   if (countOnly) state.fallback = true;
   state.preflight = false;
   newAnalyzer();
-  Rec.start(state.stream); attemptT0 = performance.now(); helperAt = 25000;
+  if (!countOnly && previous && previous.cal && previous.status==='track') {
+    Object.assign(state.analyzer,{cal:previous.cal,analysisMode:previous.analysisMode,worldExpected:previous.worldExpected,
+      view:previous.view,side:previous.side,phase:'top',status:'track'});
+  }
+  Rec.start(state.stream); attemptT0 = performance.now(); helperAt = 12000;
   state.flash = null; lastStatus = ''; renderMain(); renderLive();
-  if (Voice.on) Voice.say(countOnly ? 'Считаю повторы, без оценки техники' : 'Начинаем. Замри на секунду в исходном положении', 'start', true);
+  if (Voice.on) Voice.say(countOnly ? 'Считаю повторы, без оценки техники' : 'Счёт включён. Начинай подход', 'start', true);
 }
 $('#setupStart').addEventListener('click', () => beginPreparedSet());
 $('#setupCount').addEventListener('click', () => beginPreparedSet(true));
@@ -1717,7 +1898,7 @@ const Rec = {
     });
   }
 };
-const framed = kp => { if (!kp) return false; const ok = i => kp[i] && kp[i].score > 0.5, any = (a, b) => ok(a) || ok(b); return any(11, 12) && any(23, 24) && (any(25, 26) || any(27, 28)); };
+const framed = kp => !!kp && AT.requiredChains(state.ex).some(chain=>chain.every(i=>kp[i]&&kp[i].score>.5));
 const viewWord = () => { const v = AT.viewOf(state.ex); return v === 'front' ? 'лицом к телефону' : v === 'side' ? 'боком к телефону' : 'боком или лицом к телефону'; };
 function manualSet() {
   renderSets(); el.setsBox.hidden = false;
@@ -1729,13 +1910,14 @@ let attemptT0 = 0, helperAt = 25000;
 function helperCheck() {
   if (!state.on || state.file || state.recOnly || state.preflight || !el.msg.hidden) return;
   const A = state.analyzer;
-  if (!A || A.reps.length || A.rep) { attemptT0 = performance.now(); return; }
+  if (!A || A.reps.length || (isHold() && state.snap && state.snap.phase==='hold')) { attemptT0 = performance.now(); return; }
   if (performance.now() - attemptT0 < helperAt) return;
   helperAt = Infinity;
   const s = state.snap ? state.snap.status : 'nobody';
   const why = s === 'nobody' ? missingHint(state.frame && state.frame.kp)
     : s === 'turn' || s === 'turn_front' ? 'Ракурс не подходит: встань ' + viewWord() + ', в 2–3 м'
     : s === 'calib' ? 'Замри на секунду в начальном положении — так я пойму, откуда считать'
+    : s === 'world_lost' ? STATUS_TEXT.world_lost
     : 'Не вижу повторов — двигайся на полную амплитуду, целиком в кадре';
   showLiveHelp('Не получается посчитать?', why + '.', () => { attemptT0 = performance.now(); helperAt = 45000; });
   Voice.say('Не получается посчитать. ' + why, 'helper', true);
@@ -1745,7 +1927,7 @@ function showLiveHelp(title, why, onContinue) {
   if (secs >= 4) acts.push({ label: 'Разобрать запись', primary: true, run: () => { hideMsg(); analyzeLive(); } });
   acts.push({ label: 'Записать вручную', primary: !acts.length, run: () => { hideMsg(); stopCamera(); manualSet(); } });
   acts.push({ label: onContinue ? 'Продолжить' : 'Выключить камеру', run: () => { hideMsg(); if (onContinue) onContinue(); else stopCamera(); } });
-  showMsg(title, why + (secs >= 4 ? '\n\nЯ записала последние ' + secs + ' с — могу пройти запись кадр за кадром, это точнее. Или запиши подход вручную.' : '\n\nМожно записать подход вручную или снять на видео и разобрать после.'), acts);
+  showMsg(title, why + (secs >= 4 ? '\n\nНа устройстве есть запись последних ' + secs + ' с — могу повторно пройти её кадр за кадром. Или запиши подход вручную.' : '\n\nМожно записать подход вручную или снять на видео и разобрать после.'), acts);
 }
 async function analyzeLive() {
   const blob = await Rec.take();
@@ -1758,13 +1940,12 @@ async function finishRecording() { state.recOnly = false; renderMain(); return a
 /* before a video: how to film it, so the coach can read it */
 function pickVideo(skipGuide) {
   if (skipGuide) return $('#fileInput').click();
-  const v = AT.viewOf(state.ex), name = info().name;
   showMsg('Как снять, чтобы я разобрала',
-    '• Встань подальше — в 2–3 м от телефона: в кадре всё тело от головы до стоп.\n' +
-    '• Встань ' + viewWord() + (v === 'side' ? ' — так видно углы в суставах' : '') + '. Для «' + name + '» это важно.\n' +
-    '• Телефон неподвижно, на уровне пояса — на полке, скамье или штативе.\n' +
+    (state.ex==='leg_ext' ? '• Разгибания ног: в кадре нужны таз, колено и стопа одной ноги. Голова и руки для подсчёта не обязательны.\n' : '• Поставь телефон в 2–3 м: рабочие суставы должны оставаться в кадре весь подход.\n') +
+    '• Подходит съёмка спереди, сбоку, сзади и под углом, если видны нужные суставы. Не закрывай их оборудованием.\n' +
+    '• Телефон неподвижно и ровно, без наклона вбок, на уровне пояса — на полке, скамье или штативе.\n' +
     '• Свет спереди, не против окна. Одно видео — один подход, до минуты.\n\n' +
-    'Если снято по-другому, я честно скажу, что по такому видео ничего сказать не могу.',
+    'Видео обрабатывается на устройстве. 3D из одной камеры — предварительная оценка: скрытые суставы и контакт с полом надёжно проверить нельзя. Если точек недостаточно, анализ приостановится.',
     [{ label: 'Выбрать видео', primary: true, run: () => { hideMsg(); $('#fileInput').click(); } },
      { label: 'Снять сейчас', run: () => { hideMsg(); startRecordMode(); } },
      { label: 'Отмена', run: hideMsg }]);
@@ -1805,7 +1986,7 @@ async function analyzeVideo(blob, from) {
   setAspect(v.videoWidth, v.videoHeight); newAnalyzer(); showCameraMode(true);
   if (!(await loadModelWithUi())) return stopCamera();
   const token = ++fileToken, st = { n: 0, miss: {} };
-  const shadow = isFree() || state.fallback ? null : new AT.FreeAnalyzer(state.level);   // counts reps even when the angle does not suit the technique rules
+  const shadow = isFree() || state.fallback ? null : new AT.FreeAnalyzer(state.level,state.ex,true);   // Independent image-based counter when world landmarks are unreliable.
   resetDet(); state.analyzing = true; state.prog = 0;
   try { await v.play(); v.pause(); } catch (err) { /* priming */ }
   const step = 1 / (dur > 60 ? 8 : dur > 20 ? 10 : 15);   // a long recording: fewer frames, still enough to see every rep
@@ -1833,20 +2014,23 @@ async function analyzeVideo(blob, from) {
   videoVerdict(st, found, shadow, from);
 }
 function videoVerdict(st, found, shadow, from) {
-  const n = Math.max(1, st.n), share = k => (st[k] || 0) / n, turn = share('turn') + share('turn_front'), nobody = share('nobody');
+  const n = Math.max(1, st.n), share = k => (st[k] || 0) / n, turn = share('turn') + share('turn_front'), nobody = share('nobody'), lost3d = share('world_lost');
   const name = info().name, miss = Object.keys(st.miss).sort((a, b) => st.miss[b] - st.miss[a])[0];
   const again = [{ label: from === 'rec' ? 'Снять ещё раз' : 'Снять на камеру', primary: true, run: () => { hideMsg(); startRecordMode(); } },
     { label: 'Другое видео', run: () => { hideMsg(); pickVideo(); } }, { label: 'Записать вручную', run: () => { hideMsg(); manualSet(); } }];
   const tell = (title, text, acts, say) => { state.flash = null; showMsg(title, text, acts); Voice.say(say || title, 'verdict', true); };
   if (found) {
-    if (turn > 0.35) state.flash = { cls: 'info', text: 'Часть видео снята с неудобного ракурса — в следующий раз встань ' + viewWord(), until: performance.now() + 8000 };
+    if (lost3d > .15) state.flash = { cls: 'info', text: 'Часть видео пропущена: 3D-точки терялись. Число повторов может быть неполным', until: performance.now() + 8000 };
+    else if (turn > 0.35) state.flash = { cls: 'info', text: 'Часть видео снята с неудобного ракурса — в следующий раз встань ' + viewWord(), until: performance.now() + 8000 };
     return;
   }
   if (shadow && shadow.reps.length >= 2 && nobody < 0.5) {
     state.fallback = true; state.analyzer = shadow; shadow.endSet(); processEvents(shadow.drain());
-    return tell('Повторы посчитала, технику — нет', 'Съёмка с неподходящего ракурса: для «' + name + '» нужно встать ' + viewWord() + '. Повторы (' + shadow.reps.length + ') я записала, а подсказки по технике дам, если в следующий раз снять по-другому.',
-      [{ label: 'Понятно', primary: true, run: hideMsg }, again[0]], 'Повторы посчитала. Технику по этому видео оценить не могу: снимай ' + viewWord());
+    return tell('Повторы посчитала, технику — нет', 'По видимым движениям нашла ' + shadow.reps.length + ' повторов. Проверь число и при необходимости исправь его в подходе. Для оценки техники данных недостаточно: суставы могли быть закрыты тренажёром или 3D-точки были неустойчивы.',
+      [{ label: 'Проверить повторы', primary: true, run: hideMsg }, again[0]], 'Повторы посчитаны без оценки техники. Проверь число');
   }
+  if (lost3d > .35) return tell('Недостаточно надёжных 3D-точек',
+    'Не удалось уверенно восстановить суставы. Освободи обзор, добавь свет и поставь телефон ровно. Начни запись с неподвижного исходного положения. Скрытые части тела нельзя надёжно оценить по одной камере.', again);
   if (nobody > 0.5) {
     return tell('По этому видео я ничего не могу сказать', (miss && miss !== STATUS_TEXT.nobody && !/^Не вижу человека/.test(miss) ? miss + '.\n\n' : 'Не вижу человека в кадре целиком.\n\n') +
       'В следующий раз встань подальше — в 2–3 м от телефона, чтобы в кадре было всё тело от головы до стоп. Встань ' + viewWord() + ', телефон на уровне пояса, свет спереди.', again,
