@@ -42,6 +42,10 @@ button{cursor:pointer}
 .stage video{object-fit:contain;background:var(--stage)}
 .stage video.mirror{transform:scaleX(-1)}
 #howto{z-index:1} .stage canvas{z-index:2}
+.bar-tip{position:absolute;left:10px;right:10px;top:10px;z-index:4;display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:14px;background:var(--stage-glass);border:1px solid var(--stage-edge);color:var(--stage-ink);font-size:14px;line-height:1.35;pointer-events:none}
+.bar-tip button{pointer-events:auto;flex:none;min-height:36px;padding:0 12px;border-radius:10px;border:1px solid var(--stage-edge);background:transparent;color:var(--stage-ink);font:inherit;font-weight:600}
+.stage.picking{cursor:crosshair}
+.stage.picking .hud-tr{display:none}
 .hud-tr{position:absolute;right:10px;top:10px;z-index:2;text-align:right;color:var(--stage-ink);background:var(--stage-glass);border:1px solid var(--stage-edge);border-radius:12px;padding:7px 11px 6px;min-width:64px}
 .repnum{font:700 36px/1 var(--f-display);font-variant-numeric:tabular-nums}
 .replabel{font:600 10px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--stage-dim);margin-top:3px}
@@ -222,10 +226,12 @@ body{font:400 16px/1.45 var(--f-body)}
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5A6.5 6.5 0 0 1 15 5.2L16.5 7"/><path d="M16.5 3.5V7H13"/><path d="M16.5 11.5A6.5 6.5 0 0 1 5 14.8L3.5 13"/><path d="M3.5 16.5V13H7"/></svg>
       </button>
       <div class="hud-tr" id="hud" hidden><div class="repnum" id="repNum">0</div><div class="replabel" id="repLabel">повторов</div></div>
+      <div class="bar-tip" id="barTip" hidden><span id="barTipText"></span><button type="button" id="barTipCancel">Отмена</button></div>
       <div class="stage-msg" id="stageMsg" hidden><div class="msg-card"><div class="spin" id="msgSpin" hidden></div><h3 id="msgTitle"></h3><p id="msgText"></p><div class="msg-actions" id="msgActions"></div></div></div>
     </div>
     <div class="cue info" id="cue" role="status" aria-live="polite"><i></i><span id="cueText"></span></div>
     <button class="sub-btn" id="setupCount" type="button" disabled hidden>Только счёт повторов, без оценки техники</button>
+    <button class="sub-btn" id="setupBar" type="button" hidden>Тело закрыто тренажёром — считать по движению веса</button>
   </section>
   <p class="camtip" id="camTip"></p>
   <p class="camtip" id="analysisInfo" role="status">3D-анализ на устройстве · видео не отправляется на сервер. Скрытые суставы могут не распознаваться.</p>
@@ -1111,6 +1117,215 @@ class FreeAnalyzer extends BaseAnalyzer {
   }
 }
 
+/* ---------- the weight instead of the body ----------
+   When a machine or plates hide the joints, the plate, handle or carriage still moves with every rep. The person taps it
+   once; BarTracker follows that patch by normalized cross-correlation on a small grey copy of each frame, and
+   BarAnalyzer counts reps from its path: count, range of motion, tempo and the pause, never the body position. */
+class BarTracker {
+  constructor(r = 9, search = 12) { this.r = r; this.s = search; }
+  cut(g, W, cx, cy) {
+    const r = this.r, n = 2 * r + 1, T = new Float32Array(n * n); let k = 0, sum = 0;
+    for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) { const v = g[y * W + x]; T[k++] = v; sum += v; }
+    const m = sum / T.length; let ss = 0;
+    for (let i = 0; i < T.length; i++) { T[i] -= m; ss += T[i] * T[i]; }
+    const sd = Math.sqrt(ss / T.length), nrm = Math.sqrt(ss) || 1;
+    for (let i = 0; i < T.length; i++) T[i] /= nrm;
+    T.sd = sd; return T;
+  }
+  start(g, W, H, x, y) {
+    const r = this.r;
+    this.W = W; this.H = H;
+    this.x = clamp(Math.round(x), r, W - r - 1); this.y = clamp(Math.round(y), r, H - r - 1);
+    this.T0 = this.cut(g, W, this.x, this.y); this.T = this.T0.slice(); this.T.sd = this.T0.sd;
+    this.fx = this.x; this.fy = this.y; this.score = 1; this.lost = 0;
+    return { x: this.fx, y: this.fy, score: 1, ok: true, contrast: this.T0.sd };
+  }
+  ncc(g, cx, cy) {   // the patch against both templates: the first look and the slowly updated one
+    const r = this.r, W = this.W, T0 = this.T0, T = this.T;
+    let k = 0, sum = 0, ss = 0, d0 = 0, d1 = 0;
+    for (let y = cy - r; y <= cy + r; y++) {
+      const row = y * W;
+      for (let x = cx - r; x <= cx + r; x++) { const v = g[row + x]; sum += v; ss += v * v; d0 += v * T0[k]; d1 += v * T[k]; k++; }
+    }
+    const varn = ss - sum * sum / k;
+    if (varn < 1e-6) return -1;
+    const q = Math.sqrt(varn);
+    return 0.5 * (d0 / q) + 0.5 * (d1 / q);
+  }
+  update(g) {
+    const r = this.r, W = this.W, H = this.H, s = this.s;
+    const lo = (c, m) => Math.max(r, c - s), hi = (c, m) => Math.min(m - r - 1, c + s);
+    let best = -2, bx = this.x, by = this.y;
+    for (let y = lo(this.y, H); y <= hi(this.y, H); y += 2) for (let x = lo(this.x, W); x <= hi(this.x, W); x += 2) {
+      const v = this.ncc(g, x, y); if (v > best) { best = v; bx = x; by = y; }
+    }
+    const cx = bx, cy = by, at = {};
+    for (let y = Math.max(r, cy - 2); y <= Math.min(H - r - 1, cy + 2); y++) for (let x = Math.max(r, cx - 2); x <= Math.min(W - r - 1, cx + 2); x++) {
+      const v = this.ncc(g, x, y); at[x + ',' + y] = v; if (v > best) { best = v; bx = x; by = y; }
+    }
+    const sub = (a, b, c) => { const d = a - 2 * b + c; return d < 0 ? clamp(0.5 * (a - c) / d, -0.5, 0.5) : 0; };
+    const v = (x, y) => at[x + ',' + y] != null ? at[x + ',' + y] : best;
+    this.score = best;
+    if (best < 0.45) { this.lost++; return { x: this.fx, y: this.fy, score: best, ok: false }; }
+    this.lost = 0; this.x = bx; this.y = by;
+    this.fx = bx + sub(v(bx - 1, by), best, v(bx + 1, by)); this.fy = by + sub(v(bx, by - 1), best, v(bx, by + 1));
+    if (best > 0.7) {   // follow slow changes of light and angle, the first look keeps it from drifting away
+      const P = this.cut(g, W, bx, by), T = this.T;
+      let ss = 0; for (let i = 0; i < T.length; i++) { T[i] = 0.85 * T[i] + 0.15 * P[i]; ss += T[i] * T[i]; }
+      const n = Math.sqrt(ss) || 1; for (let i = 0; i < T.length; i++) T[i] /= n;
+    }
+    return { x: this.fx, y: this.fy, score: best, ok: true };
+  }
+}
+const BAR_META = {
+  bar_rom: { title: 'Амплитуда', cue: 'Делай полную амплитуду', pen: 25 },
+  bar_fast: { title: 'Темп', cue: 'Опускай медленнее, под контролем', pen: 15 },
+  bar_hold: { title: 'Пауза', cue: 'Задержись в конечной точке', pen: 10 },
+};
+class BarAnalyzer {
+  constructor(key = null, level = 'normal') { this.key = key; this.level = level; this.isBar = true; this.reset(); }
+  reset() {
+    this.reps = []; this.events = []; this.setEnded = false; this.status = 'calib'; this.phase = 'top'; this.view = null; this.side = 'l';
+    this.analysisMode = 'bar'; this.p0 = null; this.axis = null; this.s = null; this.rest = 0; this.rep = null; this.lastRepEnd = null;
+    this.lostSince = null; this.now = 0; this.W = 160; this.path = []; this.maxAmp = 0;
+  }
+  spec() { return (D && D.specs && D.specs[this.key]) || {}; }
+  check(kind) { return (this.spec().checks || []).find(c => c[0] === kind); }
+  meta(fid) {
+    const m = BAR_META[fid] || { title: 'Движение', cue: '', pen: 10 };
+    const own = fid === 'bar_rom' ? this.check('rom') || this.check('romrel') : fid === 'bar_fast' ? this.check('tempo') : fid === 'bar_hold' ? this.check('hold') : null;
+    return own ? Object.assign({}, m, { cue: own[own.length - 1] }) : m;
+  }
+  emit(e) { this.events.push(e); }
+  drain() { const e = this.events; this.events = []; return e; }
+  h() { const a = this.reps.map(r => r.extra.amp).sort((x, y) => x - y); return Math.max(0.025 * this.W, a.length ? 0.35 * a[a.length >> 1] : 0); }
+  snapshot() {
+    return { status: this.status, phase: this.phase, view: null, side: 'l', reps: this.setEnded ? 0 : this.reps.length, live: [], setEnded: this.setEnded,
+      held: null, analysisMode: 'bar', partial: false, bar: true };
+  }
+  /* p: the tracked point in pixels of the small frame {x, y, ok}; W: the frame width (the scale of every threshold) */
+  update(p, t, W) {
+    this.now = t; if (W) this.W = W;
+    if (!p || !p.ok) {
+      if (this.lostSince == null) this.lostSince = t;
+      if (t - this.lostSince > 0.6) { this.status = 'bar_lost'; if (this.rep) { this.rep = null; this.phase = 'top'; } }   // a gap breaks the unfinished rep
+      return this.snapshot();
+    }
+    this.lostSince = null; this.status = 'track';
+    if (!this.p0) { this.p0 = { x: p.x, y: p.y }; this.early = []; }
+    const dx = p.x - this.p0.x, dy = p.y - this.p0.y;
+    if (!this.axis) {
+      this.early.push([t, dx, dy]);
+      const d = Math.hypot(dx, dy);
+      if (d < 1.5 * this.h()) return this.snapshot();
+      // The line of motion is the first clear movement. Which way is «out» from the start: a weight goes up on the lifting
+      // part of the rep, so with mostly vertical motion «out» is up — or down for exercises that start with lowering.
+      let ax = dx / d, ay = dy / d;
+      if (Math.abs(ay) >= 0.5) { const up = this.spec().ecc !== 'first'; if ((ay < 0) !== up) { ax = -ax; ay = -ay; } }
+      this.axis = { x: ax, y: ay };
+      for (const [te, ex, ey] of this.early) this.step(te, ex * ax + ey * ay);   // the start of the set is not lost
+      this.early = null;
+      return this.snapshot();
+    }
+    this.step(t, dx * this.axis.x + dy * this.axis.y);
+    return this.snapshot();
+  }
+  step(t, raw) {
+    this.s = this.s == null ? raw : lerp(this.s, raw, 0.5);
+    const s = this.s, h = this.h();
+    this.path.push([t, s]); if (this.path.length > 900) this.path.splice(0, 300);
+    if (this.path.length === 1) this.rest = s;
+    if (!this.rep) {
+      if (s < this.rest) this.rest = s;
+      if (s - this.rest > h) {
+        if (this.setEnded) { this.reps = []; this.setEnded = false; this.emit({ type: 'newSet' }); }
+        this.closeBack(this.reps[this.reps.length - 1]);
+        let i = this.path.length - 1; while (i > 0 && this.path[i - 1][1] < this.path[i][1] && this.path[i - 1][1] >= this.rest) i--;
+        this.rep = { n: this.reps.length + 1, t0: this.path[i][0], rest: this.rest, far: s, tFar: t, faults: {}, faultList: [], extra: {}, grade: 'good', score: 100 };
+        this.phase = 'down';
+      } else if (this.lastRepEnd != null && !this.setEnded && t - this.lastRepEnd > 7) this.endSet();
+      return;
+    }
+    const R = this.rep;
+    if (s > R.far) { R.far = s; R.tFar = t; }
+    const amp = R.far - R.rest;
+    if (this.phase === 'down' && R.far - s > Math.max(h, 0.12 * amp)) this.phase = 'up';
+    if (this.phase === 'up' && s > R.far - 0.12 * amp) this.phase = 'down';   // pressed again: still the same rep
+    if (this.phase === 'up' && s <= R.rest + 0.3 * amp) {
+      if (amp < Math.max(h, 0.4 * this.refAmp())) { this.rep = null; this.phase = 'top'; this.rest = s; return; }
+      this.finish(R, t); this.rest = s;
+    }
+  }
+  reanchor() { this.p0 = null; this.axis = null; this.early = null; this.s = null; this.rep = null; this.path = []; this.phase = 'top'; this.rest = 0; }   // a new point: the same set goes on
+  refAmp() { return this.reps.length ? Math.max(...this.reps.map(r => r.extra.amp)) : 0; }
+  /* times on the way out and back from the path, between 10 % and 90 % of the range; the pause is the time beyond 90 % */
+  finish(R, t) {
+    const pts = this.path.filter(q => q[0] >= R.t0 && q[0] <= t), amp = R.far - R.rest, at = f => R.rest + f * amp;
+    const first = (from, test) => { for (const q of pts) if (q[0] >= from && test(q[1])) return q[0]; return null; };
+    const o10 = first(R.t0, v => v >= at(0.1)), o90 = first(R.t0, v => v >= at(0.9));
+    const b90 = first(R.tFar, v => v < at(0.9)), b10 = first(R.tFar, v => v <= at(0.1));
+    const out = o10 != null && o90 != null ? o90 - o10 : null, back = b90 != null && b10 != null ? b10 - b90 : null;
+    const hold = o90 != null && b90 != null ? b90 - o90 : 0;
+    R.t1 = t; R.extra = { amp, far: R.far, rest: R.rest, tFar: R.tFar, out, back, ecc: null, hold };
+    this.tempo(R);
+    const holdC = this.check('hold');
+    if (holdC && hold < holdC[1]) R.faults.bar_hold = true;
+    if (this.reps.length && this.short(R, this.reps)) R.faults.bar_rom = true;
+    this.grade(R);
+    this.reps.push(R); this.lastRepEnd = t; this.rep = null; this.phase = 'top'; this.maxAmp = Math.max(this.maxAmp, amp);
+    this.emit({ type: 'rep', rep: R });
+  }
+  /* the way back is finished only after the rep is counted (at 30 %): its time is filled in when the path is there */
+  closeBack(R) {
+    if (!R || R.extra.back != null) return;
+    const X = R.extra, at = f => X.rest + f * X.amp;
+    let b90 = null, b10 = null;
+    for (const q of this.path) { if (q[0] < X.tFar) continue; if (b90 == null && q[1] < at(0.9)) b90 = q[0]; if (b90 != null && q[1] <= at(0.1)) { b10 = q[0]; break; } }
+    if (b90 != null && b10 != null) { X.back = b10 - b90; this.tempo(R); this.grade(R); }
+  }
+  tempo(R) {
+    const X = R.extra, tempo = this.check('tempo');
+    X.ecc = this.spec().ecc === 'first' ? X.out : X.back;
+    if (X.ecc != null && X.ecc < 0.75 * (tempo ? tempo[1] : 0.8)) R.faults.bar_fast = true; else delete R.faults.bar_fast;
+  }
+  /* short = the far end (the top of a bridge, the bottom of a squat) stops clearly before where the other reps go;
+     a rep whose start was not filmed is not short */
+  short(R, others) {
+    const med = a => { const b = a.slice().sort((x, y) => x - y); return b[b.length >> 1]; };
+    const fars = others.map(r => r.extra.far), amps = others.map(r => r.extra.amp);
+    return R.extra.far < med(fars) - 0.28 * med(amps);
+  }
+  grade(R) {
+    R.faultList = Object.keys(R.faults).sort((a, b) => this.meta(b).pen - this.meta(a).pen);
+    R.score = 100 - R.faultList.reduce((a, f) => a + this.meta(f).pen, 0); R.grade = R.score >= 85 ? 'good' : R.score >= 65 ? 'ok' : 'bad';
+  }
+  endSet() {
+    const R = this.rep;
+    this.closeBack(this.reps[this.reps.length - 1]);
+    if (R && this.s != null) {   // the recording stopped on the way back: a rep that came most of the way home counts
+      const amp = R.far - R.rest;
+      if (this.phase === 'up' && amp >= Math.max(this.h(), 0.4 * this.refAmp()) && this.s <= R.rest + 0.6 * amp) this.finish(R, this.now);
+      this.rep = null; this.phase = 'top';
+    }
+    if (this.reps.length >= 3) for (const r of this.reps) {   // the whole set is known now: the first reps are judged too
+      if (this.short(r, this.reps)) r.faults.bar_rom = true; else delete r.faults.bar_rom; this.grade(r);
+    }
+    if (this.reps.length && !this.setEnded) { this.setEnded = true; this.emit({ type: 'setEnd' }); }
+  }
+  /* the result in words: the count, then what to change, without anything about the body */
+  note() {
+    const reps = this.reps, n = reps.length; if (!n) return '';
+    const short = reps.filter(r => r.faults.bar_rom).map(r => r.n), fast = reps.filter(r => r.faults.bar_fast).length, noHold = reps.filter(r => r.faults.bar_hold).length;
+    const parts = ['По движению веса: ' + n + ' ' + (n % 10 === 1 && n % 100 !== 11 ? 'повтор' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'повтора' : 'повторов') + '.'];
+    parts.push(short.length ? (short.length === 1 ? 'Повтор ' + short[0] + ' короче остальных. ' : 'Повторы ' + short.join(', ') + ' короче остальных. ') + this.meta('bar_rom').cue + '.' : 'Амплитуда ровная.');
+    const eccs = reps.map(r => r.extra.ecc).filter(v => v != null);
+    if (fast > n / 2 && eccs.length) parts.push(this.meta('bar_fast').cue + ': сейчас около ' + (eccs.reduce((a, b) => a + b, 0) / eccs.length).toFixed(1).replace('.', ',') + ' с.');
+    if (noHold > n / 2) parts.push(this.meta('bar_hold').cue + '.');
+    parts.push('Положение тела не оценивалось.');
+    return parts.join(' ');
+  }
+}
+
 function requiredChains(key) {
   const spec=D.specs[key], perSide=names => ['l','r'].map(s=>names.map(j=>SIDE[s][j]));
   if (key in D.squat) return perSide(['sh','hip','kn','an']);
@@ -1137,7 +1352,7 @@ function viewOf(key) { return key in D.squat ? 'any' : key in D.pushup ? 'side' 
 function isHold(key) { return !!(D.specs[key] && D.specs[key].hold); }
 function family(key) { return key in D.squat ? 'squat' : key in D.pushup ? 'pushup' : 'generic'; }
 
-return { setData(d) { D = d; }, data: () => D, analyzerFor, viewOf, isHold, family, requiredChains, SIDE, poseToKeypoints, projectWorld, angle, BaseAnalyzer, SquatAnalyzer, PushupAnalyzer, GenericAnalyzer, LegExtensionAnalyzer, FreeAnalyzer };
+return { setData(d) { D = d; }, data: () => D, analyzerFor, viewOf, isHold, family, requiredChains, SIDE, poseToKeypoints, projectWorld, angle, BaseAnalyzer, SquatAnalyzer, PushupAnalyzer, GenericAnalyzer, LegExtensionAnalyzer, FreeAnalyzer, BarTracker, BarAnalyzer };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = AT;
 </script>
@@ -1298,7 +1513,7 @@ function setExercise(key) {
     if (HOWTO_HAVE.has(key)) el.howto.src = 'howto/' + key + '.mp4'; else { el.howto.removeAttribute('src'); try { el.howto.load(); } catch (e) { /* fine */ } }
     if (!state.on) try { const p = el.howto.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* autoplay blocked */ }
   }
-  state.fallback = false;
+  state.fallback = false; barReset();
   if (state.on && !state.file && !state.recOnly) { Rec.drop(); state.preflight = true; }
   el.note.hidden = !isFree() || state.on;
   loadSets();
@@ -1333,6 +1548,7 @@ function setAspect(w, h) { el.stage.style.setProperty('--ar', clamp(w / h, 9 / 1
 const BONES = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28], [27, 29], [29, 31], [27, 31], [28, 30], [30, 32], [28, 32]];
 function draw() {
   ctx.clearRect(0, 0, viewW, viewH);
+  if (state.bar && state.bar.pts && state.bar.pts.length && state.on) return drawBar(state.bar);
   const f = state.frame; if (!f || !f.kp || !state.on) return;
   const s = Math.min(viewW / f.W, viewH / f.H), ox = (viewW - f.W * s) / 2, oy = (viewH - f.H * s) / 2;
   const mirror = !state.file && state.facing === 'user';
@@ -1363,6 +1579,17 @@ function draw() {
       ctx.globalAlpha = 1;
     }
   }
+}
+
+function drawBar(B) {
+  const v = el.vid, W = v.videoWidth, Hh = v.videoHeight; if (!W || !Hh) return;
+  const s = Math.min(viewW / W, viewH / Hh), ox = (viewW - W * s) / 2, oy = (viewH - Hh * s) / 2, mirror = !state.file && state.facing === 'user';
+  const X = p => ox + (mirror ? W - p.x : p.x) * s, Y = p => oy + p.y * s, pts = B.pts, last = pts[pts.length - 1];
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(8,12,16,.5)'; ctx.globalAlpha = 0.8; ctx.lineWidth = 6; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p))); ctx.stroke();
+  ctx.strokeStyle = C.bone; ctx.globalAlpha = 0.9; ctx.lineWidth = 3; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p))); ctx.stroke();
+  const rr = Math.max(14, ((B.tr && B.tr.r) || 9) * (B.k || 1) * s);
+  ctx.globalAlpha = 1; ctx.lineWidth = 4; ctx.strokeStyle = last.ok ? C.good : C.bad; ctx.beginPath(); ctx.arc(X(last), Y(last), rr, 0, 7); ctx.stroke();
 }
 
 /* ---------- live loop ---------- */
@@ -1404,6 +1631,7 @@ function syncSize(v) { if (v.videoWidth && (v.width !== v.videoWidth || v.height
 const toKp = AT.poseToKeypoints; // One adapter for live inference and uploaded video frames.
 async function infer() {
   const v = el.vid;
+  if (state.bar && state.on && !state.file) { if (state.bar.live) barInferLive(); return; }   // picking a point or following it: no pose
   if (!state.on || state.file || state.busy || !state.detector || v.readyState < 2 || !v.videoWidth) return;
   const revision=state.revision,detector=state.detector,analyzer=state.analyzer,stream=state.stream;
   const current=()=>state.on && !state.file && state.revision===revision && state.detector===detector && state.analyzer===analyzer && state.stream===stream;
@@ -1441,7 +1669,8 @@ function processEvents(evts) {
     else if (e.type === 'rep') {
       const r = e.rep, now = performance.now();
       if (isHold()) continue;
-      state.flash = isFree() || state.fallback ? { cls: 'info', text: 'Повтор ' + r.n + ' · без оценки техники', until: now + 1400 } : r.faultList.length
+      state.flash = A.isBar ? { cls: r.faultList.length ? 'warn' : 'info', text: 'Повтор ' + r.n + (r.faultList.length ? ': ' + A.meta(r.faultList[0]).cue.toLowerCase() : ' · по движению веса'), until: now + 1600 }
+        : isFree() || state.fallback ? { cls: 'info', text: 'Повтор ' + r.n + ' · без оценки техники', until: now + 1400 } : r.faultList.length
         ? { cls: r.grade === 'bad' ? 'bad' : 'warn', text: 'Повтор ' + r.n + ': ' + A.meta(r.faultList[0]).cue.toLowerCase(), until: now + 1800 }
         : r.partial ? { cls: 'info', text: 'Повтор ' + r.n + ' · 3D: в доступных проверках замечаний нет', until: now + 1800 }
         : { cls: 'good', text: 'Повтор ' + r.n + ' — ' + (Math.random() < 0.3 ? pick(T.praise).toLowerCase() : 'чисто'), until: now + 1400 };
@@ -1470,6 +1699,7 @@ function recordSet() {
   set.note = countOnly ? 'Повторы посчитаны. Техника не оценивалась.' : partial
     ? '3D: предварительные подсказки по видимым суставам. ' + (set.cue || 'В доступных проверках замечаний нет.') + (AT.family(state.ex) === 'squat' ? ' Контакт пяток с полом не проверен.' : '')
     : setVerdict(set, set.cue);
+  if (A.isBar) { set.bar = true; set.analysisMode = 'bar'; set.note = A.note(); }
   state.sets.push(set); state.view = A.view || state.view; saveSets();
   if (!state.file) { Rec.restart(); attemptT0 = performance.now(); helperAt = 25000; }
   state.flash = { cls: set.c / set.n >= 0.8 ? 'good' : 'info', text: 'Подход ' + state.sets.length + ' · ' + set.note, until: performance.now() + 6000 };
@@ -1638,6 +1868,7 @@ el.sendBox.addEventListener('click', async e => {
 
 /* ---------- live UI ---------- */
 const STATUS_TEXT = {
+  bar_lost: 'Потеряла точку — нажми на блин на экране ещё раз',
   nobody: 'Встань в кадр целиком — от головы до стоп',
   world_lost: 'Недостаточно надёжных 3D-точек. Открой суставы и замри в исходном положении',
   turn: 'Повернись к камере боком',
@@ -1664,6 +1895,8 @@ function missingHint(kp) {
 }
 function cueState() {
   const snap = state.snap, now = performance.now(), A = state.analyzer;
+  if (state.bar && state.bar.picking) return { cls: 'info', text: 'Нажми на блин, стопку грузов или каретку' };
+  if (state.bar && state.on && state.file && state.analyzing) return { cls: 'info', text: 'Слежу за весом · ' + (state.prog || 0) + '%' + (snap && snap.reps ? ' · повторов: ' + snap.reps : '') };
   if (state.on && state.file && !state.analyzing && state.snap) {
     const r = state.videoSummary;
     return {cls:'info',text:r ? 'Видео: '+(isHold()?'секунд':'повторов')+' — '+r.reps+' · подходов — '+r.sets+(r.warning ? '. '+r.warning : '. Проверь результат ниже') : 'Видео обработано. Проверь результат ниже'};
@@ -1729,7 +1962,7 @@ function setupReason(checks,snap) {
 function renderSetup() {
   const panel = $('#setupCheck'), active = state.on && state.preflight && !state.file && !state.recOnly;
   panel.hidden = !active;
-  $('#setupCount').hidden = !active;
+  $('#setupCount').hidden = !active; $('#setupBar').hidden = !active;
   if (!active) return;
   const f = state.frame, checks = checkSetup(f && f.kp, f && f.W, f && f.H, state.snap, state.ex);
   for (const item of panel.querySelectorAll('[data-setup]')) item.dataset.ok = String(checks[item.dataset.setup]);
@@ -1745,10 +1978,11 @@ function renderLive() {
   el.cue.className = 'cue ' + cs.cls;
   if (el.cueText.textContent !== cs.text) el.cueText.textContent = cs.text;
   const snap = state.snap, hold = isHold();
-  const analysisText = state.fallback ? 'Версия 2.5.3 · Только счёт повторов по видимому движению. Техника не оценивается'
+  const analysisText = state.bar ? 'Версия 2.6 · Счёт по движению веса: повторы, амплитуда и темп. Положение тела не оценивается'
+    : state.fallback ? 'Версия 2.6 · Только счёт повторов по видимому движению. Техника не оценивается'
     : snap && snap.analysisMode === '2d'
-    ? 'Версия 2.5.3 · 2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
-    : 'Версия 2.5.3 · 3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
+    ? 'Версия 2.6 · 2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
+    : 'Версия 2.6 · 3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
   const analysisInfo = $('#analysisInfo');
   if (analysisInfo.textContent !== analysisText) analysisInfo.textContent = analysisText;
   el.hud.hidden = !state.on || !!state.recOnly || state.preflight;
@@ -1776,7 +2010,7 @@ el.main.addEventListener('click', () => {
   if (state.preflight) return stopCamera();
   if (state.recOnly) return finishRecording();
   if (A && A.reps.length && !A.setEnded) { A.endSet(); processEvents(A.drain()); return; }
-  if (!state.file && A && !A.reps.length && el.msg.hidden) return showLiveHelp('Подход не распознан', 'Повторы не удалось определить. ' + (state.snap && state.snap.status==='world_lost' ? STATUS_TEXT.world_lost : missingHint(state.frame&&state.frame.kp)));
+  if (!state.file && A && !A.isBar && !A.reps.length && el.msg.hidden) return showLiveHelp('Подход не распознан', 'Повторы не удалось определить. ' + (state.snap && state.snap.status==='world_lost' ? STATUS_TEXT.world_lost : missingHint(state.frame&&state.frame.kp)));
   stopCamera();
 });
 $('#recBtn').addEventListener('click', () => startRecordMode());
@@ -1798,6 +2032,7 @@ function beginPreparedSet(countOnly = false) {
 }
 $('#setupStart').addEventListener('click', () => beginPreparedSet());
 $('#setupCount').addEventListener('click', () => beginPreparedSet(true));
+$('#setupBar').addEventListener('click', () => barPick('live'));
 $('#vidBtn').addEventListener('click', () => pickVideo());
 $('#voiceSel').addEventListener('change', e => { store.set(VOICE_KEY, e.target.value); pickVoice(); });
 $('#voiceTest').addEventListener('click', () => { const was = Voice.on; Voice.on = true; Voice.say('Привет! Отойди подальше, чтобы было видно всё тело. Начинаем подход.', 'test', true); Voice.on = was; });
@@ -1910,6 +2145,7 @@ async function startCamera() {
   if (state.recOnly) Voice.say('Запись пошла. Сделай подход и нажми «Стоп»', 'rec', true);
 }
 function stopStream() {
+  barReset();
   Rec.drop();
   if (state.stream) { for (const t of state.stream.getTracks()) t.stop(); state.stream = null; }
   if (el.vid.srcObject) el.vid.srcObject = null;
@@ -1988,7 +2224,7 @@ function manualSet() {
 /* the live coach could not count: offer the recording, or the set by hand */
 let attemptT0 = 0, helperAt = 25000;
 function helperCheck() {
-  if (!state.on || state.file || state.recOnly || state.preflight || !el.msg.hidden) return;
+  if (!state.on || state.file || state.recOnly || state.preflight || !el.msg.hidden || state.bar) return;
   const A = state.analyzer;
   if (!A || A.reps.length || (isHold() && state.snap && state.snap.phase==='hold')) { attemptT0 = performance.now(); return; }
   if (performance.now() - attemptT0 < helperAt) return;
@@ -2005,6 +2241,7 @@ function helperCheck() {
 function showLiveHelp(title, why, onContinue) {
   const acts = [], secs = Math.round(Rec.secs());
   if (secs >= 4) acts.push({ label: 'Разобрать запись', primary: true, run: () => { hideMsg(); analyzeLive(); } });
+  if (state.on && !state.file) acts.push({ label: 'Тело закрыто — считать по весу', run: () => { hideMsg(); barPick('live'); } });
   acts.push({ label: 'Записать вручную', primary: !acts.length, run: () => { hideMsg(); stopCamera(); manualSet(); } });
   acts.push({ label: onContinue ? 'Продолжить' : 'Выключить камеру', run: () => { hideMsg(); if (onContinue) onContinue(); else stopCamera(); } });
   showMsg(title, why + (secs >= 4 ? '\n\nНа устройстве есть запись последних ' + secs + ' с — могу повторно пройти её кадр за кадром. Или запиши подход вручную.' : '\n\nМожно записать подход вручную или снять на видео и разобрать после.'), acts);
@@ -2019,14 +2256,17 @@ async function startRecordMode() { state.recOnly = true; await startCamera(); if
 async function finishRecording() { state.recOnly = false; renderMain(); return analyzeLive(); }
 /* before a video: how to film it, so the coach can read it */
 function pickVideo(skipGuide) {
+  state.barNext = false;
   if (skipGuide) return $('#fileInput').click();
   showMsg('Как снять, чтобы я разобрала',
     (state.ex==='leg_ext' ? '• Разгибания ног: в кадре нужны таз, колено и стопа одной ноги. Голова и руки для подсчёта не обязательны.\n' : '• Поставь телефон в 2–3 м: рабочие суставы должны оставаться в кадре весь подход.\n') +
     '• Подходит съёмка спереди, сбоку, сзади и под углом, если видны нужные суставы. Не закрывай их оборудованием.\n' +
     '• Телефон неподвижно и ровно, без наклона вбок, на уровне пояса — на полке, скамье или штативе.\n' +
-    '• Свет спереди, не против окна. Одно видео — один подход, до минуты.\n\n' +
+    '• Свет спереди, не против окна. Одно видео — один подход, до минуты.\n' +
+    '• Тренажёр или блины закрывают тело? Выбери «Тело закрыто тренажёром» — посчитаю повторы по движению веса.\n\n' +
     'Видео обрабатывается на устройстве. 3D из одной камеры — предварительная оценка: скрытые суставы и контакт с полом надёжно проверить нельзя. Если точек недостаточно, анализ приостановится.',
     [{ label: 'Выбрать видео', primary: true, run: () => { hideMsg(); $('#fileInput').click(); } },
+     { label: 'Тело закрыто тренажёром', run: () => { hideMsg(); state.barNext = true; $('#fileInput').click(); } },
      { label: 'Снять сейчас', run: () => { hideMsg(); startRecordMode(); } },
      { label: 'Отмена', run: hideMsg }]);
 }
@@ -2036,13 +2276,14 @@ let fileToken = 0;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function seekTo(v, t) { return new Promise(res => { let to = 0; const done = () => { v.removeEventListener('seeked', done); clearTimeout(to); res(); }; to = setTimeout(done, 1500); v.addEventListener('seeked', done); v.currentTime = t; }); }
 function stopFile() {
-  fileToken++;
+  fileToken++; barReset();
   state.analyzing=false; state.videoSummary=null;
   if (state.file) { try { el.vid.pause(); } catch (e) { /* fine */ } el.vid.removeAttribute('src'); el.vid.load(); URL.revokeObjectURL(state.file); state.file = null; }
 }
 $('#fileInput').addEventListener('change', e => {
-  const file = e.target.files[0]; e.target.value = ''; if (!file) return;
-  analyzeVideo(file, 'upload');
+  const file = e.target.files[0]; e.target.value = ''; if (!file) { state.barNext = false; return; }
+  const bar = !!state.barNext; state.barNext = false;
+  analyzeVideo(file, 'upload', bar);
 });
 const metaOf = v => new Promise(res => { if (v.readyState >= 1) return res(true); v.addEventListener('loadedmetadata', () => res(true), { once: true }); v.addEventListener('error', () => res(false), { once: true }); });
 /* a recording from the phone (webm) knows its length only after a seek to the very end */
@@ -2056,7 +2297,7 @@ function fixDuration(v) {
     try { v.currentTime = 1e101; } catch (e) { done(); }
   });
 }
-async function analyzeVideo(blob, from) {
+async function analyzeVideo(blob, from, bar = false) {
   stopStream(); stopFile(); state.recOnly = false; state.fallback = false; hideMsg();
   state.file = URL.createObjectURL(blob); state.usedFile = true;
   const token=++fileToken;
@@ -2068,6 +2309,7 @@ async function analyzeVideo(blob, from) {
   if (token!==fileToken) return;
   if (!ok || !v.videoWidth || !isFinite(dur) || dur <= 0) { stopFile(); showCameraMode(false); return showMsg('Видео не открылось', 'Попробуй другой файл: MP4 или MOV, снятый на телефон.', [{ label: 'Понятно', primary: true, run: hideMsg }]); }
   setAspect(v.videoWidth, v.videoHeight); newAnalyzer(); showCameraMode(true);
+  if (bar) return barPick('file');   // the body is hidden anyway: no pose model, the weight is followed
   const modelReady=await loadModelWithUi();
   if (token!==fileToken) return;
   if (!modelReady) return stopCamera();
@@ -2109,13 +2351,150 @@ async function analyzeVideo(blob, from) {
   try { v.pause(); } catch (e) { /* fine */ }
   videoVerdict(st, found, shadow, from);
 }
+/* ---------- count by the weight: the plates or the machine hide the body ----------
+   The person taps the plate, weight stack or carriage once; AT.BarTracker follows it on a 160-px grey copy of each frame and
+   AT.BarAnalyzer counts the reps from its path. Works on a chosen video and live; the body position is not assessed. */
+const BAR_W = 160, barCv = document.createElement('canvas'), barCtx = barCv.getContext('2d', { willReadFrequently: true });
+function barGray(v) {
+  const w = v.videoWidth, h = v.videoHeight; if (!w || !h) return null;
+  const W = BAR_W, Hh = Math.max(2, Math.round(h * W / w));
+  if (barCv.width !== W || barCv.height !== Hh) { barCv.width = W; barCv.height = Hh; }
+  barCtx.drawImage(v, 0, 0, W, Hh);
+  const d = barCtx.getImageData(0, 0, W, Hh).data, g = new Float32Array(W * Hh);
+  for (let i = 0, j = 0; j < g.length; i += 4, j++) g[j] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+  return { g, W, H: Hh };
+}
+function barReset() {
+  if (state.bar && state.bar.live) Rec.drop();
+  state.bar = null; el.stage.classList.remove('picking'); $('#barTip').hidden = true;
+}
+function barPick(mode) {
+  if (mode === 'file' ? !state.file : !state.on || state.file) return;
+  hideMsg();
+  const keep = state.bar && state.bar.live ? state.bar : null;   // live: a new point for the same set
+  state.bar = { picking: true, mode, pts: [], keep };
+  el.stage.classList.add('picking');
+  $('#barTipText').textContent = 'Нажми на то, что ходит вместе с весом: блин, стопку грузов или каретку. Лучше на край блина или надпись.';
+  $('#barTip').hidden = false;
+  if (mode === 'file') { state.analyzing = false; const v = el.vid; seekTo(v, Math.min(0.2, isFinite(v.duration) ? v.duration / 2 : 0)); }
+  Voice.say('Нажми на блин или каретку на экране', 'barpick', true);
+  renderLive(); renderMain();
+}
+$('#barTipCancel').addEventListener('click', () => {
+  const B = state.bar; el.stage.classList.remove('picking'); $('#barTip').hidden = true;
+  state.bar = B && B.keep ? B.keep : null;
+  if (!state.bar && state.file && !state.analyzing) showMsg('Как посчитать подход', 'Можно указать точку ещё раз или записать подход вручную.', [{ label: 'Указать точку', primary: true, run: () => barPick('file') }, { label: 'Записать вручную', run: () => { hideMsg(); manualSet(); } }]);
+  renderLive();
+});
+el.stage.addEventListener('pointerdown', e => {
+  const B = state.bar;
+  if (!B || !(B.picking || B.live) || e.target.closest('#barTip, .stage-msg, button')) return;
+  const v = el.vid, r = el.stage.getBoundingClientRect(), W = v.videoWidth, Hh = v.videoHeight; if (!W || !Hh) return;
+  const s = Math.min(r.width / W, r.height / Hh), ox = (r.width - W * s) / 2, oy = (r.height - Hh * s) / 2;
+  let x = (e.clientX - r.left - ox) / s; const y = (e.clientY - r.top - oy) / s;
+  if (!state.file && state.facing === 'user') x = W - x;
+  if (x < 0 || y < 0 || x > W || y > Hh) return;
+  e.preventDefault();
+  el.stage.classList.remove('picking'); $('#barTip').hidden = true;
+  if (B.live) return barAnchor(x / W, y / Hh);   // live: tapping again moves the point
+  B.picking = false;
+  if (B.mode === 'file') barRunFile(x / W, y / Hh); else barStartLive(x / W, y / Hh);
+});
+const barFlat = () => showMsg('Здесь не за что зацепиться', 'Это место слишком однотонное. Нажми на край блина, надпись или болт — что-то с рисунком.', [{ label: 'Выбрать снова', primary: true, run: () => barPick(state.file ? 'file' : 'live') }, { label: 'Отмена', run: hideMsg }]);
+async function barRunFile(nx, ny) {
+  const v = el.vid, token = fileToken, dur = isFinite(v.duration) ? v.duration : 0;
+  if (!dur) return;
+  const tr = new AT.BarTracker(), A = new AT.BarAnalyzer(state.ex, state.level), setStart = state.sets.length;
+  state.fallback = true; state.analyzer = A; state.snap = null; state.flash = null; state.frame = null;
+  state.bar = { mode: 'file', pts: [], tr, k: 1 };
+  state.analyzing = true; state.prog = 0; renderLive(); renderMain();
+  let n = 0, lost = 0, flat = false;
+  const live = () => token === fileToken && state.bar && state.bar.tr === tr;
+  const take = t => {   // one frame of the video at time t
+    const f = barGray(v); if (!f) return;
+    let p;
+    if (!n) { p = tr.start(f.g, f.W, f.H, nx * f.W, ny * f.H); if (p.contrast < 4) { flat = true; return; } }
+    else p = tr.update(f.g);
+    n++; if (!p.ok) lost++;
+    const B = state.bar; B.k = v.videoWidth / f.W; B.pts.push({ x: p.x * B.k, y: p.y * B.k, ok: p.ok }); if (B.pts.length > 45) B.pts.shift();
+    handleSnap(A.update(p, t, f.W));
+    state.prog = Math.min(99, Math.round(t / dur * 100));
+  };
+  await seekTo(v, 0); if (!live()) return;
+  take(0);
+  // The video plays once and every shown frame is read (fast, and how Safari is happiest); seeking frame by frame otherwise.
+  let played = false;
+  if (!flat && 'requestVideoFrameCallback' in v) {
+    played = await new Promise(res => {
+      let last = 0;
+      const stop = ok => { v.removeEventListener('ended', ended); try { v.pause(); } catch (e) { /* fine */ } res(ok); };
+      const ended = () => stop(true);
+      const onFrame = (now, md) => {
+        if (!live() || flat) return stop(true);
+        const t = md.mediaTime; if (t > last) { take(t); last = t; }
+        if (v.ended || t >= dur - 0.04) return stop(true);
+        v.requestVideoFrameCallback(onFrame);
+      };
+      v.addEventListener('ended', ended);
+      v.requestVideoFrameCallback(onFrame);
+      v.playbackRate = 1;
+      const pr = v.play(); if (pr && pr.catch) pr.catch(() => stop(false));
+    });
+  }
+  if (!played && !flat) for (let t = 1 / 15; live() && t <= dur && !flat; t += 1 / 15) {
+    await seekTo(v, Math.min(t, Math.max(0, dur - 0.01)));
+    if (!live()) return;
+    take(t);
+    await sleep(0);
+  }
+  if (flat) { state.analyzing = false; state.bar = null; return barFlat(); }
+  if (token !== fileToken) return;
+  state.analyzing = false;
+  A.endSet(); processEvents(A.drain());
+  const sets = state.sets.slice(setStart), found = sets.reduce((a, x) => a + x.r, 0);
+  state.videoSummary = { reps: found, sets: sets.length, warning: found ? 'Посчитано по движению веса, положение тела не оценивалось' : 'Повторы не найдены' };
+  const redo = { label: 'Указать другую точку', run: () => { if (state.sets.length > setStart) { state.sets.splice(setStart); saveSets(); renderSets(); } barPick('file'); } };
+  const byHand = { label: 'Записать вручную', run: () => { hideMsg(); manualSet(); } };
+  if (found) { showMsg('Посчитала по движению веса', A.note() + (lost > n * 0.2 ? ' Точка иногда терялась — проверь число повторов.' : ''), [{ label: 'Готово', primary: true, run: hideMsg }, redo, byHand]); Voice.say('Посчитала по движению веса: ' + found + ' ' + plural(found, 'повтор', 'повтора', 'повторов'), 'verdict', true); return; }
+  const lostIt = lost > n * 0.4;
+  showMsg(lostIt ? 'Не смогла проследить за точкой' : 'Повторов не нашла', lostIt ? 'Точка пропадала из кадра или похожа на соседние места. Нажми на край блина, надпись или болт — то, что всё время видно.' : 'Точка почти не двигалась. Выбери то, что ходит вместе с весом на всю амплитуду: блин, стопку грузов или каретку.', [Object.assign({}, redo, { primary: true }), byHand]);
+}
+function barStartLive(nx, ny) {
+  const v = el.vid, f = barGray(v); if (!f) return;
+  const tr = new AT.BarTracker(), p = tr.start(f.g, f.W, f.H, nx * f.W, ny * f.H);
+  if (p.contrast < 4) { state.bar = null; return barFlat(); }
+  const fresh = !!state.preflight || !Rec.mr;
+  if (state.analyzer && state.analyzer.reps.length && !state.analyzer.setEnded && !state.analyzer.isBar) { state.analyzer.endSet(); processEvents(state.analyzer.drain()); }
+  state.preflight = false; state.preflightReady = false; state.fallback = true;
+  state.analyzer = new AT.BarAnalyzer(state.ex, state.level); state.snap = null; state.flash = null; state.frame = null;
+  state.bar = { mode: 'live', live: true, tr, pts: [], k: v.videoWidth / f.W };
+  if (fresh) Rec.start(state.stream);
+  lastStatus = ''; renderMain(); renderLive();
+  Voice.say('Слежу за весом. Начинай подход', 'bar', true);
+}
+function barAnchor(nx, ny) {   // live: the point was lost or a better one is chosen — same set, new point
+  const B = state.bar, f = barGray(el.vid); if (!B || !f) return;
+  const p = B.tr.start(f.g, f.W, f.H, nx * f.W, ny * f.H);
+  if (p.contrast < 4) return barFlat();
+  B.pts = []; state.analyzer.reanchor();
+  Voice.say('Новая точка', 'bar', true);
+}
+function barInferLive() {
+  const v = el.vid, B = state.bar; if (v.readyState < 2 || !v.videoWidth) return;
+  const f = barGray(v); if (!f) return;
+  const t = performance.now() / 1000, p = B.tr.update(f.g);
+  B.k = v.videoWidth / f.W; B.pts.push({ x: p.x * B.k, y: p.y * B.k, ok: p.ok }); if (B.pts.length > 45) B.pts.shift();
+  handleSnap(state.analyzer.update(p, t, f.W));
+}
 function videoVerdict(st, found, shadow, from) {
   const n = Math.max(1, st.n), share = k => (st[k] || 0) / n, turn = share('turn') + share('turn_front'), nobody = share('nobody'), lost3d = share('world_lost');
   const shadowGroups = st.shadowGroups.filter(g=>g.length), shadowTotal = shadowGroups.reduce((sum,g)=>sum+g.length,0);
   const name = info().name, miss = Object.keys(st.miss).sort((a, b) => st.miss[b] - st.miss[a])[0];
-  const again = [{ label: from === 'rec' ? 'Снять ещё раз' : 'Снять на камеру', primary: true, run: () => { hideMsg(); startRecordMode(); } },
+  const byWeight = { label: 'Посчитать по движению веса', primary: weighted(), run: () => { hideMsg(); barPick('file'); } };
+  const again = [{ label: from === 'rec' ? 'Снять ещё раз' : 'Снять на камеру', primary: !weighted(), run: () => { hideMsg(); startRecordMode(); } },
     { label: 'Другое видео', run: () => { hideMsg(); pickVideo(); } }, { label: 'Записать вручную', run: () => { hideMsg(); manualSet(); } }];
-  const tell = (title, text, acts, say) => { state.flash = null; showMsg(title, text, acts); Voice.say(say || title, 'verdict', true); };
+  again.splice(weighted() ? 0 : 1, 0, byWeight);   // a machine or plates hide the body: counting by the weight comes first
+  const tell = (title, text, acts, say) => { state.flash = null; showMsg(title, text + (acts && acts.includes(byWeight) ? '\n\nТренажёр или блины закрывают тело? Нажми «Посчитать по движению веса» и укажи блин или каретку.' : ''), acts); Voice.say(say || title, 'verdict', true); };
   if (!found && st.errors>=3 && st.errors>st.n) {
     state.videoSummary.warning = 'Техническая ошибка обработки. Повторы не удалось определить';
     return tell('Не удалось обработать видео',
@@ -2132,7 +2511,7 @@ function videoVerdict(st, found, shadow, from) {
     for (const group of shadowGroups) { shadow.reps = group; recordSet(); }
     state.videoSummary = {reps:shadowTotal,sets:shadowGroups.length,warning:'Техника не оценивалась. Проверь число повторов'};
     return tell('Повторы посчитала, технику — нет', 'По видимым движениям нашла ' + shadowTotal + ' повторов. Проверь число и при необходимости исправь его в подходе. Для оценки техники данных недостаточно: суставы могли быть закрыты тренажёром или 3D-точки были неустойчивы.',
-      [{ label: 'Проверить повторы', primary: true, run: hideMsg }, again[0]], 'Повторы посчитаны без оценки техники. Проверь число');
+      [{ label: 'Проверить повторы', primary: true, run: hideMsg }, again.find(a => a !== byWeight)], 'Повторы посчитаны без оценки техники. Проверь число');
   }
   if (lost3d > .35) return tell('Недостаточно надёжных 3D-точек',
     'Не удалось уверенно восстановить суставы. Освободи обзор, добавь свет и поставь телефон ровно. Начни запись с неподвижного исходного положения. Скрытые части тела нельзя надёжно оценить по одной камере.', again);

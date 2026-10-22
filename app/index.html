@@ -738,7 +738,7 @@ const CAT = {};
 for (const [k, n, g, c, i, cue, p] of CAT_DATA.ex) CAT[k] = {k, n, g: g || 'legs', cam: !!c, inc: i, cue: cue || '', p: p || ''};
 const SYN = CAT_DATA.syn || {};
 
-const APP_VERSION = '2.5.3 · тест';
+const APP_VERSION = '2.6 · тест';
 const KEY = 'ai-trainer-app-1';
 const INBOX = 'aitrainer.inbox';
 const STEP = {bb_lower: 5, bb_upper: 2.5, machine: 2.5, db: 1, bw: 0, time: 0};
@@ -1340,15 +1340,22 @@ const NOISE = /^\W*(назад|готово|сохранить|начать|ст
 const W_ROW = /^\s*(вес|weight)(?![а-яёa-z])[\s:.]*(.*)$/i, R_ROW = /^\s*(повт\S*|повтор\S*|reps?|раз)(?![а-яёa-z])[\s:.]*(.*)$/i;
 function coachNote(text) {
   const t = String(text).replace(/^\s*\d{1,2}[.)]\s*/, '').replace(/^[^\p{L}\p{N}+]+/u, '').trim().toLowerCase();
-  return /^(?:рекомендаци\S*|комментари\S*|совет\S*|заметк\S*|примечани\S*|подсказк\S*)(?:\s|:|$)/u.test(t)
+  // an icon in front of the advice is often read as a letter: «▲ Увеличиваем вес» → «А Увеличиваем вес»
+  return coachText(t) || coachText(t.replace(/^[\p{L}\p{N}]{1,2}\s+(?=\p{L}{3})/u, ''));
+}
+function coachText(t) {
+  return /^(?:следим|держим|делаем|не\s+забыва\S*|важно)(?:\s|:|$)/u.test(t) || /^[а-яё]{3,}(?:аем|яем|уем|юем)(?:\s|$)/u.test(t)
+    || /^(?:рекомендаци\S*|комментари\S*|совет\S*|заметк\S*|примечани\S*|подсказк\S*)(?:\s|:|$)/u.test(t)
     || /^(?:увеличива\S*|увеличи\S*|уменьша\S*|уменьши\S*|оставля\S*|остав\S*|закрепля\S*|снижа\S*|сниз\S*|повыша\S*|повыси\S*|добавля\S*|добав\S*|сохраня\S*|сохрани\S*|прибавля\S*|прибав\S*)(?:$|\s+(?:(?:рабоч\S*|текущ\S*|прежн\S*|немного|постепенно|все|всё|по|на|к)\s+){0,3}(?:вес\S*|нагруз\S*|\d))/u.test(t)
     || /^(?:рабоч\S*\s+)?вес\S*\s+(?:увелич\S*|повы\S*|уменьш\S*|сниж\S*|остав\S*|сохра\S*|прибав\S*)/u.test(t)
     || /^(?:в\s+следующ\S*\s+(?:раз|тренировк\S*|подход\S*)|на\s+следующ\S*\s+тренировк\S*|если\s+(?:легко|тяжело|получ\S*)|нужно\s+видео|нужен\s+видео\S*|сними\S*\s+видео|пришли\S*\s+видео)/u.test(t)
     || /^\+\s*\d+(?:[.,]\d+)?\s*(?:кг|kg)(?:\s|$)/u.test(t);
 }
 function importOrdinal(line) {
-  const m = String(line).match(/^\s*(?:№\s*)?(\d{1,2})(?:[.)]\s*|\s+)(?=[\p{L}])/u);
-  return m ? +m[1] : null;
+  const s = String(line).replace(/^\s*([\u2460-\u2473])\s*/u, (m, c) => (c.charCodeAt(0) - 0x245F) + ' ');
+  const m = s.match(/^\s*(?:№\s*)?(?:[([]\s*(\d{1,2})\s*[)\]]\s*|(\d{1,2})(?:[.)]\s*|\s+))(?=[\p{L}])/u);
+  if (m) return +(m[1] || m[2]);
+  return null;
 }
 function importLines(lines) {
   const out = [];
@@ -1475,12 +1482,17 @@ function parseDose(text) {
   }
   return null;
 }
+const LAT_LOOK = /^[ABCEHKMOPTXYacekmopxyr]+$/;
 function fixOcr(line) {
+  if ((line.match(/[А-Яа-яЁё]/g) || []).length >= 3) line = line.split(/(\s+)/).map(w => LAT_LOOK.test(w) ? toCyr(w) : w).join('');
+  line = line.replace(/(\d)\s*[«»"'’]?\s*[кkK][кkK]?[гrГ](?![А-Яа-яЁёA-Za-z])/g, '$1 кг').replace(/(\d)\s*[сcC][еeE][кkK](?![А-Яа-яЁёA-Za-z])/g, '$1 сек');
   return line.replace(new RegExp(`(?<![А-Яа-яA-Za-z])[зЗ](?=\\s*${X}\\s*\\d)`, 'g'), '3').replace(new RegExp(`(?<=\\d${X})\\s*[зЗ](?=\\d|\\b)`, 'g'), '3')
     .replace(/(?<=\d)[оОoO](?=\d|\b)/g, '0').replace(/(?<![А-Яа-яA-Za-z])[оОoO](?=\d)/g, '0');
 }
 function cleanName(text) {
-  let t = text.replace(/^\s*(\d{1,2}[.)]|[-–—•·*])\s*/, '').replace(/^\d{1,2}\s+(?=[А-ЯЁA-Z])/, '');
+  let t = text.replace(/^[^А-Яа-яЁёA-Za-z0-9(]+/, '').replace(/^[([]\s*\d{1,2}\s*[)\]]\s*/, '').replace(/^[А-Яа-яЁёA-Za-z]\s+(?=[А-ЯЁA-Z][а-яё])/, '');
+  t = t.replace(/(?:\s+[^\sА-Яа-яЁёA-Za-z0-9()]{1,2})+\s*$/, '');      // icons at the end of a card: «@ >», «›»
+  t = t.replace(/^\s*(\d{1,2}[.)]|[-–—•·*])\s*/, '').replace(/^\d{1,2}\s+(?=[А-ЯЁA-Z])/, '');
   if (/\s{2,}\S/.test(t) && t.split('  ')[0].length > 3) t = t.replace(/\s{2,}.*$/, '');
   return t.replace(/[\s,;:–—-]+$/, '').replace(/\s+/g, ' ').trim().replace(/^[ .:]+|[ .:]+$/g, '');
 }
@@ -1542,12 +1554,44 @@ function importItem(name, d, src, wHint) {
 function parseImport(lines, report = {}) {
   lines = importLines(lines);
   const cardMode = lines.filter(x => x !== PHOTO_BREAK && (W_ROW.test(x || '') || R_ROW.test(x || ''))).length >= 2;
-  return cardMode ? parseCards(lines, report) : parseList(lines, report);
+  return tidyImport(cardMode ? parseCards(lines, report) : parseList(lines, report));
+}
+function tidyImport(days) {
+  const all = days.flatMap(d => d.items);
+  const reps = all.filter(i => !i.sec && i.hi <= 40).map(i => i.hi).sort((a, b) => a - b), mid = reps.length ? reps[reps.length >> 1] : 12;
+  for (const it of all) {
+    // «Отведение бедер в тренажере (с» — the rest of the name went off the screen: take it from the same exercise elsewhere
+    if ((it.name.match(/\(/g) || []).length > (it.name.match(/\)/g) || []).length) {
+      const head = norm(it.name), full = all.find(o => o !== it && norm(o.name).startsWith(head) && o.name.length > it.name.length && !/\([^)]*$/.test(o.name));
+      if (full) { it.name = full.name; if (full.base && !it.base) { it.base = full.base; it.cam = full.cam; it.inc = full.inc; } it.st = full.st; }
+      else if (/\(\s*[^)]{0,3}$/.test(it.name)) it.name = it.name.replace(/\s*\(\s*[^)]{0,3}$/, '');
+    }
+    // 172 repetitions is a misread «12»: drop one digit (the value closest to the rest of the program wins) and ask to check
+    if (!it.sec && it.hi > 40) {
+      const fix = v => { const t = String(v), c = []; for (let k = 0; k < t.length; k++) { const n = +(t.slice(0, k) + t.slice(k + 1)); if (n >= 3 && n <= 30) c.push(n); } return c.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid))[0]; };
+      const was = it.lo === it.hi ? `${it.lo}` : `${it.lo}–${it.hi}`, lo = fix(it.lo) || mid, hi = it.hi === it.lo ? lo : (fix(it.hi) || lo);
+      Object.assign(it, {lo: Math.min(lo, hi), hi: Math.max(lo, hi), _needsDose: true, _warn: `повторы прочитались как ${was}`});
+    }
+    if (it.w > 300) Object.assign(it, {_warn: (it._warn ? it._warn + '; ' : '') + `вес прочитался как ${fmt(it.w)} кг`, w: 0, _needsDose: true});
+  }
+  return days;
 }
 const SS_MARK = /^\s*(?:(\d{1,2})([абвгabcd])|([абвгabcd])(\d))(?=[\s.):\-—–]|$)[\s.):\-—–]*/i;
 const SS_HEAD = /^\s*(?:супер|три|гигант|super|tri|giant)\s*-?\s*сет[а-яё]*(?![а-яёa-z])[\s:.\-—–\dх×x]*(?:раз|круг[а-яё]*)?\s*$|^\s*(?:super|tri|giant)\s*-?\s*sets?\s*[\s:.\-—–\d]*$/i;
+/* the next line continues a name: «(…», «…)», an open bracket or a preposition at the end, or lower case that is not an exercise itself */
+const wrapsName = (name, next) => /^\(/.test(next) || (next.match(/\)/g) || []).length > (next.match(/\(/g) || []).length
+  || (name.match(/\(/g) || []).length > (name.match(/\)/g) || []).length || /(\s(с|со|на|в|во|для|и|к|от|по|из|под|над)|[-–(])$/i.test(name)
+  || (/^[а-яё]/.test(next) && !matchEx(next, .8)[0]);
 function parseList(lines, report = {}) {
   const tracker = importTracker(report), days = tracker.days; let cur = null, pending = null, open = null, ordinal = null;
+  const joinPending = (name, line) => {
+    if (norm(pending.name).endsWith(norm(name))) return;               // the same card again on the next screenshot
+    const j = importItem(pending.name + ' ' + name, null, pending.raw + ' / ' + line, 0);
+    Object.assign(pending, {name: j.name, base: j.base, cam: j.cam, st: j.st, inc: j.inc, sec: j.sec, raw: j.raw});
+    const items = cur.items, first = it => (it._photos || [0])[0];
+    const dup = items.find(o => o !== pending && norm(o.name) === norm(pending.name) && items.indexOf(o) >= items.length - 6 && first(o) < first(pending));
+    if (dup) { items.splice(items.indexOf(pending), 1); dup._photos = [...new Set([...(dup._photos || []), ...(pending._photos || [])])]; pending = dup; }
+  };
   const add = it => { const result = tracker.add(it, ordinal); cur = tracker.current; ordinal = null; return result; };
   for (const raw of lines) {
     if (raw === PHOTO_BREAK) { tracker.nextPhoto(); ordinal = null; continue; }
@@ -1579,7 +1623,9 @@ function parseList(lines, report = {}) {
       name = name.replace(/(^|\s)(подход\S*|повтор\S*|раз|reps?|sets?|кг|kg)(?=\s|$)/gi, ' ').replace(/^[\s,.;:–—-]+|[\s,.;:–—-]+$/g, '').replace(/\s+/g, ' ');
       const wm = line.slice(d.span[1]).match(/(\d+(?:[.,]\d+)?)\s*(кг|kg)/i) || line.slice(0, d.span[0]).match(/(\d+(?:[.,]\d+)?)\s*(кг|kg)/i);
       if (wm) name = name.replace(wm[0], '').trim();
-      if (norm(name).length >= 3 && /[a-zа-я]{3,}/.test(norm(name))) { tag(add(importItem(name, d, line, wm ? parseNum(wm[1]) : 0), d)); pending = null; continue; }
+      const cont = pending && cur && cur.items.includes(pending) && /^[а-яёa-z(]/.test(name) && wrapsName(pending.name, name);
+      if (cont) joinPending(name, line);
+      else if (norm(name).length >= 3 && /[a-zа-я]{3,}/.test(norm(name))) { tag(add(importItem(name, d, line, wm ? parseNum(wm[1]) : 0), d)); pending = null; continue; }
       if (pending) {
         pending._photos = [...new Set([...(pending._photos || []), tracker.photo])];
         Object.assign(pending, {s: d.s, lo: d.lo, hi: d.hi}); if (d.sec) pending.sec = true; if (d.rest) pending.rest = d.rest;
@@ -1592,6 +1638,7 @@ function parseList(lines, report = {}) {
     }
     if (NOISE.test(line) || norm(line).length < 4 || !/[a-zа-яё]{3,}/.test(line.toLowerCase())) continue;
     const name = cleanName(line);
+    if (pending && cur && cur.items.includes(pending) && pending._needsDose && wrapsName(pending.name, name)) { joinPending(name, line); continue; }
     if (matchEx(name)[0] || name.length >= 6) { pending = tag(add(importItem(name, null, line, 0))); pending._needsDose = true; }
   }
   return days.filter(x => x.items.length);
@@ -2212,11 +2259,40 @@ function snapImport() {
   IMP.undo.push(JSON.stringify({days: IMP.days, notes: IMP.notes, warnings: IMP.warnings, expectedDays: IMP.expectedDays, countConfirmed: IMP.countConfirmed}));
   if (IMP.undo.length > 20) IMP.undo.shift();
 }
+/* fewer days found than the person says: cut where one screenshot ends and an unrelated one begins (never inside a found day
+   boundary), sizes as even as possible; a cut inside a screenshot only when there are not enough screenshot changes */
+function splitImportByPhotos(n) {
+  const items = IMP.days.flatMap(d => d.items), N = items.length, k0 = IMP.days.filter(d => d.items.length).length;
+  if (IMP.mode !== 'photo' || k0 >= n || N < n) return false;
+  const starts = new Set(); let acc = 0; for (const d of IMP.days) { if (d.items.length) starts.add(acc); acc += d.items.length; }
+  const ph = it => (it._photos || [])[0];
+  const border = i => ph(items[i]) != null && ph(items[i]) !== ph(items[i - 1]) && !(items[i - 1]._photos || []).includes(ph(items[i]));
+  const cand = [...Array(N).keys()].filter(i => i > 0 && !starts.has(i) && border(i));
+  if (cand.length < n - k0) return false;
+  const cost = i => starts.has(i) || border(i) ? 0 : 1e6, avg = N / n, INF = 1e12;
+  const best = Array.from({length: n + 1}, () => new Array(N + 1).fill(INF)), from = Array.from({length: n + 1}, () => new Array(N + 1).fill(0));
+  best[0][0] = 0;
+  for (let k = 1; k <= n; k++) for (let j = k; j <= N; j++) for (let i = k - 1; i < j; i++) {
+    if (best[k - 1][i] >= INF || [...starts].some(s => s > i && s < j)) continue;   // a found boundary stays a boundary
+    const v = best[k - 1][i] + (j - i - avg) ** 2 + (i > 0 ? cost(i) : 0);
+    if (v < best[k][j]) { best[k][j] = v; from[k][j] = i; }
+  }
+  if (best[n][N] >= 1e6) return false;
+  const cuts = []; for (let k = n, j = N; k > 0; k--) { cuts.unshift(from[k][j]); j = from[k][j]; }
+  const old = new Map(); acc = 0; for (const d of IMP.days) { if (d.items.length) old.set(acc, d); acc += d.items.length; }
+  IMP.days = cuts.map((c, k) => {
+    const part = items.slice(c, k + 1 < cuts.length ? cuts[k + 1] : N), was = old.get(c);
+    return was ? {...was, items: part} : {id: nid('r'), title: `День ${k + 1}`, items: part, _reason: `Граница по смене скриншотов (фото ${ph(part[0])}) — проверь`};
+  });
+  IMP.days.forEach((d, index) => { if (/^День \d+( · |$)/.test(d.title)) d.title = d.title.replace(/^День \d+/, `День ${index + 1}`); });
+  return true;
+}
 function setImportDayCount(value) {
   IMP.expectedDays = value;
   IMP.countConfirmed = null;
   if (value !== 'auto') {
     IMP.days = IMP.days.filter(d => d.items.length);
+    splitImportByPhotos(+value);
     while (IMP.days.length < +value) IMP.days.push({id: nid('r'), title: `День ${IMP.days.length + 1}`, items: [], _reason: 'День добавлен вручную'});
   }
 }
@@ -2332,7 +2408,8 @@ function renderImport() {
   const flagged = IMP.days.reduce((a, d) => a + d.items.filter(i => i.st !== 'ok').length, 0);
   const dayOpts = P.map(d => `<option value="${d.id}" ${IMP.toDay === d.id ? 'selected' : ''}>${esc(d.title)}</option>`).join('');
   const destOpt = (k, title, sub) => `<button class="opt" role="radio" aria-checked="${IMP.dest === k}" data-act="imp-dest" data-v="${k}"><span class="rd"></span><span class="grow"><b>${title}</b><span>${sub}</span></span></button>`;
-  const sourceInfo = it => {
+  const sourceInfo = it => (it._warn ? `<div class="mt" style="color:var(--warn)">⚠︎ ${esc(it._warn)} — нажми и поправь</div>` : '') + sourceInfo0(it);
+  const sourceInfo0 = it => {
     const photo = IMP.mode === 'photo';
     const source = [it._number ? `№ ${it._number} ${photo ? 'на скриншоте' : 'в исходном тексте'}` : '', photo && it._photos ? 'Фото ' + it._photos.join(', ') : ''].filter(Boolean).join(' · ');
     return `${source ? `<div class="mt">${esc(source)}</div>` : ''}${it.coachNotes && it.coachNotes.length ? `<div class="mt">Заметка: ${it.coachNotes.map(esc).join(' · ')}</div>` : ''}`;
@@ -2341,7 +2418,7 @@ function renderImport() {
     <section class="rday" data-review-day="${d.id}"><div class="rday-h"><input value="${esc(d.title)}" data-imp-title="${di}" aria-label="Название дня ${di + 1}"><span class="badge">${d.items.length} упр.</span></div>
     <div class="review-day-tools"><span class="hint">${esc(d._reason || 'День из программы')}</span>${di > 0 ? `<button class="btn sm" data-act="imp-merge" data-v="${di}">Объединить с предыдущим</button>` : ''}${!d.items.length ? `<button class="btn sm danger" data-act="imp-day-delete" data-v="${di}">Удалить пустой день</button>` : ''}</div>
     ${d.items.map((it, ii) => `<div class="rrow"><span class="st ${it.st}" aria-label="${it.st === 'ok' ? 'из справочника' : it.st === 'check' ? 'проверь' : 'своё'}">${it.st === 'ok' ? '✓' : it.st === 'check' ? '?' : '+'}</span>
-      <button class="grow" style="text-align:left" data-act="imp-fix" data-v="${di}:${ii}" aria-label="Изменить ${esc(it.name)}"><div class="nm">${esc(it.name)}</div><div class="mt">${dose(it)}${it.w ? ' · ' + fmt(it.w) + ' кг' : ''}${it._needsDose ? '<span class="badge warn">проверь повторы</span>' : it.st === 'check' ? '<span class="badge warn">проверь название</span>' : it.st === 'new' ? '<span class="badge new">своё</span>' : ''}</div>${sourceInfo(it)}${coachNote(it.name) ? '<div class="hint" style="color:var(--warn)">Похоже на рекомендацию — можно убрать в заметки</div>' : ''}</button>
+      <button class="grow" style="text-align:left" data-act="imp-fix" data-v="${di}:${ii}" aria-label="Изменить ${esc(it.name)}"><div class="nm">${esc(it.name)}</div><div class="mt">${dose(it)}${it.w ? ' · ' + fmt(it.w) + ' кг' : ''}${it._warn ? '<span class="badge warn">проверь цифры</span>' : it._needsDose ? '<span class="badge warn">проверь повторы</span>' : it.st === 'check' ? '<span class="badge warn">проверь название</span>' : it.st === 'new' ? '<span class="badge new">своё</span>' : ''}</div>${sourceInfo(it)}${coachNote(it.name) ? '<div class="hint" style="color:var(--warn)">Похоже на рекомендацию — можно убрать в заметки</div>' : ''}</button>
       <button class="icon-btn" data-act="imp-row-menu" data-v="${di}:${ii}" aria-label="Действия: ${esc(it.name)}">${DOTS}</button>
       <div class="review-row-tools">${ii > 0 ? `<button data-act="imp-split" data-v="${di}:${ii}">Новый день отсюда</button>` : ''}<button data-act="imp-move-menu" data-v="${di}:${ii}">Перенести в другой день</button></div></div>`).join('') || '<div class="empty">Пока нет упражнений. Перенеси их из другого дня или добавь вручную.</div>'}
     <div class="review-day-tools"><button class="btn sm" data-act="imp-add-item" data-v="${di}">${I.plus}Добавить упражнение</button></div>
@@ -2349,7 +2426,7 @@ function renderImport() {
   b.innerHTML = `
     <div class="card pad"><b>${IMP.existing ? 'Редактирование программы' : 'Результат распознавания'}: ${importDayCount()} ${plural(importDayCount(), 'день', 'дня', 'дней')}, ${n} ${plural(n, 'упражнение', 'упражнения', 'упражнений')}</b><div class="hint">${flagged ? `${flagged} ${plural(flagged, 'название требует', 'названия требуют', 'названий требуют')} проверки. ` : ''}Правки сохраняются в черновик на этом устройстве. Программа изменится после сохранения.</div></div>
     <section class="import-count card pad"><div class="field"><label for="imp-review-count">На сколько дней нужно разделить?</label><select class="input" id="imp-review-count">${dayOptions(IMP.expectedDays)}</select></div>
-      <span class="hint">Фото не равны дням. Если границ недостаточно, добавлю пустые дни для ручного переноса, а не разделю упражнения поровну.</span>
+      <span class="hint">Фото не равны дням. Если заголовков и нумерации мало, разделю по смене скриншотов — проверь границы; если и этого не хватит, добавлю пустые дни для ручного переноса, а не разделю упражнения поровну.</span>
       ${IMP.expectedDays === 'auto' ? `<button class="btn" data-act="imp-confirm-days" ${n && nd === importDayCount() ? '' : 'disabled'}>${IMP.countConfirmed === importDayCount() ? '✓ Подтверждено' : 'Верно'}: ${importDayCount()} ${plural(importDayCount(), 'день', 'дня', 'дней')}</button>` : ''}
       <div class="row" style="flex-wrap:wrap"><button class="btn sm" data-act="imp-day-add">${I.plus}Добавить день</button><button class="btn sm" data-act="imp-undo" ${IMP.undo.length ? '' : 'disabled'}>Отменить правку</button></div></section>
     ${IMP.warnings.length ? `<div class="note warn">${I.info}<span>${IMP.warnings.map(esc).join('<br>')}</span></div>` : ''}
@@ -2449,7 +2526,7 @@ function importSave() {
   const P = S.program;
   const owners = new Set(IMP.days.flatMap(d => d.items.map(it => it.id)));
   const orphanNotes = IMP.notes.filter(note => !owners.has(note.ownerId)).map(note => note.text);
-  const days = IMP.days.filter(d => d.items.length).map(d => ({id: IMP.existing ? d.id : nid('d'), title: d.title.trim() || 'День', ...(d.coachNotes ? {coachNotes: d.coachNotes} : {}), items: d.items.map(({st, raw, _number, _photos, _needsDose, ...it}) => ({...it, id: IMP.existing ? it.id : nid('i')}))}));
+  const days = IMP.days.filter(d => d.items.length).map(d => ({id: IMP.existing ? d.id : nid('d'), title: d.title.trim() || 'День', ...(d.coachNotes ? {coachNotes: d.coachNotes} : {}), items: d.items.map(({st, raw, _number, _photos, _needsDose, _warn, ...it}) => ({...it, id: IMP.existing ? it.id : nid('i')}))}));
   snap();
   let msg, flashId;
   if (!P.days.length || IMP.dest === 'replace') { if (!IMP.existing) { delete P.coachNotes; P.at = Date.now(); P.by = 'import'; } P.days = days; if (!IMP.existing || !days.some(d => d.id === S.next)) S.next = days[0].id; msg = `Программа сохранена: ${days.length} ${plural(days.length, 'день', 'дня', 'дней')}`; flashId = days[0].id; }
@@ -3170,7 +3247,7 @@ const A = {
     snapImport();
     const it = ii == null ? importItem(name, d, '', w) : IMP.days[di].items[ii];
     const renamed = it.name !== name;
-    it.name = name.slice(0, 60); Object.assign(it, {s: d.s, lo: d.lo, hi: d.hi, sec: d.sec, w}); delete it._needsDose;
+    it.name = name.slice(0, 60); Object.assign(it, {s: d.s, lo: d.lo, hi: d.hi, sec: d.sec, w}); delete it._needsDose; delete it._warn;
     const picked = IMP.fixPick !== undefined ? IMP.fixPick : renamed ? resolve(name)[0] || '' : it.base;
     const c = CAT[picked]; it.base = c ? c.k : null; it.cam = !!(c && c.cam); it.inc = guessInc(it.name, it.base, !!w, it.sec);
     it.st = it.base ? 'ok' : 'new';
