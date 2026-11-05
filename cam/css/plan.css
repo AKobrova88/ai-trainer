@@ -1,0 +1,39 @@
+/* today's workout from the app: chips to switch, a switch to alternate sets */
+.plan{display:grid;gap:8px}
+.plan-h{font:600 12px/1.2 var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.plan-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px 2px}
+.plan-chips::-webkit-scrollbar{display:none}
+.plan-chips button{flex:none;min-height:46px;max-width:230px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:15px;padding:0 14px;display:flex;align-items:center;gap:8px}
+.plan-chips .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plan-chips button[aria-pressed="true"]{background:var(--blue);color:var(--blue-ink);border-color:var(--blue)}
+.plan-chips b{font:800 15px/1 var(--f-num);background:var(--surface-3);color:var(--ink);border-radius:999px;padding:3px 8px;flex:none}
+.plan-chips button[aria-pressed="true"] b{background:rgba(18,21,31,.16);color:var(--blue-ink)}
+.plan-chips .lb{font:800 13px/1 var(--f-num);color:var(--muted);flex:none}
+.plan-chips button[aria-pressed="true"] .lb{color:var(--blue-ink);opacity:.7}
+.plan-chips button.ss{border-color:var(--lime)}
+.plan-chips button.fin .nm{opacity:.55}
+.plan-info{font-size:14px;line-height:1.35;color:var(--muted);margin:0}
+.plan-info b{color:var(--lime);font-weight:700}
+.alt-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:-4px}
+.sub-btn{min-height:48px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:650;font-size:14px;line-height:1.25;padding:6px 10px;display:flex;align-items:center;justify-content:center;gap:7px;text-align:center}
+.sub-btn svg{width:18px;height:18px;flex:none}
+.main-btn.rec{background:#e5484d;color:#fff}
+.voicesel{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:14px;color:var(--muted)}
+.voicesel select{min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;padding:0 10px;min-width:0}
+.voicesel button{min-height:44px;min-width:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700}
+.alt-btns[hidden],.sub-btn[hidden],.voicesel[hidden]{display:none}
+.stage.msg-open{min-height:min(620px,88vh);max-height:none}
+.stage-msg{overflow-y:auto}
+.msg-actions{flex-wrap:wrap}
+.alt-btns:has(.sub-btn[hidden]){grid-template-columns:1fr}
+.setup-check{display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:22px;background:var(--surface)}
+.setup-check h2{margin:0;font:700 22px/1.2 var(--f-display)}
+.setup-check ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.setup-check li{display:flex;align-items:center;gap:10px;color:var(--muted)}
+.setup-check li::before{content:'○';width:24px;text-align:center;flex:none}
+.setup-check li[data-ok="true"]{color:var(--good)}
+.setup-check li[data-ok="true"]::before{content:'✓'}
+.setup-check p{margin:0;color:var(--muted);font-size:14px;line-height:1.4}
+.setup-check .main-btn{min-height:52px;font-size:17px}
+.setup-check button:disabled{opacity:.45;cursor:default}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
