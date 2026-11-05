@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- the account on the server ----------
-   Inside Telegram the account is the person's Telegram (no password); in a browser — e-mail and password.
+   Inside Telegram the account is the person's Telegram; in a browser — the e-mail: a 6-digit code comes in a letter, no passwords.
    Signed in, the server decides access (trial, promo codes, subscription, AI limits) and keeps the data in sync.
    Without the server (no connection, or not signed in) the app works on the phone exactly as in 2.6. */
 const Account = (() => {
@@ -16,7 +16,7 @@ const Account = (() => {
   }
   function applyMe(me) {
     const u = me.user, pd = me.consents.find(c => c.kind === 'pd'), terms = me.consents.find(c => c.kind === 'terms');
-    S.acct = {id: u.id, email: u.email || '', tg: u.telegram, hasPassword: !!u.has_password, consents: me.consents, versions: me.consent_versions};
+    S.acct = {id: u.id, email: u.email || '', tg: u.telegram, consents: me.consents, versions: me.consent_versions};
     setEnt(me.entitlements);
     const consent = {pd: {v: pd ? pd.version : CONSENT_V, at: pd ? pd.accepted_at : Date.now()}, terms: {v: terms ? terms.version : CONSENT_V, at: terms ? terms.accepted_at : Date.now()}, news: me.consents.some(c => c.kind === 'marketing')};
     S.user = {...(S.user || {}), email: u.email || (S.user && S.user.email) || '', at: u.trial_started_at, consent};
@@ -71,64 +71,98 @@ const Account = (() => {
       '<button class="btn" data-act="close">Не сейчас</button><button class="btn primary" id="reg-go" data-act="acc-consent-go" disabled>Сохранять в аккаунте</button>');
   }
 
-  /* ---- browser: e-mail and password ---- */
+  /* ---- e-mail: a one-time code from the letter (sign in, a new account, or an address for a Telegram account) ---- */
   function localUser(email) {
     if (S.user) return;
     const at = Date.now();
     S.user = {email, at, consent: {pd: {v: CONSENT_V, at}, terms: {v: CONSENT_V, at}, news: REG.news}};
   }
-  async function register(email, password, promo) {
+  let pending = null;          // {email, mode: 'login' | 'add', consents, promo, code}: the letter is on its way
+  let waitTimer = 0;
+  const startPath = mode => mode === 'add' ? '/v1/me/email/start' : '/v1/auth/email/start';
+  async function sendCode(email, ctx) {
+    const r = ctx.mode === 'add' ? await API.call(startPath('add'), {method: 'POST', body: {email}}) : await API.raw(startPath('login'), {method: 'POST', body: {email}});
+    if (!r.ok) return r;
+    pending = {...ctx, email};
+    codeSheet(r.data.resend_after || 60);
+    return r;
+  }
+  /* the first screen and «Создать аккаунт»: e-mail and consents, then the code */
+  async function register(email, promo) {
     const btn = $('#reg-go'); if (btn) btn.disabled = true;
-    const body = {email, password, consents: {pd: REG.pd, terms: REG.terms, marketing: REG.news}};
-    if (promo) body.promo = promo;
-    if (S.user && S.user.at) body.registered_at = S.user.at;
-    if (TG.inside()) body.init_data = TG.initData();
-    const r = await API.raw('/v1/auth/register', {method: 'POST', body});
+    const r = await sendCode(email, {mode: 'login', consents: {pd: REG.pd, terms: REG.terms, marketing: REG.news}, promo});
     if (btn) btn.disabled = false;
-    if (r.ok) { localUser(email); return finishSignIn(r.data); }
+    if (r.ok) return;
     if (r.status === 0 && S.stage === 'welcome') {
       localUser(email); S.stage = 'start'; render(); window.scrollTo({top: 0});
       return toast('Нет связи с сервером — начнём на этом телефоне. Аккаунт можно создать позже в профиле');
     }
-    if (r.error.code === 'email_taken') { toast(r.error.message); return loginSheet(email); }
     toast(r.error.message);
   }
-  function loginSheet(email) {
-    sheet('Вход в аккаунт', `<div class="field"><label for="acc-email">Электронная почта</label><input class="input" id="acc-email" type="email" autocomplete="email" inputmode="email" placeholder="name@mail.ru" value="${esc(email || (S.user && S.user.email) || '')}"></div>
-      <div class="field"><label for="acc-pass">Пароль</label><input class="input" id="acc-pass" type="password" autocomplete="current-password"></div>
-      <button class="btn ghost" data-act="acc-forgot">Не помню пароль</button>
-      ${S.program.days.length || S.diary.length ? '<p class="hint" style="margin:0">После входа программа и дневник из аккаунта появятся здесь, а тренировки с этого телефона добавятся в аккаунт.</p>' : ''}`,
-      '<button class="btn" data-act="close">Отмена</button><button class="btn primary" id="acc-go" data-act="acc-login-go">Войти</button>', '', true);
-    setTimeout(() => { const i = $(email ? '#acc-pass' : '#acc-email'); i && i.focus(); }, 60);
+  function emailSheet(mode) {
+    const add = mode === 'add';
+    sheet(add ? 'Почта для входа' : 'Вход по почте', `<p class="hint" style="margin:0">${add ? 'Чтобы открывать приложение и в браузере — на компьютере или другом телефоне. ' : ''}Пришлём на почту код из 6 цифр — пароль не нужен.</p>
+      <div class="field"><label for="acc-email">Электронная почта</label><input class="input" id="acc-email" type="email" autocomplete="email" inputmode="email" placeholder="name@mail.ru" value="${esc(add ? '' : (S.user && S.user.email) || '')}"></div>
+      ${!add && (S.program.days.length || S.diary.length) ? '<p class="hint" style="margin:0">После входа программа и дневник из аккаунта появятся здесь, а тренировки с этого телефона добавятся в аккаунт.</p>' : ''}`,
+      `<button class="btn" data-act="close">Отмена</button><button class="btn primary" id="acc-go" data-act="acc-email-go" data-v="${add ? 'add' : 'login'}">Получить код</button>`, '', true);
+    setTimeout(() => { const i = $('#acc-email'); i && i.focus(); }, 60);
   }
-  function registerSheet() {
+  function loginSheet() { emailSheet('login'); }
+  function codeSheet(wait) {
+    closeTop();
+    sheet('Код из письма', `<p class="hint" style="margin:0">Отправили код на <b>${esc(pending.email)}</b>. Он действует 10 минут. Если письма нет — загляни в «Спам».</p>
+      <div class="field"><label for="acc-code">Код</label><input class="input" id="acc-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" style="font-size:24px;letter-spacing:6px;text-align:center"></div>
+      <button class="btn ghost" id="acc-again" data-act="acc-code-again" disabled></button>`,
+      `<button class="btn" data-act="close">Отмена</button><button class="btn primary" id="acc-go" data-act="acc-code-go">${pending.mode === 'add' ? 'Подтвердить' : 'Войти'}</button>`, '', true);
+    const input = $('#acc-code');
+    if (input) {
+      input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0, 6); if (input.value.length === 6) A['acc-code-go'](); });
+      setTimeout(() => input.focus(), 60);
+    }
+    countdown(wait);
+  }
+  function countdown(wait) {
+    clearInterval(waitTimer);
+    let left = wait;
+    const tick = () => {
+      const b = $('#acc-again'); if (!b) return clearInterval(waitTimer);
+      b.disabled = left > 0; b.textContent = left > 0 ? `Отправить ещё раз — через ${left} с` : 'Отправить код ещё раз';
+      if (left-- <= 0) clearInterval(waitTimer);
+    };
+    tick(); waitTimer = setInterval(tick, 1000);
+  }
+  /* a new address and no consents yet (sign-in from the profile): ask for them, the same code stays valid */
+  function newAccountSheet() {
     REG.pd = false; REG.terms = false;
-    sheet('Создать аккаунт', `<div class="field"><label for="reg-email">Электронная почта</label><input class="input" id="reg-email" type="email" autocomplete="email" inputmode="email" placeholder="name@mail.ru" value="${esc((S.user && S.user.email) || '')}"></div>
-      <div class="field"><label for="reg-pass">Пароль</label><input class="input" id="reg-pass" type="password" autocomplete="new-password" placeholder="Не короче 8 символов"></div>
+    closeTop();
+    sheet('Новый аккаунт', `<p style="margin:0">Аккаунта с почтой <b>${esc(pending.email)}</b> ещё нет — создадим его. Программа, дневник и итоги разборов будут храниться в нём на сервере в России. Травмы и ограничения остаются только на телефоне.</p>
       ${ckRow('pd', 'Даю <a class="linkish" href="#consent" data-act="doc" data-v="consent">согласие на обработку персональных данных</a>', true)}
-      ${ckRow('terms', 'Мне есть 18 лет, принимаю <a class="linkish" href="#terms" data-act="doc" data-v="terms">пользовательское соглашение</a>', true)}
-      <p class="hint" style="margin:0">Программа, дневник и итоги разборов перейдут в аккаунт. Травмы и ограничения останутся только на телефоне.</p>`,
-      '<button class="btn" data-act="close">Отмена</button><button class="btn primary" id="reg-go" data-act="acc-register-go" disabled>Создать</button>', '', true);
+      ${ckRow('terms', 'Мне есть 18 лет, принимаю <a class="linkish" href="#terms" data-act="doc" data-v="terms">пользовательское соглашение</a>', true)}`,
+      '<button class="btn" data-act="close">Отмена</button><button class="btn primary" id="reg-go" data-act="acc-newacc-go" disabled>Создать аккаунт</button>', '', true);
   }
-  function credentialsSheet() {
-    sheet('Почта и пароль', `<p class="hint" style="margin:0">Чтобы открывать приложение и в браузере — на компьютере или другом телефоне.</p>
-      <div class="field"><label for="acc-email">Электронная почта</label><input class="input" id="acc-email" type="email" autocomplete="email" inputmode="email" placeholder="name@mail.ru"></div>
-      <div class="field"><label for="acc-pass">Пароль</label><input class="input" id="acc-pass" type="password" autocomplete="new-password" placeholder="Не короче 8 символов"></div>`,
-      '<button class="btn" data-act="close">Отмена</button><button class="btn primary" id="acc-go" data-act="acc-cred-go">Сохранить</button>', '', true);
+  async function verify() {
+    const p = pending;
+    if (p.mode === 'add') {
+      const r = await API.call('/v1/me/email/verify', {method: 'POST', body: {email: p.email, code: p.code}});
+      if (!r.ok) return toast(r.error.message);
+      pending = null; applyMe(r.data); saveLocal(); closeSheet(); render(); return toast('Готово: теперь можно входить и по почте');
+    }
+    const body = {email: p.email, code: p.code};
+    if (p.consents && p.consents.pd && p.consents.terms) body.consents = p.consents;
+    if (p.promo) body.promo = p.promo;
+    if (S.user && S.user.at) body.registered_at = S.user.at;
+    if (TG.inside()) body.init_data = TG.initData();
+    const r = await API.raw('/v1/auth/email/verify', {method: 'POST', body});
+    if (r.ok) {
+      clearInterval(waitTimer); pending = null;
+      if (S.stage !== 'welcome') Sync.reset();   // signing in on a phone with its own data: the account's data comes first
+      localUser(p.email); finishSignIn(r.data); return toast('Вход выполнен');
+    }
+    if (r.error.code === 'consent_required') return newAccountSheet();
+    toast(r.error.message);
+    if (r.error.code === 'code_tries') { const i = $('#acc-code'); if (i) i.value = ''; }
   }
-  function forgotSheet() {
-    const email = (($('#acc-email') || {}).value || (S.user && S.user.email) || '').trim();
-    sheet('Новый пароль', `<p class="hint" style="margin:0">Пришлём на почту код из 6 цифр.</p>
-      <div class="field"><label for="acc-email">Электронная почта</label><input class="input" id="acc-email" type="email" autocomplete="email" inputmode="email" value="${esc(email)}"></div>`,
-      '<button class="btn" data-act="close-top">Отмена</button><button class="btn primary" id="acc-go" data-act="acc-forgot-go">Прислать код</button>', '', true);
-  }
-  function resetSheet(email) {
-    sheet('Код из письма', `<p class="hint" style="margin:0">Код отправлен на ${esc(email)}. Он действует 30 минут.</p>
-      <div class="field"><label for="acc-code">Код</label><input class="input" id="acc-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>
-      <div class="field"><label for="acc-pass">Новый пароль</label><input class="input" id="acc-pass" type="password" autocomplete="new-password" placeholder="Не короче 8 символов"></div>
-      <input type="hidden" id="acc-email" value="${esc(email)}">`,
-      '<button class="btn" data-act="close-top">Отмена</button><button class="btn primary" id="acc-go" data-act="acc-reset-go">Сохранить пароль</button>', '', true);
-  }
+
   const field = id => (($(id) || {}).value || '').trim();
   async function busy(fn) { const b = $('#acc-go'); if (b) b.disabled = true; try { return await fn(); } finally { const x = $('#acc-go'); if (x) x.disabled = false; } }
 
@@ -141,7 +175,7 @@ const Account = (() => {
       <div class="prow"><span>Согласие дано</span><span class="val">${consent}</span></div></div>`;   // as in 2.6
     if (!signedIn()) {
       return `<div class="plist">${row('Почта', esc(S.user ? S.user.email || '—' : '—'))}${row('Согласие дано', consent)}
-        ${TG.inside() ? btn('acc-tg', 'Сохранять данные в аккаунте') : btn('acc-login', 'Войти в аккаунт') + btn('acc-register', 'Создать аккаунт')}</div>
+        ${TG.inside() ? btn('acc-tg', 'Сохранять данные в аккаунте') : btn('acc-login', 'Войти или создать аккаунт по почте')}</div>
         <p class="hint" style="margin:-4px 2px 0">Аккаунт хранит программу и дневник на сервере в России — их не потерять при смене телефона.</p>`;
     }
     const a = S.acct, how = a.tg ? `Telegram${a.tg.username ? ' · @' + esc(a.tg.username) : a.tg.first_name ? ' · ' + esc(a.tg.first_name) : ''}` : 'почта и пароль';
@@ -149,7 +183,7 @@ const Account = (() => {
       : Sync.lastAt() ? 'на сервере · ' + new Date(Sync.lastAt()).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}) : 'на сервере';
     return `<div class="plist">${row('Вход', how)}${row('Почта', esc(a.email || 'не указана'))}${row('Согласие дано', consent)}
       <button class="prow" data-act="acc-sync"><span>Данные</span><span class="val">${st}</span></button>
-      ${a.email ? '' : btn('acc-cred', 'Добавить почту и пароль для браузера')}
+      ${a.email ? '' : btn('acc-cred', 'Добавить почту для входа из браузера')}
       ${btn('acc-export', 'Выгрузить мои данные')}${btn('acc-logout', 'Выйти из аккаунта')}</div>`;
   }
 
@@ -183,56 +217,35 @@ const Account = (() => {
   /* ---- buttons ---- */
   Object.assign(A, {
     'acc-login': () => loginSheet(),
-    'acc-register': () => registerSheet(),
     'acc-tg': () => tgSignIn(),
-    'acc-forgot': () => forgotSheet(),
-    'acc-cred': () => credentialsSheet(),
+    'acc-cred': () => emailSheet('add'),
     'acc-sync': async () => { syncInfo.state = 'syncing'; syncDone({ok: true}); const r = await Sync.now(); toast(r && r.ok ? 'Данные сохранены в аккаунте' : 'Нет связи с сервером — данные остаются на телефоне'); },
-    'acc-login-go': () => busy(async () => {
-      const email = field('#acc-email'), password = ($('#acc-pass') || {}).value || '';
+    'acc-email-go': v => busy(async () => {
+      const email = field('#acc-email');
       if (!EMAIL_RX.test(email)) return toast('Проверь почту — например, name@mail.ru');
-      if (!password) return toast('Введи пароль');
-      const body = {email, password}; if (TG.inside()) body.init_data = TG.initData();
-      const r = await API.raw('/v1/auth/login', {method: 'POST', body});
-      if (!r.ok) return toast(r.error.message);
-      Sync.reset(); finishSignIn(r.data); toast('Вход выполнен');
+      const r = await sendCode(email, {mode: v === 'add' ? 'add' : 'login'});
+      if (!r.ok) toast(r.error.message);
     }),
-    'acc-register-go': () => {
-      const email = field('#reg-email'), password = ($('#reg-pass') || {}).value || '';
-      if (!EMAIL_RX.test(email)) return toast('Проверь почту — например, name@mail.ru');
-      if (password.length < 8) return toast('Пароль — не короче 8 символов');
-      if (!REG.pd || !REG.terms) return toast('Отметь согласие и соглашение — без них аккаунт не создать');
-      return register(email, password, '');
+    'acc-code-go': () => busy(async () => {
+      const code = field('#acc-code');
+      if (!pending) return closeSheet();
+      if (!/^\d{6}$/.test(code)) return toast('Код — 6 цифр из письма');
+      pending.code = code;
+      await verify();
+    }),
+    'acc-code-again': async () => {
+      if (!pending) return;
+      const r = pending.mode === 'add' ? await API.call(startPath('add'), {method: 'POST', body: {email: pending.email}}) : await API.raw(startPath('login'), {method: 'POST', body: {email: pending.email}});
+      if (!r.ok) return toast(r.error.message);
+      countdown(r.data.resend_after || 60); toast('Отправили новый код. Прежний больше не действует');
     },
+    'acc-newacc-go': () => { if (!pending || !REG.pd || !REG.terms) return; pending.consents = {pd: true, terms: true, marketing: false}; verify(); },
     'acc-consent-go': () => { if (REG.pd && REG.terms) tgSignIn({pd: true, terms: true, marketing: REG.news}); },
     'acc-reconsent-go': async () => {
       if (!REG.pd || !REG.terms) return;
       for (const kind of ['pd', 'terms']) { const r = await API.call('/v1/me/consents', {method: 'POST', body: {kind}}); if (!r.ok) return toast(r.error.message); if (kind === 'terms') { applyMe(r.data); saveLocal(); } }
       closeSheet(); render(); toast('Спасибо, согласие обновлено');
     },
-    'acc-forgot-go': () => busy(async () => {
-      const email = field('#acc-email');
-      if (!EMAIL_RX.test(email)) return toast('Проверь почту — например, name@mail.ru');
-      const r = await API.raw('/v1/auth/password/forgot', {method: 'POST', body: {email}});
-      if (!r.ok) return toast(r.error.message);
-      closeTop(); resetSheet(email);
-    }),
-    'acc-reset-go': () => busy(async () => {
-      const email = field('#acc-email'), code = field('#acc-code'), password = ($('#acc-pass') || {}).value || '';
-      if (!/^\d{6}$/.test(code)) return toast('Код — 6 цифр из письма');
-      if (password.length < 8) return toast('Пароль — не короче 8 символов');
-      const r = await API.raw('/v1/auth/password/reset', {method: 'POST', body: {email, code, password}});
-      if (!r.ok) return toast(r.error.message);
-      Sync.reset(); finishSignIn(r.data); toast('Пароль сохранён');
-    }),
-    'acc-cred-go': () => busy(async () => {
-      const email = field('#acc-email'), password = ($('#acc-pass') || {}).value || '';
-      if (!EMAIL_RX.test(email)) return toast('Проверь почту — например, name@mail.ru');
-      if (password.length < 8) return toast('Пароль — не короче 8 символов');
-      const r = await API.call('/v1/me/credentials', {method: 'POST', body: {email, password}});
-      if (!r.ok) return toast(r.error.message);
-      applyMe(r.data); saveLocal(); closeSheet(); render(); toast('Готово: теперь можно входить и по почте');
-    }),
     /* leaving the account clears this phone: the data is in the account, and the next person must not see it */
     'acc-logout': async () => {
       const r = await Sync.now();
@@ -240,7 +253,7 @@ const Account = (() => {
       const token = API.refreshToken();
       if (token) API.raw('/v1/auth/logout', {method: 'POST', body: {refresh_token: token}});
       forget(); startClean(); saveLocal(); render(); window.scrollTo({top: 0});
-      toast('Ты вышла из аккаунта. Программа и дневник сохранены в нём — войди снова, чтобы их вернуть');
+      toast('Выход выполнен. Программа и дневник сохранены в аккаунте — войди снова, чтобы их вернуть');
     },
     'acc-export': async () => {
       const r = await API.call('/v1/me/export');

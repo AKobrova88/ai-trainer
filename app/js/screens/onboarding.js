@@ -13,14 +13,13 @@ function viewWelcome() {
     <h1 class="hero-t">Твой тренер<br>в телефоне</h1>
     <p class="lead">Программа под твои цели, подсказки по технике через камеру и дневник прогресса.</p>
     <section class="form-card" aria-label="Регистрация">
-      ${TRENER.accounts && TG.inside() ? `<div class="note blue">${I.tg}<span>Вход через Telegram${Account.tgName() ? ` — ${esc(Account.tgName())}` : ''}. Пароль не нужен.</span></div>` : `<div class="field"><label for="reg-email">Электронная почта</label><input class="input" id="reg-email" type="email" autocomplete="email" inputmode="email" placeholder="name@mail.ru" value="${esc(REG.email)}"></div>${TRENER.accounts ? `
-      <div class="field"><label for="reg-pass">Пароль</label><input class="input" id="reg-pass" type="password" autocomplete="new-password" placeholder="Не короче 8 символов"></div>` : ''}`}
+      ${TRENER.accounts && TG.inside() ? `<div class="note blue">${I.tg}<span>Вход через Telegram${Account.tgName() ? ` — ${esc(Account.tgName())}` : ''}. Пароль не нужен.</span></div>` : `<div class="field"><label for="reg-email">Электронная почта</label><input class="input" id="reg-email" type="email" autocomplete="email" inputmode="email" placeholder="name@mail.ru" value="${esc(REG.email)}"></div>`}
       <div class="field"><label for="reg-promo">Промокод, если есть</label><input class="input" id="reg-promo" autocomplete="off" autocapitalize="characters" placeholder="Например, TEST2026" value="${esc(REG.promo || '')}" style="text-transform:uppercase"></div>
       ${ckRow('pd', 'Даю <a class="linkish" href="#consent" data-act="doc" data-v="consent">согласие на обработку персональных данных</a>', true)}
       ${ckRow('terms', 'Мне есть 18 лет, принимаю <a class="linkish" href="#terms" data-act="doc" data-v="terms">пользовательское соглашение</a>', true)}
       ${ckRow('news', 'Хочу получать советы и новости на почту', false)}
-      <button class="btn primary big" data-act="reg-go" id="reg-go" ${REG.pd && REG.terms ? '' : 'disabled'}>Начать</button>
-      <span class="hint">* без этих отметок регистрация недоступна. Первые ${PRICING.trialDays} дней открыто всё, оплата в тесте отключена. ${TRENER.accounts ? 'Программа и дневник сохраняются в аккаунте на сервере в России.' : 'Аккаунт пока хранится только на этом телефоне.'}</span>
+      <button class="btn primary big" data-act="reg-go" id="reg-go" ${REG.pd && REG.terms ? '' : 'disabled'}>${TRENER.accounts && !TG.inside() ? 'Получить код' : 'Начать'}</button>
+      <span class="hint">* без этих отметок регистрация недоступна. Первые ${PRICING.trialDays} дней открыто всё, оплата в тесте отключена. ${TRENER.accounts ? `Программа и дневник сохраняются в аккаунте на сервере в России.${TG.inside() ? '' : ' Пароль не нужен — пришлём код на почту.'}` : 'Аккаунт пока хранится только на этом телефоне.'}</span>
       ${TRENER.accounts && !TG.inside() ? '<button class="btn ghost" data-act="acc-login">Уже есть аккаунт — войти</button>' : ''}
     </section>
     <button class="btn big" data-act="demo">Посмотреть приложение на примере</button>

@@ -35,7 +35,7 @@ const API = (() => {
     if (!refreshing) refreshing = raw('/v1/auth/refresh', {method: 'POST', body: {refresh_token: saved.refresh}}).then(r => {
       refreshing = null;
       if (r.ok) { setTokens(r.data); return true; }
-      if (r.status === 401) clear();   // the session ended (logout elsewhere, password changed, stolen token)
+      if (r.status === 401) clear();   // the session ended (logout elsewhere, account deleted, stolen token)
       return r.status === 0 ? null : false;
     });
     return refreshing;

@@ -41,12 +41,11 @@ const A = {
       if (!REG.pd || !REG.terms) return toast('Отметь согласие и соглашение — без них регистрация недоступна');
       return Account.tgSignIn({pd: true, terms: true, marketing: REG.news}, pc);
     }
-    const e = $('#reg-email'), email = (e ? e.value : '').trim(), pw = ($('#reg-pass') || {}).value || '';
+    const e = $('#reg-email'), email = (e ? e.value : '').trim();
     REG.email = email;
     if (!EMAIL_RX.test(email)) { toast('Проверь почту — например, name@mail.ru'); e && e.focus(); return; }
-    if (pw.length < 8) { toast('Пароль — не короче 8 символов'); const p = $('#reg-pass'); p && p.focus(); return; }
     if (!REG.pd || !REG.terms) return toast('Отметь согласие и соглашение — без них регистрация недоступна');
-    return Account.register(email, pw, pc);
+    return Account.register(email, pc);
   },
   doc: v => docSheet(v),
   'start-path': v => {

@@ -1,6 +1,6 @@
 // ИИ Тренер: offline cache. Page and the camera's own code (cam/) = network first, libraries and models = cache first.
 // Since 2.7 the camera page is split into files: its code must never be served stale next to a fresh page.
-const CACHE = 'aitrainer-20261105-v27';
+const CACHE = 'aitrainer-20261105-v271';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
