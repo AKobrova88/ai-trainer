@@ -34,3 +34,5 @@ const TG = (() => {
   return {inside: () => !!data(), initData: data, app, syncChrome, onReady, userId: () => userId, slot: () => (userId ? ':tg' + userId : ''),
     user: () => { try { return JSON.parse(new URLSearchParams(data()).get('user') || 'null'); } catch (e) { return null; } }};
 })();
+
+const telegramBridge = Startup.telegram(/tgWebApp/.test(location.hash) || window.TelegramWebviewProxy || TG.inside());

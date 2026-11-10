@@ -6,13 +6,15 @@ window.addEventListener('focus', processInbox);
 window.addEventListener('storage', e => { if (e.key === INBOX && e.newValue) processInbox(); else if (e.key === KEY && e.newValue && !S.workout) { S = load(); render(); } });
 
 /* inside Telegram: use its frame (also after coming back from the camera page, when the address no longer carries tgWebApp…) */
-if (/tgWebApp/.test(location.hash) || window.TelegramWebviewProxy || TG.inside()) {
-  loadScript('https://telegram.org/js/telegram-web-app.js').then(() => { try { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } catch (e) { /* old client */ } applyTheme(); TG.onReady(); }).catch(() => {});
-}
+telegramBridge.then(W => {
+  if (!W) return;
+  try { W.ready(); W.expand(); } catch (e) { /* old client */ }
+  applyTheme();
+  TG.onReady();
+});
 if (location.hash === '#from-camera') { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ } }
 if (S.stage !== 'welcome' && !S.user && !S.demo) S.stage = 'welcome';
 render();
 processInbox();
 /* the account: sign in with Telegram or the saved session, then sync (the app is already usable meanwhile) */
 Account.start();
-

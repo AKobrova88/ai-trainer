@@ -9,6 +9,7 @@ const num = s => { const v = parseFloat(String(s == null ? '' : s).replace(',', 
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const IN_TG = /tgWebApp/.test(location.hash) || /[?&]tg=1/.test(location.search);
 if (IN_TG) document.documentElement.classList.add('in-telegram');
+const telegramBridge = Startup.telegram(IN_TG);
 /* every Telegram account on this phone has its own unsaved sets and its own way back to the app: the keys carry its Telegram ID
    (the app keeps Telegram's data for this window in sessionStorage 'trener.tg') */
 const TG_SLOT = (() => {
@@ -21,4 +22,3 @@ const TG_SLOT = (() => {
 })();
 const SETS_KEY = 'aitrainer.sets' + TG_SLOT;
 const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-
