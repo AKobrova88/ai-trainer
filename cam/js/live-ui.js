@@ -111,13 +111,14 @@ function renderLive() {
   el.cue.className = 'cue ' + cs.cls;
   if (el.cueText.textContent !== cs.text) el.cueText.textContent = cs.text;
   const snap = state.snap, hold = isHold();
-  const analysisText = state.bar ? 'Версия 2.6 · Счёт по движению веса: повторы, амплитуда и темп. Положение тела не оценивается'
-    : state.fallback ? 'Версия 2.6 · Только счёт повторов по видимому движению. Техника не оценивается'
+  const analysisText = state.bar ? 'Счёт по движению веса: повторы, амплитуда и темп. Положение тела не оценивается'
+    : state.fallback ? 'Только счёт повторов по видимому движению. Техника не оценивается'
     : snap && snap.analysisMode === '2d'
-    ? 'Версия 2.6 · 2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
-    : 'Версия 2.6 · 3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
+    ? '2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
+    : '3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
   const analysisInfo = $('#analysisInfo');
-  if (analysisInfo.textContent !== analysisText) analysisInfo.textContent = analysisText;
+  const versionedAnalysis = 'Версия 2.7.3 · ' + analysisText;
+  if (analysisInfo.textContent !== versionedAnalysis) analysisInfo.textContent = versionedAnalysis;
   el.hud.hidden = !state.on || !!state.recOnly || state.preflight;
   if (snap) {
     const n = hold ? Math.floor(snap.held || 0) : (snap.setEnded ? 0 : snap.reps);

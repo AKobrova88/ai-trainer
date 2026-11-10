@@ -29,7 +29,7 @@ async function analyzeVideo(blob, from, bar = false) {
   stopStream(); stopFile(); state.recOnly = false; state.fallback = false; hideMsg();
   state.file = URL.createObjectURL(blob); state.usedFile = true;
   const token=++fileToken;
-  const v = el.vid; v.srcObject = null; v.src = state.file; v.muted = true; v.classList.remove('mirror');
+  const v = el.vid; v.autoplay = false; v.srcObject = null; v.src = state.file; v.muted = true; v.classList.remove('mirror');
   const ok = await metaOf(v);
   if (token!==fileToken) return;
   let dur = ok ? v.duration : NaN;
@@ -38,9 +38,8 @@ async function analyzeVideo(blob, from, bar = false) {
   if (!ok || !v.videoWidth || !isFinite(dur) || dur <= 0) { stopFile(); showCameraMode(false); return showMsg('Видео не открылось', 'Попробуй другой файл: MP4 или MOV, снятый на телефон.', [{ label: 'Понятно', primary: true, run: hideMsg }]); }
   setAspect(v.videoWidth, v.videoHeight); newAnalyzer(); showCameraMode(true);
   if (bar) return barPick('file');   // the body is hidden anyway: no pose model, the weight is followed
-  const modelReady=await loadModelWithUi();
-  if (token!==fileToken) return;
-  if (!modelReady) return stopCamera();
+  const current = () => token === fileToken;
+  if (!(await loadModelWithUi(current, () => analyzeVideo(blob, from, bar))) || !current()) return;
   const st = { n: 0, miss: {}, errors:0, consecutiveErrors:0, shadowGroups:[[]] }, setStart = state.sets.length;
   const shadow = isFree() || state.fallback ? null : state.ex === 'leg_ext' ? new AT.LegExtensionAnalyzer(state.level,true) : new AT.FreeAnalyzer(state.level,state.ex,true);
   resetDet(); state.analyzing = true; state.prog = 0;
