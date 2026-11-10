@@ -91,7 +91,7 @@ function pickKey(pattern, P) {
   if (key && P.exp === 'novice') key = ({pushup: 'pushup_incline', pike_pushup: 'pushup_incline', back_squat: P.limits.includes('knees') ? key : 'goblet', bulgarian: 'step_up', rdl_bb: P.place === 'gym' ? 'rdl_db' : key})[key] || key;
   if (key && P.exp === 'pro' && key === 'lat_pulldown' && !P.limits.includes('shoulders')) key = 'pullup';
   if (key && P.limits.some(l => AVOID[l] && AVOID[l].has(key))) {
-    const alt = Object.values(CAT).find(c => c.p === CAT[key].p && !P.limits.some(l => AVOID[l] && AVOID[l].has(c.k)) && placeFits(c.inc, P.place) && c.k !== key);
+    const alt = Object.values(CAT).find(c => !c.webOnly && c.p === CAT[key].p && !P.limits.some(l => AVOID[l] && AVOID[l].has(c.k)) && placeFits(c.inc, P.place) && c.k !== key);
     key = alt ? alt.k : null;
   }
   return key;
@@ -125,7 +125,7 @@ function buildProgram(P0) {
     for (const [pattern, role] of slots) {
       let key = pickKey(pattern, P);
       if (!key || used.has(key)) {
-        const alt = key && Object.values(CAT).find(c => c.p === CAT[key].p && !used.has(c.k) && placeFits(c.inc, P.place) && !P.limits.some(l => AVOID[l] && AVOID[l].has(c.k)));
+        const alt = key && Object.values(CAT).find(c => !c.webOnly && c.p === CAT[key].p && !used.has(c.k) && placeFits(c.inc, P.place) && !P.limits.some(l => AVOID[l] && AVOID[l].has(c.k)));
         key = alt ? alt.k : null;
       }
       if (!key || !CAT[key]) continue;

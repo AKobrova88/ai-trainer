@@ -1,4 +1,4 @@
-/* ---------- «Сумерки»: big type for the gym, error = pink + «!» + words, never colour alone ---------- */
+/* Big type for the gym. Feedback uses symbols and text as well as color. */
 body{font:400 16px/1.45 var(--f-body)}
 .app{gap:14px}
 .ex label,.camsel>span,.sets h2{font:600 12px/1.2 var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
@@ -55,3 +55,20 @@ body{font:400 16px/1.45 var(--f-body)}
 .send .main-btn{min-height:56px;font-size:18px}
 .send .main-btn.secondary{text-transform:none;font:700 15px/1.3 var(--f-body);letter-spacing:0}
 .add-set{min-height:48px;border-radius:16px;font-size:15px}
+.exercise-search{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:0 12px}
+.exercise-search summary{cursor:pointer;padding:10px 0;color:var(--muted)}
+.exercise-search input{width:100%;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);margin-bottom:8px}
+#exerciseMatches:not(:empty){display:grid;gap:6px;padding-bottom:10px}
+#exerciseMatches p{margin:0;color:var(--muted)}
+.video-auto{display:flex;align-items:center;gap:7px;min-height:34px;color:var(--muted);font-size:14px;cursor:pointer}
+.video-auto input{width:18px;height:18px;accent-color:var(--accent)}
+:root[data-theme="bento"] .video-auto input{accent-color:var(--blue-ink)}
+:root[data-theme="bento"] .repnum,:root[data-theme="bento"] .cue.good,:root[data-theme="bento"] .set-q.good{color:var(--good)}
+:root[data-theme="bento"] .cue.warn{color:var(--warn)}
+:root[data-theme="bento"] .cue.bad{color:var(--bad)}
+:root[data-theme="bento"] .cue.info i,:root[data-theme="bento"] .cue.tip i{color:var(--blue-ink)}
+:root[data-theme="bento"] .cue.good i{background:var(--good)}
+:root[data-theme="bento"] .main-btn:not(.secondary):not(.rec),:root[data-theme="bento"] .msg-actions button.primary{color:var(--ink)}
+:root[data-theme="bento"] .stage-msg{background:rgba(38,40,56,.42)}
+:root[data-theme="bento"] .spin{border-top-color:var(--good)}
+:root[data-theme="bento"] .plan-info b{color:var(--good)}

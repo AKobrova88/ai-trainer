@@ -31,7 +31,7 @@ function alternativesFor(it, n = 6) {
   const c = it.base && CAT[it.base];
   const avoid = new Set((S.profile.limits || []).flatMap(l => [...(AVOID[l] || [])]));
   const fitsPlace = k => placeFits(CAT[k].inc, S.profile.place);
-  const pool = Object.values(CAT).filter(x => x.k !== it.base && !avoid.has(x.k) && fitsPlace(x.k));
+  const pool = Object.values(CAT).filter(x => !x.webOnly && x.k !== it.base && !avoid.has(x.k) && fitsPlace(x.k));
   const same = c && c.p ? pool.filter(x => x.p === c.p) : [];
   const grp = c ? pool.filter(x => x.g === c.g && !same.includes(x)) : [];
   return [...same, ...grp].sort((a, b) => (b.cam - a.cam)).slice(0, n);

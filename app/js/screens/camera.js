@@ -30,6 +30,7 @@ function camLink(it, mode) {
   }
   if (plan.length > 1) u.searchParams.set('plan', b64u(JSON.stringify(plan)));
   u.searchParams.set('cam', S.camFacing === 'back' ? 'back' : 'front');
+  u.searchParams.set('theme', S.theme === 'bento' ? 'bento' : 'dusk');
   u.searchParams.set('l', S.profile.exp || 'normal');
   if (mode) u.searchParams.set('mode', mode);
   u.searchParams.set('src', 'app');
@@ -67,7 +68,7 @@ function viewCamera() {
       <a class="btn primary big" href="${esc(camLink(it))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go">Включить камеру</a>
     </section>
     <section class="camcard">
-      <div class="hd"><span class="pi">${I.video}</span><span><b>Разбор видео</b><span>Запись подхода до 60 секунд — ошибки по каждому повтору</span></span></div>
+      <div class="hd"><span class="pi">${I.video}</span><span><b>Разбор видео</b><span>Распознаёт знакомые движения по записи подхода</span></span></div>
       <a class="btn big" style="border:2px dashed var(--line);background:transparent" href="${esc(camLink(it, 'video'))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go">${I.plus}Выбрать видео</a>
       <span class="hint">Видео разбирается на телефоне и никуда не загружается — сохраняется только итог: повторы и ошибки.</span>
     </section>

@@ -26,17 +26,22 @@ const PLAN = (() => {
 const FREE_KEYS = new Set();
 const HOWTO_HAVE = new Set(["ab_wheel", "arnold", "assisted_pullup", "back_squat", "bb_curl", "bb_ohp", "bb_row", "bench", "bench_dips", "bird_dog", "box_squat", "bulgarian", "bw_squat", "cable_cross", "cable_crunch", "cable_curl", "cable_lateral", "cable_pullover", "cable_row", "calf_raise", "calf_raise_bw", "calf_raise_db", "chair_squat", "chest_press", "chest_row", "chinup", "close_bench", "crunch", "db_bench", "db_bench_neutral", "db_curl", "db_ext", "db_floor_press", "db_ohp", "db_pullover", "db_rear_fly", "db_row", "dead_bug", "deadlift", "dips", "face_pull", "front_raise", "front_squat", "glute_bridge", "glute_bridge_db", "glute_kickback", "goblet", "goblet_box", "good_morning", "hack_squat", "hammer_curl", "hanging_leg_raise", "hip_thrust", "hollow_hold", "hyperext", "incline_bench", "incline_db", "landmine", "lat_pulldown", "lateral_raise", "leg_curl", "leg_ext", "leg_press", "lunge_db", "lying_leg_raise", "machine_ohp", "mountain_climber", "overhead_cable_ext", "pallof", "pike_pushup", "plank", "preacher_curl", "pulldown_close", "pullup", "pushdown", "pushup", "pushup_incline", "rdl_bb", "rdl_db", "reverse_lunge", "reverse_pec", "seated_calf", "side_plank", "skull_crusher", "sl_glute_bridge", "smith_squat", "split_squat_db", "step_up", "step_up_bw", "step_up_db", "sumo_deadlift", "superman", "table_row", "tbar_row", "towel_row", "upright_row", "walking_lunge"]);
 function addFree(k, n, u) {
-  if (!k || keys.includes(k) || !n) return null;
+  if (!/^[a-z][a-z0-9_:-]{0,39}$/.test(k || '') || keys.includes(k) || !n) return null;
   const inc = ({ bw: 'bw', time: 'time' })[u] || 'machine';
   EX.ex[k] = { name: n.slice(0, 60), inc, tips: ['Начни из исходного положения и замри на секунду — дальше считаю сам', 'Двигайся на полную амплитуду, без рывков'] };
   FREE_KEYS.add(k); return k;
 }
 for (const p of PLAN) addFree(p.k, p.n, p.u);
 const FREE = addFree(qp.get('ex'), (qp.get('n') || '').trim(), qp.get('u'));
+for (const entry of Object.values(CAT)) {
+  if (entry.inc === 'time' || (entry.webOnly && IN_TG && !RET) || FREE_KEYS.has(entry.k)) continue;
+  addFree(entry.k, entry.n, entry.inc === 'bw' ? 'bw' : 'w');
+}
+const cameraHas = k => keys.includes(k) || FREE_KEYS.has(k);
 const isFree = () => FREE_KEYS.has(state.ex);
 const FACING = { front: 'user', back: 'environment' };
 const state = {
-  ex: FREE || (keys.includes(qp.get('ex')) ? qp.get('ex') : keys.includes(prefs.ex) ? prefs.ex : 'bw_squat'),
+  ex: FREE || (cameraHas(qp.get('ex')) ? qp.get('ex') : cameraHas(prefs.ex) ? prefs.ex : 'bw_squat'),
   depth: pickOpt(qp.get('d'), ['half', 'parallel', 'deep'], pickOpt(prefs.depth, ['half', 'parallel', 'deep'], 'parallel')),
   level: pickOpt(qp.get('l'), ['novice', 'normal', 'pro'], pickOpt(prefs.level, ['novice', 'normal', 'pro'], 'normal')),
   urlW: num(qp.get('w')), fromBot: qp.has('ex'),

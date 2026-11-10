@@ -87,11 +87,11 @@ function catSheet(mode, dayId, swapId) {
 function catList() {
   const q = norm(S.cat.q.trim());
   let list = Object.values(CAT);
-  if (S.cat.mode === 'cam') list = list.filter(c => c.cam);
+  if (S.cat.mode === 'cam') list = list.filter(c => c.cam || c.inc !== 'time');
   list = q ? list.filter(c => norm(c.n).includes(q) || q.split(' ').every(w => norm(c.n).includes(w)) || (SYN[c.k] || []).some(s => norm(s).includes(q))) : list.filter(c => c.g === S.cat.g);
   list.sort((a, b) => (b.cam - a.cam) || a.n.localeCompare(b.n, 'ru'));
   $('#cat-g').style.display = q ? 'none' : '';
-  let html = list.slice(0, 60).map(c => `<button class="cat-item" data-act="cat-add" data-v="${c.k}"><b>${esc(c.n)}</b>${c.cam ? '<span class="badge cam">камера</span>' : ''}<span class="plus">＋</span></button>`).join('');
+  let html = list.slice(0, 60).map(c => `<button class="cat-item" data-act="cat-add" data-v="${c.k}"><b>${esc(c.n)}</b>${c.cam ? '<span class="badge cam">техника</span>' : S.cat.mode === 'cam' ? '<span class="badge">счёт повторов</span>' : ''}<span class="plus">＋</span></button>`).join('');
   if (q && S.cat.mode !== 'cam') html += `<button class="cat-item" data-act="cat-own"><b>Своё: «${esc(S.cat.q.trim())}»</b><span class="badge new">своё</span><span class="plus">＋</span></button>`;
   $('#cat-list').innerHTML = html || '<div class="empty">Ничего не нашлось</div>';
 }

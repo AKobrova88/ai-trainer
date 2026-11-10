@@ -1,9 +1,9 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><script>(function(){var q=location.search,h=location.hash;if(!/[?&](ex|n|u|w|d|l|mode|plan|tg|cam|src|ret|camera)=?/.test(q)&&!/tgWebApp/.test(h)&&!/[?&]tg=1/.test(q))location.replace('app/'+h);})();</script><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#12151f"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ИИ Тренер"><meta name="apple-mobile-web-app-status-bar-style" content="black"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png" type="image/png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>:root{color-scheme:dark;background:#12151f;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style><script>window.AI_TRAINER_STANDALONE=true</script></head><body><title>ИИ Тренер</title>
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><script>(function(){var q=location.search,h=location.hash;if(!/[?&](ex|n|u|w|d|l|mode|plan|tg|cam|src|ret|camera)=?/.test(q)&&!/tgWebApp/.test(h)&&!/[?&]tg=1/.test(q))location.replace('app/'+h);})();</script><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#12151f"><script src="cam/js/theme.js?v=2.7.4"></script><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ИИ Тренер"><meta name="apple-mobile-web-app-status-bar-style" content="black"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png" type="image/png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>:root{color-scheme:dark;background:#12151f;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style><script>window.AI_TRAINER_STANDALONE=true</script></head><body><title>ИИ Тренер</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@400;500;600;700&family=Sofia+Sans+Condensed:wght@600;700;800&display=swap">
-<link rel="stylesheet" href="cam/css/base.css?v=2.7.1">
-<link rel="stylesheet" href="cam/css/theme.css?v=2.7.1">
+<link id="web-fonts" rel="stylesheet" media="print" href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@400;500;600;700&family=Sofia+Sans+Condensed:wght@600;700;800&display=swap">
+<link rel="stylesheet" href="cam/css/base.css?v=2.7.4">
+<link rel="stylesheet" href="cam/css/theme.css?v=2.7.4">
 <link rel="stylesheet" href="cam/css/plan.css?v=2.7.1">
 
 <div class="app">
@@ -17,6 +17,12 @@
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8v4h3l4 3.5v-11L6 8H3z"/><path d="M13.5 7.5a3.5 3.5 0 0 1 0 5M15.8 5.2a6.8 6.8 0 0 1 0 9.6"/></svg>
     </button>
   </header>
+
+  <details class="exercise-search" id="exerciseFinder">
+    <summary>Найти упражнение в каталоге</summary>
+    <input type="search" id="exerciseSearch" aria-label="Поиск упражнения" placeholder="Например, бицепс или выпады" autocomplete="off">
+    <div id="exerciseMatches"></div>
+  </details>
 
   <section class="plan" id="planBox" hidden aria-label="Упражнения тренировки">
     <div class="plan-h">Тренировка сегодня — нажми, чтобы переключить</div>
@@ -41,6 +47,7 @@
     <button class="sub-btn" id="setupCount" type="button" disabled hidden>Только счёт повторов, без оценки техники</button>
     <button class="sub-btn" id="setupBar" type="button" hidden>Тело закрыто тренажёром — считать по движению веса</button>
   </section>
+  <p class="camtip" id="videoExercise" role="status" hidden></p>
   <p class="camtip" id="camTip"></p>
   <p class="camtip" id="analysisInfo" role="status">3D-анализ на устройстве · видео не отправляется на сервер. Скрытые суставы могут не распознаваться.</p>
   <section class="setup-check" id="setupCheck" aria-labelledby="setupTitle" hidden>
@@ -61,6 +68,7 @@
     <button class="sub-btn" id="recBtn" type="button"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="3" fill="currentColor"/></svg>Снять на видео, разбор после</button>
     <button class="sub-btn" id="vidBtn" type="button"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M8.5 7.8v4.4l3.6-2.2z" fill="currentColor"/></svg>Разобрать видео из галереи</button>
   </div>
+  <label class="video-auto" id="videoAutoRow"><input type="checkbox" id="videoAuto" checked> Определять упражнение по видео</label>
   <label class="voicesel" id="voiceRow" hidden><span>Голос</span><select id="voiceSel" aria-label="Голос тренера"></select><button type="button" id="voiceTest" aria-label="Послушать голос">▶</button></label>
 
   <section class="sets" id="setsBox" hidden aria-label="Подходы">
@@ -73,20 +81,23 @@
   <input class="vh" id="fileInput" type="file" accept="video/*">
 </div>
 
-<script src="cam/js/analyzers.js?v=2.7.1"></script>
-<script src="cam/js/data/exercises.js?v=2.7.1"></script>
-<script src="cam/js/core.js?v=2.7.1"></script>
-<script src="cam/js/voice.js?v=2.7.1"></script>
-<script src="cam/js/state.js?v=2.7.1"></script>
-<script src="cam/js/exercise.js?v=2.7.1"></script>
-<script src="cam/js/canvas.js?v=2.7.1"></script>
-<script src="cam/js/live-loop.js?v=2.7.1"></script>
-<script src="cam/js/sets.js?v=2.7.1"></script>
-<script src="cam/js/plan.js?v=2.7.1"></script>
-<script src="cam/js/live-ui.js?v=2.7.3"></script>
-<script src="cam/js/engine.js?v=2.7.3"></script>
-<script src="cam/js/recording.js?v=2.7.1"></script>
-<script src="cam/js/video.js?v=2.7.3"></script>
-<script src="cam/js/bar.js?v=2.7.1"></script>
-<script src="cam/js/main.js?v=2.7.1"></script>
+<script defer src="shared/startup.js?v=2.7.2"></script>
+<script defer src="cam/js/analyzers.js?v=2.7.1"></script>
+<script defer src="cam/js/data/exercises.js?v=2.7.1"></script>
+<script defer src="cam/js/core.js?v=2.7.2"></script>
+<script defer src="cam/js/voice.js?v=2.7.1"></script>
+<script defer src="app/js/data/catalog.js?v=2.7.4"></script>
+<script defer src="cam/js/state.js?v=2.7.4"></script>
+<script defer src="cam/js/exercise.js?v=2.7.4"></script>
+<script defer src="cam/js/canvas.js?v=2.7.1"></script>
+<script defer src="cam/js/live-loop.js?v=2.7.1"></script>
+<script defer src="cam/js/sets.js?v=2.7.1"></script>
+<script defer src="cam/js/plan.js?v=2.7.1"></script>
+<script defer src="cam/js/live-ui.js?v=2.7.4"></script>
+<script defer src="cam/js/engine.js?v=2.7.3"></script>
+<script defer src="cam/js/recording.js?v=2.7.1"></script>
+<script defer src="cam/js/recognition.js?v=2.7.4"></script>
+<script defer src="cam/js/video.js?v=2.7.4"></script>
+<script defer src="cam/js/bar.js?v=2.7.4"></script>
+<script defer src="cam/js/main.js?v=2.7.4"></script>
 </body></html>

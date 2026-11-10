@@ -1,15 +1,30 @@
 'use strict';
 /* ---------- exercise ---------- */
 function fillSelect() {
-  const sorted = keys.slice().sort((a, b) => EX.ex[a].name.localeCompare(EX.ex[b].name, 'ru'));
-  if (FREE) sorted.unshift(FREE);
-  for (const k of FREE_KEYS) if (!sorted.includes(k)) sorted.unshift(k);
-  el.sel.innerHTML = sorted.map(k => '<option value="' + k + '">' + esc(EX.ex[k].name) + (FREE_KEYS.has(k) ? ' · счёт повторов' : '') + '</option>').join('');
+  const sorted = [...keys, ...FREE_KEYS].sort((a, b) => EX.ex[a].name.localeCompare(EX.ex[b].name, 'ru'));
+  const options = list => list.map(k => '<option value="' + esc(k) + '">' + esc(EX.ex[k].name) + '</option>').join('');
+  el.sel.innerHTML = '<optgroup label="Разбор техники">' + options(sorted.filter(k => !FREE_KEYS.has(k))) + '</optgroup>' +
+    '<optgroup label="Счёт повторов">' + options(sorted.filter(k => FREE_KEYS.has(k))) + '</optgroup>';
   el.sel.value = state.ex;
+  const query = $('#exerciseSearch'), results = $('#exerciseMatches');
+  const normName = s => s.toLowerCase().replace(/ё/g, 'е');
+  query.addEventListener('input', () => {
+    const words = normName(query.value).trim().split(/\s+/).filter(Boolean);
+    if (!words.length) { results.innerHTML = ''; return; }
+    const matches = sorted.filter(k => [EX.ex[k].name, ...(SYN[k] || [])].some(name => words.every(w => normName(name).includes(w))));
+    results.innerHTML = matches.slice(0, 12).map(k => '<button class="sub-btn" type="button" data-ex="' + esc(k) + '">' +
+      esc(EX.ex[k].name) + (FREE_KEYS.has(k) ? ' · счёт' : '') + '</button>').join('') || '<p>Упражнения не найдены</p>';
+  });
+  results.addEventListener('click', e => {
+    const button = e.target.closest('button[data-ex]');
+    if (!button) return;
+    setExercise(button.dataset.ex);
+    query.value = ''; results.innerHTML = ''; $('#exerciseFinder').open = false;
+  });
 }
-function setExercise(key) {
-  if (state.file) stopCamera();
-  if (state.on && !state.preflight && state.analyzer && state.analyzer.reps.length && !state.analyzer.setEnded) {
+function setExercise(key, keepVideo = false) {
+  if (state.file && !keepVideo) stopCamera();
+  if (!keepVideo && state.on && !state.preflight && state.analyzer && state.analyzer.reps.length && !state.analyzer.setEnded) {
     state.analyzer.endSet(); processEvents(state.analyzer.drain());
   }
   state.ex = key; el.sel.value = key;
@@ -26,16 +41,16 @@ function setExercise(key) {
   if (state.on && !state.file && !state.recOnly) { Rec.drop(); state.preflight = true; }
   el.note.hidden = !isFree() || state.on;
   loadSets();
-  newAnalyzer();
+  newAnalyzer(!keepVideo);
   renderSets(); renderMain();
 }
-function newAnalyzer() {
+function newAnalyzer(resetPose = true) {
   state.revision++;
   state.analyzer = state.fallback && state.ex === 'leg_ext' ? new AT.LegExtensionAnalyzer(state.level,true)
     : isFree() || state.fallback ? new AT.FreeAnalyzer(state.level, state.ex, !!state.fallback) : AT.analyzerFor(state.ex, state.depth, state.level);
   state.snap = null; state.flash = null;
   state.preflightReady = false; state.preflightSince = null;
-  resetDet();
+  if (resetPose) resetDet();
 }
 el.sel.addEventListener('change', () => setExercise(el.sel.value));
 

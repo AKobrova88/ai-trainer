@@ -68,8 +68,8 @@ async function barRunFile(nx, ny) {
     handleSnap(A.update(p, t, f.W));
     state.prog = Math.min(99, Math.round(t / dur * 100));
   };
-  await seekTo(v, 0); if (!live()) return;
-  take(0);
+  const firstFrame = await seekTo(v, 0); if (!live()) return;
+  if (firstFrame) take(0);
   // The video plays once and every shown frame is read (fast, and how Safari is happiest); seeking frame by frame otherwise.
   let played = false;
   if (!flat && 'requestVideoFrameCallback' in v) {
@@ -90,9 +90,9 @@ async function barRunFile(nx, ny) {
     });
   }
   if (!played && !flat) for (let t = 1 / 15; live() && t <= dur && !flat; t += 1 / 15) {
-    await seekTo(v, Math.min(t, Math.max(0, dur - 0.01)));
+    const decoded = await seekTo(v, Math.min(t, Math.max(0, dur - 0.01)));
     if (!live()) return;
-    take(t);
+    if (decoded) take(t);
     await sleep(0);
   }
   if (flat) { state.analyzing = false; state.bar = null; return barFlat(); }

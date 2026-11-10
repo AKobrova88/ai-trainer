@@ -34,7 +34,7 @@ function cueState() {
     const r = state.videoSummary;
     return {cls:'info',text:r ? 'Видео: '+(isHold()?'секунд':'повторов')+' — '+r.reps+' · подходов — '+r.sets+(r.warning ? '. '+r.warning : '. Проверь результат ниже') : 'Видео обработано. Проверь результат ниже'};
   }
-  if (state.on && state.file && state.analyzing) return { cls: 'info', text: 'Разбираю видео · ' + (state.prog || 0) + '%' + (snap && snap.reps ? ' · повторов: ' + snap.reps : '') };
+  if (state.on && state.file && state.analyzing) return { cls: 'info', text: (state.recognizingVideo ? 'Определяю упражнение' : 'Разбираю видео') + ' · ' + (state.prog || 0) + '%' + (snap && snap.reps ? ' · повторов: ' + snap.reps : '') };
   if (state.on && state.recOnly) { const s = Math.round(Rec.secs()); return { cls: 'info', text: '● Запись ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' · ' + (!snap || snap.status === 'nobody' ? 'встань в кадр целиком' : 'вижу тебя целиком') }; }
   if (!state.on) return state.flash && state.flash.until > now ? state.flash : { cls: 'tip', text: info().tips[0] };
   if (!snap) return { cls: 'info', text: state.detector ? 'Включаю камеру…' : 'Готовлю тренера…' };
@@ -111,13 +111,16 @@ function renderLive() {
   el.cue.className = 'cue ' + cs.cls;
   if (el.cueText.textContent !== cs.text) el.cueText.textContent = cs.text;
   const snap = state.snap, hold = isHold();
+  const videoExercise = $('#videoExercise');
+  videoExercise.hidden = !state.videoExercise;
+  if (videoExercise.textContent !== (state.videoExercise || '')) videoExercise.textContent = state.videoExercise || '';
   const analysisText = state.bar ? 'Счёт по движению веса: повторы, амплитуда и темп. Положение тела не оценивается'
-    : state.fallback ? 'Только счёт повторов по видимому движению. Техника не оценивается'
+    : state.fallback || isFree() ? 'Только счёт повторов по видимому движению. Техника не оценивается'
     : snap && snap.analysisMode === '2d'
     ? '2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
     : '3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
   const analysisInfo = $('#analysisInfo');
-  const versionedAnalysis = 'Версия 2.7.3 · ' + analysisText;
+  const versionedAnalysis = 'Версия 2.7.4 · ' + analysisText;
   if (analysisInfo.textContent !== versionedAnalysis) analysisInfo.textContent = versionedAnalysis;
   el.hud.hidden = !state.on || !!state.recOnly || state.preflight;
   if (snap) {
@@ -132,6 +135,7 @@ function renderMain() {
   const A = state.analyzer, inSet = state.on && A && A.reps.length && !A.setEnded;
   const b = el.main;
   $('#altBtns').hidden = state.on;
+  $('#videoAutoRow').hidden = state.on;
   if (state.on && state.preflight) { b.className = 'main-btn secondary'; b.innerHTML = 'Выключить камеру'; return; }
   if (state.on && state.recOnly) { b.className = 'main-btn rec'; b.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="2"/></svg>Стоп — разобрать видео'; return; }
   b.className = 'main-btn' + (inSet ? ' stop' : state.on ? ' secondary' : '');

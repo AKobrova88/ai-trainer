@@ -1,5 +1,4 @@
-/* One screen, one job: the exercise, a looping example, the camera with live cues, and the list of sets to save.
-   The camera is always dark — the «Сумерки» theme of the app (tokens: claude/design-system-v1.md), whatever the phone or Telegram theme. */
+/* Camera colors, including the controls drawn over the video. */
 :root{
   --bg:#12151f; --surface:#1c2131; --surface-2:#252b3e; --surface-3:#2f3750; --ink:#f3efe7; --muted:#a9acbc; --line:#2a3044;
   --accent:#c3eb6e; --accent-ink:#12151f; --accent-soft:#2b3522;
@@ -13,6 +12,15 @@
   --f-mono:"Sofia Sans Condensed",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --r:24px;
   color-scheme:dark;
+}
+:root[data-theme="bento"]{
+  --bg:#f1e8dc; --surface:#fff8ef; --surface-2:#f7efe4; --surface-3:#e7dac8; --ink:#262838; --muted:#5d5a63; --line:#e5d9c9;
+  --accent:#16406c; --accent-ink:#fff; --accent-soft:#cde3f7;
+  --blue:#cde3f7; --blue-ink:#16406c; --lime:#d5efa3; --pink:#b3261e; --beige:#5d5a63;
+  --good:#3d5a12; --good-soft:#e7f4cc; --warn:#8a5300; --warn-soft:#fbe7c4; --bad:#b3261e; --bad-soft:#fbe0dc;
+  --stage:#e5d9c9; --stage-2:#fff8ef; --stage-ink:#262838; --stage-dim:#5d5a63; --stage-glass:rgba(255,248,239,.94); --stage-edge:rgba(38,40,56,.24);
+  --stage-accent:#16406c; --stage-bone:#9dcbf4; --stage-good:#c3eb6e; --stage-warn:#f0b45a; --stage-bad:#f4a9c0;
+  background:var(--bg);color-scheme:light;
 }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--f-body);-webkit-font-smoothing:antialiased;margin:0}
