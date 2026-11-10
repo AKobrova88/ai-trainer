@@ -1,27 +1,43 @@
-// ИИ Тренер: offline cache. Page and the camera's own code (cam/) = network first, libraries and models = cache first.
-// Since 2.7 the camera page is split into files: its code must never be served stale next to a fresh page.
-const CACHE = 'aitrainer-20261105-v271';
-const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
-self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('aitrainer-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+// Camera code is refreshed separately from the large model files already on the device.
+const ASSETS = 'aitrainer-20261105-v271';
+const CAMERA = 'aitrainer-camera-278';
+const scope = new URL(self.registration.scope);
+const entry = new URL('index.html', scope).href;
+
+self.addEventListener('install', event => {
+  event.waitUntil(caches.open(CAMERA).then(cache => cache.add(new Request(entry, {cache: 'reload'})))
+    .then(() => self.skipWaiting()));
 });
-const networkFirst = (req, key) => fetch(req).then(r => {
-  if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(key || req, copy)); }
-  return r;
-}).catch(() => caches.match(key || req, {ignoreSearch: !key}));
-self.addEventListener('fetch', e => {
-  const req = e.request, url = new URL(req.url);
-  if (req.method !== 'GET' || url.origin !== location.origin) return;
-  if (url.pathname.includes('/app/')) return;   // the web app next door keeps its own files
-  if (url.pathname.endsWith('.mp4')) return;   // example videos stream straight from the network (range requests)
-  if (req.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('index.html')) {
-    e.respondWith(networkFirst(req, 'index.html'));
-    return;
-  }
-  if (url.pathname.includes('/cam/') || url.pathname.endsWith('/config.js')) { e.respondWith(networkFirst(req)); return; }
-  e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
-    if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
-    return r;
-  })));
+self.addEventListener('activate', event => {
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys
+    .filter(key => key.startsWith('aitrainer-camera-') && key !== CAMERA).map(key => caches.delete(key))))
+    .then(() => self.clients.claim()));
+});
+
+function save(cache, key, response) {
+  if (!response?.ok) return;
+  const copy = response.clone();
+  return cache.then(storage => storage.put(key, copy));
+}
+
+function networkFirst(event, key) {
+  const cache = caches.open(CAMERA);
+  const fresh = fetch(event.request, {cache: 'no-cache'});
+  event.waitUntil(fresh.then(response => save(cache, key, response)).catch(() => {}));
+  // A script can fall back only to the exact URL, including its release query.
+  event.respondWith(fresh.catch(async error => (await (await cache).match(key)) || Promise.reject(error)));
+}
+
+self.addEventListener('fetch', event => {
+  const req = event.request, url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== scope.origin || !url.pathname.startsWith(scope.pathname)) return;
+  const path = url.pathname.slice(scope.pathname.length);
+  if (path === '' || path === 'index.html') return networkFirst(event, entry);
+  if (path.startsWith('cam/') || path.startsWith('shared/') || path === 'app/js/data/catalog.js') return networkFirst(event, req);
+  if (path.startsWith('app/') || path === 'app' || path.endsWith('.mp4') || req.mode === 'navigate') return;
+  const cache = caches.open(ASSETS);
+  const hit = cache.then(storage => storage.match(req));
+  const fresh = hit.then(cached => cached ? null : fetch(req));
+  event.waitUntil(fresh.then(response => save(cache, req, response)).catch(() => {}));
+  event.respondWith(hit.then(cached => cached || fresh));
 });

@@ -25,7 +25,8 @@ const ENGINE_VERSION = 3;
 const LOCAL = !!window.AI_TRAINER_STANDALONE;
 const MP_PATH = LOCAL ? new URL('vendor/mediapipe', location.href).href : 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404';
 function appleMobile() {
-  return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    || new URLSearchParams(location.hash.slice(1)).get('tgWebAppPlatform') === 'ios';
 }
 function engineOrder(preferred) {
   const e = store.get(ENGINE_KEY, null), fresh = e?.v === ENGINE_VERSION && Date.now() - e.at < 3 * 864e5;
@@ -134,25 +135,61 @@ function disposeDetector(det) {
   try { Promise.resolve(det?.dispose?.()).catch(() => {}); } catch (e) { /* best effort */ }
 }
 
-async function createEngine(kind, mode, signal) {
+function modelSource(path, signal, onBytes) {
+  if (!LOCAL || typeof tf.io?.http !== 'function' || typeof fetch !== 'function') return path;
+  return tf.io.http(new URL(path, location.href).href, {
+    requestInit: {signal},
+    async fetchFunc(input, options) {
+      const response = await fetch(input, options);
+      if (!response.ok || !response.body?.getReader || typeof ReadableStream !== 'function') return response;
+      const reader = response.body.getReader();
+      const body = new ReadableStream({
+        async pull(controller) {
+          const {value, done} = await reader.read();
+          if (done) { controller.close(); return; }
+          onBytes(value.byteLength);
+          controller.enqueue(value);
+        },
+        cancel(reason) { return reader.cancel(reason); },
+      });
+      return new Response(body, {status: response.status, statusText: response.statusText, headers: response.headers});
+    },
+  });
+}
+
+async function createEngine(kind, mode, signal, report = () => {}) {
   let det;
   const checkDeadline = () => { if (signal.aborted) throw new Error('Запуск модели отменён'); };
   const dispose = () => { disposeDetector(det); det = null; };
   signal.addEventListener('abort', dispose, { once: true });
   try {
     if (kind === 'tfjs') {
+      report('library');
       if (!window.tf) await loadScript(LOCAL ? 'vendor/tf.min.js' : 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js');
       checkDeadline();
       if (!window.poseDetection) await loadScript(LOCAL ? 'vendor/pose-detection.min.js' : 'https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js');
       checkDeadline();
+      report('runtime');
+      if (mode === 'wasm') {
+        const assets = new URL('vendor/tfjs-wasm/', location.href).href;
+        if (!tf.wasm) await loadScript(assets + 'tf-backend-wasm.min.js');
+        checkDeadline();
+        tf.wasm.setWasmPaths(assets);
+        tf.wasm.setThreadsCount(1); // Telegram need not isolate its WebView for shared-memory threads.
+      }
       if (!(await tf.setBackend(mode))) throw new Error('Недоступен режим анализа: ' + mode);
       await tf.ready();
       checkDeadline();
+      let bytes = 0;
+      const onBytes = size => { bytes += size; report('model', bytes); };
+      report('model');
       det = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, {
         runtime: 'tfjs', modelType: 'lite', enableSmoothing: true,
-        detectorModelUrl: 'models/blazepose-detector.json', landmarkModelUrl: 'models/blazepose-lite.json'
+        detectorModelUrl: modelSource('models/blazepose-detector.json', signal, onBytes),
+        landmarkModelUrl: modelSource('models/blazepose-lite.json', signal, onBytes),
       });
     } else {
+      report('model');
       if (mode === 'worker') det = mediaPipeWorkerDetector(kind);
       else {
         if (!window.Pose) await loadScript(MP_PATH + '/pose.js');
@@ -162,6 +199,7 @@ async function createEngine(kind, mode, signal) {
       await det.initialize();
     }
     checkDeadline();
+    report('frame');
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 256;
     await det.estimatePoses(canvas);
@@ -178,23 +216,38 @@ async function createEngine(kind, mode, signal) {
 
 // Cold startup includes fetching several MB of model data, even if the page itself loaded quickly.
 const ENGINE_TIMEOUT_MS = 60000;
-async function startEngine(kind, mode) {
+const IOS_STARTUP_LIMIT_MS = 120000, IOS_NO_PROGRESS_MS = 30000;
+async function startEngine(kind, mode, report) {
   const deadline = new AbortController();
-  let timer;
+  const watchProgress = LOCAL && appleMobile() && kind === 'tfjs' && typeof ReadableStream === 'function';
+  let timer, idle, rejectTimeout;
+  const expired = new Promise((_, reject) => { rejectTimeout = reject; });
+  const timeout = () => {
+    rejectTimeout(new Error('Истекло время запуска модели: ' + kind + '/' + mode));
+    deadline.abort();
+  };
+  const resetIdle = () => { clearTimeout(idle); idle = setTimeout(timeout, IOS_NO_PROGRESS_MS); };
+  timer = setTimeout(timeout, watchProgress ? IOS_STARTUP_LIMIT_MS : ENGINE_TIMEOUT_MS);
+  if (watchProgress) resetIdle();
   try {
     return await Promise.race([
-      createEngine(kind, mode, deadline.signal),
-      new Promise((_, reject) => {
-        timer = setTimeout(() => {
-          reject(new Error('Истекло время запуска модели: ' + kind + '/' + mode));
-          deadline.abort();
-        }, ENGINE_TIMEOUT_MS);
-      })
+      createEngine(kind, mode, deadline.signal, (stage, bytes = 0) => {
+        if (deadline.signal.aborted) return;
+        if (watchProgress) resetIdle();
+        report?.(stage, bytes);
+      }),
+      expired,
     ]);
-  } finally { clearTimeout(timer); }
+  } finally { clearTimeout(timer); clearTimeout(idle); }
 }
 
 function engineAttempts(preferred) {
+  // In Safari and other iOS WebViews, skip both WebGL startups. This model uses the same
+  // local BlazePose weights with a faster CPU backend, and can still fall back to plain JS.
+  if (LOCAL && appleMobile()) {
+    const modes = typeof WebAssembly === 'object' ? ['wasm', 'cpu'] : ['cpu'];
+    return modes.map(mode => ({kind: 'tfjs', mode}));
+  }
   const worker = supportsPoseWorker();
   return engineOrder(preferred).flatMap(kind => {
     const modes = kind === 'tfjs' ? ['webgl', 'cpu'] : worker ? ['worker', 'page'] : ['page'];
@@ -202,15 +255,15 @@ function engineAttempts(preferred) {
   });
 }
 
-async function ensureDetector(preferred, onAttempt) {
+async function ensureDetector(preferred) {
   if (state.detector) return state.detector;
   if (!state.detectorLoading) {
     state.detectorLoading = (async () => {
       let lastError;
       for (const [i, {kind, mode}] of engineAttempts(preferred).entries()) {
-        onAttempt?.(i);
+        state.detectorProgress = {stage: 'library', bytes: 0, attempt: i};
         try {
-          const det = await startEngine(kind, mode);
+          const det = await startEngine(kind, mode, (stage, bytes) => { state.detectorProgress = {stage, bytes, attempt: i}; });
           state.detector = det;
           state.engine = kind;
           store.set(ENGINE_KEY, { v: ENGINE_VERSION, e: kind, at: Date.now() });
@@ -246,12 +299,21 @@ function hideMsg() { el.msg.hidden = true; el.stage.classList.remove('msg-open')
 async function loadModelWithUi(current, retry, videoFallback) {
   if (state.detector) return true;
   const manual = { label: 'Записать вручную', run: () => { stopCamera(); manualSet(); } };
-  showMsg('Загружаю анализатор', 'При первом запуске нужно загрузить модель. На мобильной сети это может занять около минуты.',
+  const started = performance.now();
+  const stages = { library: 'Подключаю анализатор', runtime: 'Запускаю модуль анализа', model: 'Скачиваю модель на телефон', frame: 'Проверяю обработку кадра' };
+  showMsg('Загружаю анализатор', stages.library,
     [{ label: 'Отменить', run: stopCamera }, manual], true);
+  const refresh = () => {
+    if (!current()) { clearInterval(clock); return; }
+    const p = state.detectorProgress;
+    const size = p?.bytes >= 1e5 ? ' · ' + (p.bytes / 1e6).toFixed(1).replace('.', ',') + ' МБ' : '';
+    el.msgText.textContent = (p?.attempt ? 'Запасной режим. ' : '') + (stages[p?.stage] || stages.library) + size + ' · ' + Math.floor((performance.now() - started) / 1000) + ' с';
+  };
+  const clock = setInterval(refresh, 1000);
   try {
-    await ensureDetector(undefined, i => {
-      if (i && current()) el.msgText.textContent = 'Запускаю анализ в режиме совместимости. Можно подождать или отменить.';
-    });
+    const startup = ensureDetector();
+    refresh();
+    await startup;
     if (!current()) return false;
     hideMsg();
     return true;
@@ -268,7 +330,7 @@ async function loadModelWithUi(current, retry, videoFallback) {
        manual,
        { label: 'Закрыть', run: hideMsg }]);
     return false;
-  }
+  } finally { clearInterval(clock); }
 }
 function showCameraMode(on) {
   state.on = on;
@@ -296,10 +358,18 @@ async function startCamera() {
   newAnalyzer(); showCameraMode(true);          // the video is on screen before play(): hidden videos stay frozen on some phones
   setAspect(el.vid.videoWidth || 720, el.vid.videoHeight || 1280);
   requestWake();
+  if (state.recOnly) {
+    Rec.start(stream);
+    if (!Rec.mr) {
+      stopCamera();
+      return showMsg('Запись недоступна', 'Сними подход обычной камерой телефона и выбери запись из галереи.',
+        [{ label: 'Выбрать видео', primary: true, run: () => { hideMsg(); pickVideo(true); } }, { label: 'Закрыть', run: hideMsg }]);
+    }
+    Voice.say('Запись пошла. Сделай подход и нажми «Стоп»', 'rec', true);
+    return;
+  }
   if (!(await loadModelWithUi(() => state.stream === stream, startCamera))) return;
   resetDet();
-  if (!state.preflight) { Rec.start(state.stream); attemptT0 = performance.now(); helperAt = 25000; }
-  if (state.recOnly) Voice.say('Запись пошла. Сделай подход и нажми «Стоп»', 'rec', true);
 }
 function stopStream() {
   barReset();

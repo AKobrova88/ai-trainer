@@ -120,7 +120,7 @@ function renderLive() {
     ? '2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
     : '3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
   const analysisInfo = $('#analysisInfo');
-  const versionedAnalysis = 'Версия 2.7.4 · ' + analysisText;
+  const versionedAnalysis = 'Версия 2.7.8 · ' + analysisText;
   if (analysisInfo.textContent !== versionedAnalysis) analysisInfo.textContent = versionedAnalysis;
   el.hud.hidden = !state.on || !!state.recOnly || state.preflight;
   if (snap) {

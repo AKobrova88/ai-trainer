@@ -16,7 +16,7 @@ if (!Rec.ok()) $('#recBtn').hidden = true;
 
 if (window.AI_TRAINER_STANDALONE) {
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* offline cache is optional */ }); });
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}).catch(() => { /* offline cache is optional */ }); });
   }
 }
 telegramBridge.then(W => {

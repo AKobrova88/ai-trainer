@@ -19,6 +19,7 @@ function camPlan() {
 }
 function camLink(it, mode) {
   const u = new URL(CAM_URL), plan = camPlan();
+  u.searchParams.set('rev', CAMERA_REV);
   if (it) {
     const W = S.workout, pos = W ? W.items.findIndex(x => x === it || norm(x.name) === norm(it.name)) : -1, mine = plan.find(p => p[4] === pos);
     /* the camera knows technique for its own keys; anything else it still counts by name */
@@ -34,6 +35,7 @@ function camLink(it, mode) {
   u.searchParams.set('l', S.profile.exp || 'normal');
   if (mode) u.searchParams.set('mode', mode);
   u.searchParams.set('src', 'app');
+  if (TG.inside() || /tgWebApp/.test(location.hash) || window.TelegramWebviewProxy) u.searchParams.set('tg', '1');
   if (SAME_SITE) u.searchParams.set('ret', location.pathname + '#from-camera');
   return u.href;
 }

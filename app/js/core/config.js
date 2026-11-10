@@ -1,17 +1,18 @@
 'use strict';
-const APP_VERSION = '2.7.4 · тест';
+const APP_VERSION = '2.7.8 · тест';
+const CAMERA_REV = '2.7.8';
 /* storage keys: one set per Telegram account on this phone (TG.slot() is empty in a browser) */
 const LEGACY_KEY = 'ai-trainer-app-1';
 const KEY = LEGACY_KEY + TG.slot();
 const INBOX = 'aitrainer.inbox' + TG.slot();
 const STEP = {bb_lower: 5, bb_upper: 2.5, machine: 2.5, db: 1, bw: 0, time: 0};
 /* the camera coach: on the same site the results come back by themselves; elsewhere it opens in a new tab */
-const CAM_ABS = 'https://akobrova88.github.io/ai-trainer/';
-/* own domain: the app at /, the camera at /camera/ (nginx on the server); GitHub Pages: the app at …/app/, the camera one level up */
-const OWN_DOMAIN = /(^|\.)trener-ii\.ru$/.test(location.hostname);
-/* the camera page is deployed next to the app (GitHub Pages, Vercel, a local run, a Tuna tunnel) */
-const SAME_SITE = OWN_DOMAIN || ((['akobrova88.github.io', 'localhost', '127.0.0.1'].includes(location.hostname) || /\.(vercel\.app|tuna\.am|tuna\.free)$/.test(location.hostname)) && /\/app\/?/.test(location.pathname));
-const CAM_URL = SAME_SITE && /\/app\/?/.test(location.pathname) ? new URL('../', location.href).href : OWN_DOMAIN ? new URL('/camera/', location.href).href : CAM_ABS;   // on GitHub Pages (also with the own domain) the camera is one level up
+const CAM_ABS = 'https://trener-ii.ru/';
+const OWN_DOMAIN = /^(?:www\.)?trener-ii\.ru$/.test(location.hostname);
+const APP_PATH = /\/app(?:\/(?:index\.html)?)?$/;
+/* The camera is at the root of each deployment. Keep an existing site's local training data on that origin. */
+const SAME_SITE = OWN_DOMAIN || ((['akobrova88.github.io', 'localhost', '127.0.0.1'].includes(location.hostname) || /\.(vercel\.app|tuna\.am|tuna\.free)$/.test(location.hostname)) && APP_PATH.test(location.pathname));
+const CAM_URL = SAME_SITE ? new URL(APP_PATH.test(location.pathname) ? location.pathname.replace(APP_PATH, '/') : '/', location.origin).href : CAM_ABS;
 /* who runs the service — goes into the consent text; fill in before payments are switched on */
 const OPERATOR = {name: 'Индивидуальный предприниматель Коброва Анастасия', ogrnip: '', inn: '', address: '', email: ''};
 /* One base plan. Payment details are planning metadata; acquiring is not connected. */
