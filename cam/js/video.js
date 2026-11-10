@@ -73,7 +73,7 @@ async function analyzeVideo(blob, from, bar = false) {
   setAspect(v.videoWidth, v.videoHeight); newAnalyzer(); showCameraMode(true);
   if (bar) return barPick('file');   // the body is hidden anyway: no pose model, the weight is followed
   const current = () => token === fileToken;
-  if (!(await loadModelWithUi(current, () => analyzeVideo(blob, from, bar))) || !current()) return;
+  if (!(await loadModelWithUi(current, () => analyzeVideo(blob, from), () => analyzeVideo(blob, from, true))) || !current()) return;
   const st = { n: 0, miss: {}, errors:0, consecutiveErrors:0, shadowGroups:[[]] };
   const buffer = [];
   const auto = from === 'upload' && $('#videoAuto').checked !== false;

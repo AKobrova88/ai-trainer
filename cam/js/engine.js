@@ -10,7 +10,7 @@ function loadScript(src) {
         script.remove();
         reject(new Error('Не загрузилась библиотека: ' + src));
       };
-      const timer = setTimeout(fail, 10000);
+      const timer = setTimeout(fail, 30000);
       script.src = src;
       script.onload = () => { clearTimeout(timer); resolve(); };
       script.onerror = fail;
@@ -21,10 +21,14 @@ function loadScript(src) {
   return modelScripts.get(src);
 }
 const ENGINE_KEY = 'aitrainer.engine';
+const ENGINE_VERSION = 3;
 const LOCAL = !!window.AI_TRAINER_STANDALONE;
 const MP_PATH = LOCAL ? new URL('vendor/mediapipe', location.href).href : 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404';
+function appleMobile() {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
 function engineOrder(preferred) {
-  const e = store.get(ENGINE_KEY, null), fresh = e?.v === 2 && Date.now() - e.at < 3 * 864e5;
+  const e = store.get(ENGINE_KEY, null), fresh = e?.v === ENGINE_VERSION && Date.now() - e.at < 3 * 864e5;
   let gl2 = false;
   try {
     const context = document.createElement('canvas').getContext('webgl2');
@@ -32,8 +36,7 @@ function engineOrder(preferred) {
     context?.getExtension('WEBGL_lose_context')?.loseContext();
   } catch (e) { /* WebGL probe is optional */ }
   if (typeof WebAssembly !== 'object' || !gl2 || preferred === 'tfjs') return ['tfjs'];
-  const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const mobile = appleMobile() || /Android/i.test(navigator.userAgent);
   if (!preferred && fresh && e.e === 'tfjs') return ['tfjs', 'mp-lite'];
   return [preferred || (mobile || (fresh && e.e === 'mp-lite') ? 'mp-lite' : 'mp-full'), 'tfjs'];
 }
@@ -65,6 +68,8 @@ function mediaPipeDetector(kind) {
 }
 
 function supportsPoseWorker() {
+  // A WebGL2 probe alone does not establish that MediaPipe can run in an iOS WebView worker.
+  if (appleMobile()) return false;
   if (!LOCAL || typeof Worker !== 'function' || typeof OffscreenCanvas !== 'function' || typeof createImageBitmap !== 'function') return false;
   try {
     const context = new OffscreenCanvas(1, 1).getContext('webgl2');
@@ -129,7 +134,7 @@ function disposeDetector(det) {
   try { Promise.resolve(det?.dispose?.()).catch(() => {}); } catch (e) { /* best effort */ }
 }
 
-async function createEngine(kind, signal) {
+async function createEngine(kind, mode, signal) {
   let det;
   const checkDeadline = () => { if (signal.aborted) throw new Error('Запуск модели отменён'); };
   const dispose = () => { disposeDetector(det); det = null; };
@@ -140,8 +145,7 @@ async function createEngine(kind, signal) {
       checkDeadline();
       if (!window.poseDetection) await loadScript(LOCAL ? 'vendor/pose-detection.min.js' : 'https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js');
       checkDeadline();
-      const webgl = await tf.setBackend('webgl').catch(() => false);
-      if (!webgl) await tf.setBackend('cpu');
+      if (!(await tf.setBackend(mode))) throw new Error('Недоступен режим анализа: ' + mode);
       await tf.ready();
       checkDeadline();
       det = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, {
@@ -149,7 +153,7 @@ async function createEngine(kind, signal) {
         detectorModelUrl: 'models/blazepose-detector.json', landmarkModelUrl: 'models/blazepose-lite.json'
       });
     } else {
-      if (supportsPoseWorker()) det = mediaPipeWorkerDetector(kind);
+      if (mode === 'worker') det = mediaPipeWorkerDetector(kind);
       else {
         if (!window.Pose) await loadScript(MP_PATH + '/pose.js');
         checkDeadline();
@@ -172,16 +176,17 @@ async function createEngine(kind, signal) {
   }
 }
 
-const ENGINE_TIMEOUT_MS = 12000;
-async function startEngine(kind) {
+// Cold startup includes fetching several MB of model data, even if the page itself loaded quickly.
+const ENGINE_TIMEOUT_MS = 60000;
+async function startEngine(kind, mode) {
   const deadline = new AbortController();
   let timer;
   try {
     return await Promise.race([
-      createEngine(kind, deadline.signal),
+      createEngine(kind, mode, deadline.signal),
       new Promise((_, reject) => {
         timer = setTimeout(() => {
-          reject(new Error('Модель не запустилась за 12 секунд: ' + kind));
+          reject(new Error('Истекло время запуска модели: ' + kind + '/' + mode));
           deadline.abort();
         }, ENGINE_TIMEOUT_MS);
       })
@@ -189,20 +194,29 @@ async function startEngine(kind) {
   } finally { clearTimeout(timer); }
 }
 
-async function ensureDetector(preferred) {
+function engineAttempts(preferred) {
+  const worker = supportsPoseWorker();
+  return engineOrder(preferred).flatMap(kind => {
+    const modes = kind === 'tfjs' ? ['webgl', 'cpu'] : worker ? ['worker', 'page'] : ['page'];
+    return modes.map(mode => ({kind, mode}));
+  });
+}
+
+async function ensureDetector(preferred, onAttempt) {
   if (state.detector) return state.detector;
   if (!state.detectorLoading) {
     state.detectorLoading = (async () => {
       let lastError;
-      for (const kind of engineOrder(preferred)) {
+      for (const [i, {kind, mode}] of engineAttempts(preferred).entries()) {
+        onAttempt?.(i);
         try {
-          const det = await startEngine(kind);
+          const det = await startEngine(kind, mode);
           state.detector = det;
           state.engine = kind;
-          store.set(ENGINE_KEY, { v: 2, e: kind, at: Date.now() });
+          store.set(ENGINE_KEY, { v: ENGINE_VERSION, e: kind, at: Date.now() });
           return det;
         } catch (error) {
-          console.warn(kind, error);
+          console.warn(kind + '/' + mode, error);
           lastError = error;
         }
       }
@@ -229,13 +243,15 @@ function showMsg(title, text, actions, spinning) {
   for (const a of actions || []) { const b = document.createElement('button'); b.type = 'button'; b.textContent = a.label; if (a.primary) b.className = 'primary'; b.addEventListener('click', a.run); el.msgActions.appendChild(b); }
 }
 function hideMsg() { el.msg.hidden = true; el.stage.classList.remove('msg-open'); }
-async function loadModelWithUi(current, retry) {
+async function loadModelWithUi(current, retry, videoFallback) {
   if (state.detector) return true;
   const manual = { label: 'Записать вручную', run: () => { stopCamera(); manualSet(); } };
-  showMsg('Загружаю анализатор', 'Первый запуск может занять до 24 секунд. Анализ начнётся, когда модель будет готова.',
+  showMsg('Загружаю анализатор', 'При первом запуске нужно загрузить модель. На мобильной сети это может занять около минуты.',
     [{ label: 'Отменить', run: stopCamera }, manual], true);
   try {
-    await ensureDetector();
+    await ensureDetector(undefined, i => {
+      if (i && current()) el.msgText.textContent = 'Запускаю анализ в режиме совместимости. Можно подождать или отменить.';
+    });
     if (!current()) return false;
     hideMsg();
     return true;
@@ -244,8 +260,11 @@ async function loadModelWithUi(current, retry) {
     if (!current()) return false;
     console.error(e);
     stopCamera();
-    showMsg('Анализатор не запустился', 'Попробуй ещё раз или запиши подход вручную.',
-      [{ label: 'Повторить', primary: true, run: () => { hideMsg(); retry(); } },
+    showMsg('Анализатор не запустился', videoFallback
+      ? 'Видео открылось. Проверь интернет и повтори разбор этого видео. Можно также посчитать повторы по движению веса.'
+      : 'Проверь интернет и повтори запуск. Можно записать подход вручную.',
+      [{ label: videoFallback ? 'Повторить разбор' : 'Повторить', primary: true, run: () => { hideMsg(); retry(); } },
+       ...(videoFallback ? [{ label: 'Считать по движению веса', run: () => { hideMsg(); videoFallback(); } }] : []),
        manual,
        { label: 'Закрыть', run: hideMsg }]);
     return false;
