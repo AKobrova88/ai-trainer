@@ -291,18 +291,20 @@ async function swapEngine(kind) {
 }
 function showMsg(title, text, actions, spinning) {
   el.msg.hidden = false; el.msgTitle.textContent = title; el.msgText.textContent = text; el.msgSpin.hidden = !spinning;
-  el.stage.classList.toggle('msg-open', text.length > 140 || (actions || []).length > 2);
+  el.msg.dataset.loading = String(!!spinning);
+  el.stage.classList.toggle('msg-open', !spinning && (text.length > 140 || (actions || []).length > 2));
   el.msgActions.innerHTML = '';
-  for (const a of actions || []) { const b = document.createElement('button'); b.type = 'button'; b.textContent = a.label; if (a.primary) b.className = 'primary'; b.addEventListener('click', a.run); el.msgActions.appendChild(b); }
+  for (const a of spinning ? [] : actions || []) { const b = document.createElement('button'); b.type = 'button'; b.textContent = a.label; if (a.primary) b.className = 'primary'; b.addEventListener('click', a.run); el.msgActions.appendChild(b); }
+  renderMain();
 }
-function hideMsg() { el.msg.hidden = true; el.stage.classList.remove('msg-open'); }
+function hideMsg() { el.msg.hidden = true; el.stage.classList.remove('msg-open'); renderMain(); }
 async function loadModelWithUi(current, retry, videoFallback) {
   if (state.detector) return true;
   const manual = { label: 'Записать вручную', run: () => { stopCamera(); manualSet(); } };
   const started = performance.now();
   const stages = { library: 'Подключаю анализатор', runtime: 'Запускаю модуль анализа', model: 'Скачиваю модель на телефон', frame: 'Проверяю обработку кадра' };
   showMsg('Загружаю анализатор', stages.library,
-    [{ label: 'Отменить', run: stopCamera }, manual], true);
+    [], true);
   const refresh = () => {
     if (!current()) { clearInterval(clock); return; }
     const p = state.detectorProgress;
@@ -343,14 +345,25 @@ function showCameraMode(on) {
   else { setAspect(1, 1); try { const p = el.howto.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* fine */ } }
   renderMain(); renderLive();
 }
-async function startCamera() {
+async function startCamera(automatic = false) {
+  if (state.cameraRequest) return;
+  hideMsg(); state.cameraDenied = false;
   stopFile(); state.usedFile = false; state.fallback = false; lastStatus = '';
   if (Voice.on) Voice.say('Включаю камеру', 'cam', true);   // said inside the tap, so the phone lets the coach speak later
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return cameraBlocked();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { if (!automatic) cameraBlocked(); return; }
+  const request = {}; state.cameraRequest = request; renderMain(); renderLive();
   let stream;
   stopStream();                                   // many phones cannot open the second camera while the first one is busy
   try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: state.facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }); }
-  catch (e) { return cameraBlocked(); }
+  catch (e) {
+    if (state.cameraRequest !== request) return;
+    state.cameraRequest = null; state.recOnly = false; state.preflight = false;
+    showCameraMode(false);
+    if (!automatic) cameraBlocked();
+    return;
+  }
+  if (state.cameraRequest !== request) { for (const t of stream.getTracks()) t.stop(); return; }
+  state.cameraRequest = null;
   stopStream(); state.stream = stream;
   state.preflight = !state.recOnly;
   el.vid.autoplay = true; el.vid.muted = true; el.vid.setAttribute('playsinline', ''); el.vid.srcObject = stream;
@@ -363,7 +376,7 @@ async function startCamera() {
     if (!Rec.mr) {
       stopCamera();
       return showMsg('Запись недоступна', 'Сними подход обычной камерой телефона и выбери запись из галереи.',
-        [{ label: 'Выбрать видео', primary: true, run: () => { hideMsg(); pickVideo(true); } }, { label: 'Закрыть', run: hideMsg }]);
+        [{ label: 'Выбрать видео', primary: true, run: () => { hideMsg(); pickVideo(); } }, { label: 'Закрыть', run: hideMsg }]);
     }
     Voice.say('Запись пошла. Сделай подход и нажми «Стоп»', 'rec', true);
     return;
@@ -378,35 +391,29 @@ function stopStream() {
   if (el.vid.srcObject) el.vid.srcObject = null;
 }
 function stopCamera() {
+  state.cameraRequest = null;
   hideMsg();
   state.recOnly = false;
   const A = state.analyzer;
-  if (!state.preflight && A && A.reps.length && !A.setEnded) { A.endSet(); processEvents(A.drain()); }
+  if (!state.file && !state.preflight && A && A.reps.length && !A.setEnded) { A.endSet(); processEvents(A.drain()); }
   state.preflight = false; state.preflightReady = false; state.preflightSince = null;
   stopStream(); stopFile(); releaseWake(); state.frame = null; showCameraMode(false);
 }
 function cameraBlocked() {
-  const tgIn = document.documentElement.classList.contains('in-telegram');
-  showMsg('Нет доступа к камере', tgIn
-    ? 'Разреши Telegram доступ к камере в настройках телефона и нажми «Повторить». Или выбери видео подхода из галереи.'
-    : 'Разреши камеру для этой страницы (значок замка или «аА» в адресной строке) и нажми «Повторить». Или выбери видео подхода.',
-    [{ label: 'Повторить', primary: true, run: () => { hideMsg(); startCamera(); } }, { label: 'Видео из галереи', run: () => { hideMsg(); pickVideo(); } }]);
+  state.cameraDenied = true;
+  renderMain(); renderLive();
 }
 el.stage.addEventListener('click', () => { if (state.on && el.vid.paused) { try { el.vid.play(); } catch (e) { /* fine */ } } });
 function renderFacing() {
-  for (const b of el.camBtns) b.setAttribute('aria-pressed', String(b.dataset.facing === state.facing));
-  el.camNote.textContent = state.facing === 'user'
-    ? 'Фронтальная — видишь себя и подсказки на экране.'
-    : 'Основная — картинка чётче, но экран смотрит от тебя: подсказки скажу голосом.';
+  $('#facingLabel').textContent = state.facing === 'user' ? 'Фронтальная' : 'Основная';
 }
 function setFacing(f) {
-  if (f === state.facing) return;
+  if (f === state.facing || state.cameraRequest) return;
   state.facing = f; store.set('aitrainer.v2', Object.assign(prefs, { facing: f }));
-  if (f === 'environment' && !Voice.on && 'speechSynthesis' in window) { Voice.on = true; el.voice.setAttribute('aria-pressed', 'true'); Voice.say('Голос включён', 'on', true); }
+  if (f === 'environment' && !Voice.on && 'speechSynthesis' in window) { Voice.on = true; el.voice.checked = true; Voice.say('Голос включён', 'on', true); }
   renderFacing();
   if (state.on && !state.file) startCamera();
 }
-for (const b of el.camBtns) b.addEventListener('click', () => setFacing(b.dataset.facing));
 el.flip.addEventListener('click', () => setFacing(state.facing === 'user' ? 'environment' : 'user'));
 el.vid.addEventListener('resize', () => { if (el.vid.videoWidth && state.on) setAspect(el.vid.videoWidth, el.vid.videoHeight); });
 let wake = null;

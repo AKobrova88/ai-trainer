@@ -80,29 +80,22 @@ function chatText() {
   return state.sets.filter(s => s.r > 0).map(s => weighted() && s.w ? kgTxt(s.w).replace(',', '.') + 'x' + s.r : String(s.r)).join(' ');
 }
 const appKeys = () => { const l = PLAN.map(p => p.k); if (!l.includes(state.ex)) l.push(state.ex); return l; };
+function resultHandoff() {
+  if (RET) return appKeys().some(k => setsOf(k).some(s => s.r > 0)) ? 'app' : '';
+  return canSend() && state.sets.some(s => s.r > 0) ? 'bot' : '';
+}
 function renderSend() {
-  const ok = state.sets.filter(s => s.r > 0), n = ok.length;
-  if (RET) {
-    const per = appKeys().map(k => [k, setsOf(k).filter(s => s.r > 0).length]).filter(x => x[1]), tot = per.reduce((a, x) => a + x[1], 0);
-    const missW = n && weighted() && ok.some(s => !s.w);
-    el.sendBox.innerHTML = !tot ? '<p>Сделай подход перед камерой — он появится здесь, потом одной кнопкой вернёшь его в приложение.</p><button class="main-btn secondary" type="button" id="backBtn">Вернуться в приложение</button>'
-      : (missW ? '<p>Укажи вес в каждом подходе — так прогресс посчитается точно.</p>' : '') +
-        (per.length > 1 ? '<p>' + per.map(([k, c]) => esc(short(planName(k))) + ' — ' + c).join(' · ') + '</p>' : '') +
-        '<button class="main-btn" type="button" id="appBtn">Записать ' + tot + ' ' + plural(tot, 'подход', 'подхода', 'подходов') + ' в дневник</button>' +
-        '<button class="main-btn secondary" type="button" id="backBtn">Вернуться без записи</button>';
-    return;
-  }
-  if (!n) { el.sendBox.innerHTML = state.fromBot ? '<p>Сделай подход перед камерой — он появится здесь, потом одной кнопкой запишешь всё в дневник.</p>' : ''; return; }
-  const missW = weighted() && ok.some(s => !s.w);
-  if (canSend()) {
-    el.sendBox.innerHTML = (missW ? '<p>Укажи вес в каждом подходе — так прогресс посчитается точно.</p>' : '') +
-      '<button class="main-btn" type="button" id="sendBtn">Записать ' + n + ' ' + plural(n, 'подход', 'подхода', 'подходов') + ' в дневник</button>';
-  } else if (tg()) {
-    el.sendBox.innerHTML = '<p>Отсюда запись в дневник недоступна. Скопируй результат и отправь его боту сообщением — или открой камеру кнопкой «🎥 Камера» под полем ввода.</p>' +
-      '<button class="main-btn secondary" type="button" id="copyBtn">Скопировать: ' + esc(chatText()) + '</button>';
-  } else {
+  const ok = state.sets.filter(s => s.r > 0);
+  el.sendBox.innerHTML = '';
+  if (ok.length && (RET || canSend())) {
+    if (weighted() && ok.some(s => !s.w)) el.sendBox.innerHTML = '<p>Укажи вес, чтобы точнее отслеживать прогресс.</p>';
+  } else if (ok.length && tg()) {
+    el.sendBox.innerHTML = '<p>Этот способ открытия камеры не поддерживает запись в дневник. Можно скопировать итог для бота.</p>' +
+      '<button class="sub-btn" type="button" id="copyBtn">Скопировать: ' + esc(chatText()) + '</button>';
+  } else if (ok.length) {
     el.sendBox.innerHTML = '<p>Подходы сохранены на этом телефоне до конца дня.</p>';
   }
+  renderMain();
 }
 function toApp() {
   if (state.on) stopCamera();
@@ -126,19 +119,22 @@ function toApp() {
   state.sets = [];
   location.href = RET;
 }
-el.sendBox.addEventListener('click', async e => {
-  if (e.target.closest('#appBtn')) return toApp();
-  if (e.target.closest('#backBtn')) { stopCamera(); location.href = RET; return; }
-  if (e.target.closest('#sendBtn')) {
+function commitResults() {
+  const destination = resultHandoff();
+  if (destination === 'app') return toApp();
+  if (destination === 'bot') {
     const W = tg(), A = state.analyzer;
     const sets = state.sets.filter(s => s.r > 0).map(s => {
       const f = {}; Object.keys(s.f || {}).sort((a, b) => s.f[b] - s.f[a]).slice(0, 3).forEach(k => { f[k] = s.f[k]; });
       return isFree() || s.partial || s.countOnly ? { w: weighted() ? s.w : null, r: s.r, n: 0, c: 0, f: {} } : { w: weighted() ? s.w : null, r: s.r, n: s.n, c: s.c, f };
     });
     const payload = JSON.stringify({ v: 2, ex: state.ex, view: (A && A.view) || state.view, sets });
-    try { W.sendData(payload); state.sets = []; saveSets(); }
+    try { W.sendData(payload); state.sets = []; saveSets(); renderSets(); }
     catch (err) { el.sendBox.insertAdjacentHTML('afterbegin', '<p>Не получилось отправить. Скопируй результат и пришли боту сообщением.</p>'); }
-  } else if (e.target.closest('#copyBtn')) {
+  }
+}
+el.sendBox.addEventListener('click', async e => {
+  if (e.target.closest('#copyBtn')) {
     const text = chatText();
     try { await navigator.clipboard.writeText(text); e.target.closest('#copyBtn').textContent = 'Скопировано — вставь в чат с ботом'; }
     catch (err) { e.target.closest('#copyBtn').textContent = text; }

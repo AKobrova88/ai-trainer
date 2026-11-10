@@ -28,12 +28,12 @@ function barPick(mode) {
   Voice.say('Нажми на блин или каретку на экране', 'barpick', true);
   renderLive(); renderMain();
 }
-$('#barTipCancel').addEventListener('click', () => {
+function cancelBarPick() {
   const B = state.bar; el.stage.classList.remove('picking'); $('#barTip').hidden = true;
   state.bar = B && B.keep ? B.keep : null;
   if (!state.bar && state.file && !state.analyzing) showMsg('Как посчитать подход', 'Можно указать точку ещё раз или записать подход вручную.', [{ label: 'Указать точку', primary: true, run: () => barPick('file') }, { label: 'Записать вручную', run: () => { hideMsg(); manualSet(); } }]);
-  renderLive();
-});
+  renderLive(); renderMain();
+}
 el.stage.addEventListener('pointerdown', e => {
   const B = state.bar;
   if (!B || !(B.picking || B.live) || e.target.closest('#barTip, .stage-msg, button')) return;
@@ -100,10 +100,10 @@ async function barRunFile(nx, ny) {
   state.analyzing = false;
   A.endSet(); processEvents(A.drain());
   const sets = state.sets.slice(setStart), found = sets.reduce((a, x) => a + x.r, 0);
-  state.videoSummary = { reps: found, sets: sets.length, warning: found ? 'Посчитано по движению веса, положение тела не оценивалось' : 'Повторы не найдены' };
+  state.videoSummary = { reps: found, sets: sets.length, warning: found ? 'По движению веса, без оценки техники' + (lost > n * 0.2 ? '. Проверь число повторов' : '') : 'Повторы не найдены' };
   const redo = { label: 'Указать другую точку', run: () => { if (state.sets.length > setStart) { state.sets.splice(setStart); saveSets(); renderSets(); } barPick('file'); } };
   const byHand = { label: 'Записать вручную', run: () => { hideMsg(); manualSet(); } };
-  if (found) { showMsg('Посчитала по движению веса', A.note() + (lost > n * 0.2 ? ' Точка иногда терялась — проверь число повторов.' : ''), [{ label: 'Готово', primary: true, run: hideMsg }, redo, byHand]); Voice.say('Посчитала по движению веса: ' + found + ' ' + plural(found, 'повтор', 'повтора', 'повторов'), 'verdict', true); return; }
+  if (found) { renderMain(); renderLive(); Voice.say('Посчитала по движению веса: ' + found + ' ' + plural(found, 'повтор', 'повтора', 'повторов'), 'verdict', true); return; }
   const lostIt = lost > n * 0.4;
   showMsg(lostIt ? 'Не смогла проследить за точкой' : 'Повторов не нашла', lostIt ? 'Точка пропадала из кадра или похожа на соседние места. Нажми на край блина, надпись или болт — то, что всё время видно.' : 'Точка почти не двигалась. Выбери то, что ходит вместе с весом на всю амплитуду: блин, стопку грузов или каретку.', [Object.assign({}, redo, { primary: true }), byHand]);
 }
@@ -158,8 +158,8 @@ function videoVerdict(st, found, shadow, from) {
     state.fallback = true; state.analyzer = shadow; shadow.setEnded = true;
     for (const group of shadowGroups) { shadow.reps = group; recordSet(); }
     state.videoSummary = {reps:shadowTotal,sets:shadowGroups.length,warning:'Техника не оценивалась. Проверь число повторов'};
-    return tell('Повторы посчитала, технику — нет', 'По видимым движениям нашла ' + shadowTotal + ' повторов. Проверь число и при необходимости исправь его в подходе. Для оценки техники данных недостаточно: суставы могли быть закрыты тренажёром или 3D-точки были неустойчивы.',
-      [{ label: 'Проверить повторы', primary: true, run: hideMsg }, again.find(a => a !== byWeight)], 'Повторы посчитаны без оценки техники. Проверь число');
+    Voice.say('Повторы посчитаны без оценки техники. Проверь число', 'verdict', true);
+    return;
   }
   if (lost3d > .35) return tell('Недостаточно надёжных 3D-точек',
     'Не удалось уверенно восстановить суставы. Освободи обзор, добавь свет и поставь телефон ровно. Начни запись с неподвижного исходного положения. Скрытые части тела нельзя надёжно оценить по одной камере.', again);

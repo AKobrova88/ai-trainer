@@ -17,7 +17,7 @@ function camPlan() {
   });
   return out;
 }
-function camLink(it, mode) {
+function camLink(it, mode = 'live') {
   const u = new URL(CAM_URL), plan = camPlan();
   u.searchParams.set('rev', CAMERA_REV);
   if (it) {
@@ -33,7 +33,7 @@ function camLink(it, mode) {
   u.searchParams.set('cam', S.camFacing === 'back' ? 'back' : 'front');
   u.searchParams.set('theme', S.theme === 'bento' ? 'bento' : 'dusk');
   u.searchParams.set('l', S.profile.exp || 'normal');
-  if (mode) u.searchParams.set('mode', mode);
+  u.searchParams.set('mode', mode);
   u.searchParams.set('src', 'app');
   if (TG.inside() || /tgWebApp/.test(location.hash) || window.TelegramWebviewProxy) u.searchParams.set('tg', '1');
   if (SAME_SITE) u.searchParams.set('ret', location.pathname + '#from-camera');
@@ -57,22 +57,17 @@ function viewCamera() {
     <section class="camcard"><div class="hd"><span class="pi">${I.lock}</span><span><b>Камера-тренер — в подписке</b><span>Пробный период закончился</span></span></div>
       <p style="margin:0">Камера онлайн и разбор видео без лимитов — ${rub(PRICING.sub.price)} в месяц. Своя программа, дневник и прогресс работают и без подписки.</p>
       <button class="btn primary big" data-act="paywall" data-v="cam">Подписка и промокод</button></section>`];
-  const it = currentCamEx(), c = it.base && CAT[it.base];
+  const it = currentCamEx();
   const vlog = S.videoLog.slice(0, 6);
   const q = v => { const r = v.n ? v.c / v.n : 0; return r >= .8 ? 'good' : r >= .5 ? 'fair' : 'bad'; };
   return ['Камера', `
-    <section class="camcard">
-      <div class="hd"><span class="pi">${I.camera}</span><span><b>Онлайн-тренер</b><span>Смотрит технику и подсказывает во время подхода</span></span></div>
-      <button class="pickbtn" data-act="cam-pick"><span class="grow"><small>Упражнение</small><b>${esc(it.name)}</b></span>${c && c.cam ? '<span class="badge cam">разбор техники</span>' : '<span class="badge">счёт повторов</span>'}${CHEV}</button>
-      <div class="seg" role="group" aria-label="Какой камерой снимать"><button data-act="cam-facing" data-v="front" aria-pressed="${S.camFacing !== 'back'}">Фронтальная</button><button data-act="cam-facing" data-v="back" aria-pressed="${S.camFacing === 'back'}">Основная</button></div>
-      <span class="hint">${S.camFacing === 'back' ? 'Основная — картинка чётче, а подсказки скажу голосом: экран смотрит от тебя.' : 'Фронтальная — видишь себя и подсказки на экране. Поставь телефон в 2–3 м.'}</span>
-      ${S.workout && camPlan().length > 1 ? '<span class="hint">В камеру уйдёт вся сегодняшняя тренировка: там можно переключать упражнения и чередовать подходы, а потом одной кнопкой записать всё сюда.</span>' : ''}
-      <a class="btn primary big" href="${esc(camLink(it))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go">Включить камеру</a>
-    </section>
-    <section class="camcard">
-      <div class="hd"><span class="pi">${I.video}</span><span><b>Разбор видео</b><span>Распознаёт знакомые движения по записи подхода</span></span></div>
-      <a class="btn big" style="border:2px dashed var(--line);background:transparent" href="${esc(camLink(it, 'video'))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go">${I.plus}Выбрать видео</a>
-      <span class="hint">Видео разбирается на телефоне и никуда не загружается — сохраняется только итог: повторы и ошибки.</span>
+    <section class="cam-entry" aria-label="Камера и видео">
+      <a class="cam-entry-row" href="${esc(camLink(it))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go">
+        <span class="cam-entry-icon">${I.camera}</span><span class="grow"><b>Камера</b><small>${esc(it.name)}</small></span>${CHEV}
+      </a>
+      <a class="cam-entry-row" href="${esc(camLink(it, 'video'))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go">
+        <span class="cam-entry-icon">${I.video}</span><span class="grow"><b>Разбор видео</b><small>Из галереи</small></span>${CHEV}
+      </a>
     </section>
     ${SAME_SITE ? '' : `<div class="note blue">${I.info}<span>Здесь, в предпросмотре, камера откроется в новой вкладке, и подходы оттуда нужно будет записать вручную. В установленной версии они вернутся сюда сами.</span></div>`}
     ${vlog.length ? `<div class="eyebrow">Недавние разборы</div><div class="vlog">${vlog.map(v => `<button class="vrow" data-act="vres" data-v="${v.id}"><span class="grow"><b>${esc(v.name)}</b><small>${ruDate(v.at)} · ${v.reps} ${plural(v.reps, 'повтор', 'повтора', 'повторов')}${v.mode === 'video' ? ' · видео' : ''}${v.partial ? ' · 3D, предварительно' : ''}</small></span>${v.n && !v.partial ? `<span class="q ${q(v)}">чисто ${v.c} из ${v.n}</span>` : ''}</button>`).join('')}</div>` : ''}`];

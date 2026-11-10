@@ -1,18 +1,60 @@
 'use strict';
-el.voice.addEventListener('click', () => {
-  if (!('speechSynthesis' in window)) { el.voice.disabled = true; return; }
-  Voice.on = !Voice.on; el.voice.setAttribute('aria-pressed', String(Voice.on)); store.set('aitrainer.v2', Object.assign(prefs, { voice: Voice.on }));
+function openSheet(sheet) {
+  if (sheet.open) return;
+  if (sheet.showModal) sheet.showModal(); else sheet.setAttribute('open', '');
+}
+function closeSheet(sheet) {
+  if (sheet.close && sheet.open) sheet.close(); else sheet.removeAttribute('open');
+}
+const optionsSheet = $('#cameraOptions');
+for (const dialog of [optionsSheet, $('#exerciseFinder')]) {
+  dialog.addEventListener('click', e => {
+    if (e.target === dialog || e.target.closest('[data-dismiss]')) closeSheet(dialog);
+  });
+}
+const option = (id, run) => $(id).addEventListener('click', () => { closeSheet(optionsSheet); run(); });
+const goCamera = () => { state.recOnly = false; startCamera(); };
+option('#cameraOption', goCamera);
+option('#galleryOption', () => pickVideo());
+option('#saveOption', commitResults);
+option('#recBtn', startRecordMode);
+option('#recordedOption', analyzeLive);
+option('#manualOption', () => { stopCamera(); manualSet(); });
+option('#setupCount', () => beginPreparedSet(true));
+option('#setupBar', () => state.file ? barPick('file') : state.on ? barPick('live') : pickVideo(true));
+$('#vidBtn').addEventListener('click', () => pickVideo());
+$('#facingOption').addEventListener('click', () => setFacing(state.facing === 'user' ? 'environment' : 'user'));
+$('#moreBtn').addEventListener('click', () => {
+  const [action] = cameraAction(), idle = !state.on && !state.file && !state.cameraRequest, ready = !state.analyzing && !action.startsWith('cancel');
+  $('#cameraOption').hidden = !(idle && action !== 'start');
+  $('#galleryOption').hidden = !ready || (!state.file && (!idle || action !== 'save'));
+  $('#recBtn').hidden = !idle || !Rec.ok();
+  $('#recordedOption').hidden = !ready || !state.on || !!state.file || state.recOnly || Rec.secs() < 4;
+  $('#saveOption').hidden = !ready || action === 'save' || !resultHandoff();
+  $('#setupBar').hidden = !ready || state.recOnly || isHold();
+  $('#facingOption').hidden = !idle;
+  $('#voiceOption').hidden = !('speechSynthesis' in window);
+  renderSetup(); openSheet(optionsSheet);
+});
+el.voice.addEventListener('change', () => {
+  if (!('speechSynthesis' in window)) return;
+  Voice.on = el.voice.checked; store.set('aitrainer.v2', Object.assign(prefs, { voice: Voice.on }));
   if (Voice.on) Voice.say('Голос включён', 'on', true); else speechSynthesis.cancel();
 });
+const back = $('#navBack');
+back.hidden = !RET;
+if (RET) {
+  back.setAttribute('href', RET);
+  back.addEventListener('click', () => { stopCamera(); saveSets(); });
+}
 let cameraTelegram = null;
 if (cameraColorScheme.addEventListener) cameraColorScheme.addEventListener('change', () => syncCameraTheme(cameraTelegram));
 new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
 fillSelect(); setAspect(1, 1); resize(); setExercise(state.ex); renderFacing(); renderPlan();
-el.voice.setAttribute('aria-pressed', String(Voice.on));
+el.voice.checked = Voice.on;
 requestAnimationFrame(loop);
-if (MODE_VIDEO) pickVideo();
-if (!Rec.ok()) $('#recBtn').hidden = true;
+if (MODE_LIVE) startCamera(true);
 
 if (window.AI_TRAINER_STANDALONE) {
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

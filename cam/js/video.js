@@ -58,8 +58,9 @@ function fixDuration(v) {
   });
 }
 async function analyzeVideo(blob, from, bar = false) {
-  stopStream(); stopFile(); state.recOnly = false; state.fallback = false; hideMsg();
-  state.file = URL.createObjectURL(blob); state.usedFile = true;
+  state.cameraRequest = null;
+  stopStream(); stopFile(); state.preflight = false; state.recOnly = false; state.fallback = false; hideMsg();
+  state.file = URL.createObjectURL(blob); state.usedFile = true; renderMain();
   const token=++fileToken;
   const v = el.vid; v.autoplay = false; v.srcObject = null; v.src = state.file; v.muted = true; v.classList.remove('mirror');
   showMsg('Открываю видео', 'Читаю запись на телефоне.', [{label: 'Отмена', run: stopCamera}], true);
@@ -152,8 +153,9 @@ async function analyzeVideo(blob, from, bar = false) {
       A.setEnded = true;
       recordSet();
       state.videoSummary = {reps, sets: 1, warning: 'Посчитала видимые сгибания на одной руке. Техника не оценивалась. Проверь число повторов'};
-      return;
+      renderMain(); renderLive(); return;
     }
   }
   videoVerdict(st, found, shadow, from);
+  renderMain(); renderLive();
 }

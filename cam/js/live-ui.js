@@ -30,13 +30,18 @@ function cueState() {
   const snap = state.snap, now = performance.now(), A = state.analyzer;
   if (state.bar && state.bar.picking) return { cls: 'info', text: 'Нажми на блин, стопку грузов или каретку' };
   if (state.bar && state.on && state.file && state.analyzing) return { cls: 'info', text: 'Слежу за весом · ' + (state.prog || 0) + '%' + (snap && snap.reps ? ' · повторов: ' + snap.reps : '') };
-  if (state.on && state.file && !state.analyzing && state.snap) {
+  if (state.on && state.file && !state.analyzing && (state.snap || state.videoSummary)) {
     const r = state.videoSummary;
     return {cls:'info',text:r ? 'Видео: '+(isHold()?'секунд':'повторов')+' — '+r.reps+' · подходов — '+r.sets+(r.warning ? '. '+r.warning : '. Проверь результат ниже') : 'Видео обработано. Проверь результат ниже'};
   }
   if (state.on && state.file && state.analyzing) return { cls: 'info', text: (state.recognizingVideo ? 'Определяю упражнение' : 'Разбираю видео') + ' · ' + (state.prog || 0) + '%' + (snap && snap.reps ? ' · повторов: ' + snap.reps : '') };
   if (state.on && state.recOnly) { const s = Math.round(Rec.secs()); return { cls: 'info', text: '● Запись ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' · ' + (!snap || snap.status === 'nobody' ? 'встань в кадр целиком' : 'вижу тебя целиком') }; }
+  if (state.cameraRequest) return {cls:'info', text:'Открываю камеру…'};
+  if (!state.on && state.cameraDenied) return {cls:'info', text: IN_TG
+    ? 'Разреши Telegram доступ к камере в настройках телефона или выбери видео.'
+    : 'Разреши камеру в настройках сайта или выбери видео.'};
   if (!state.on) return state.flash && state.flash.until > now ? state.flash : { cls: 'tip', text: info().tips[0] };
+  if (!el.msg.hidden && el.msg.dataset.loading === 'true') return { cls: 'info', text: 'Держи рабочие суставы в кадре' };
   if (!snap) return { cls: 'info', text: state.detector ? 'Включаю камеру…' : 'Готовлю тренера…' };
   if (state.preflight) {
     const f=state.frame,checks=checkSetup(f&&f.kp,f&&f.W,f&&f.H,snap,state.ex);
@@ -88,21 +93,15 @@ function checkSetup(kp, width, height, snap, key = null) {
 /* End setup check. */
 function setupReason(checks,snap) {
   if (!checks.body) return missingHint(state.frame&&state.frame.kp);
-  if (!checks.angle) return snap && snap.status==='world_lost' ? '3D-точки неустойчивы. Открой суставы или выбери «Только счёт повторов» ниже' : STATUS_TEXT[snap&&snap.status] || 'Не удалось распознать рабочие суставы';
+  if (!checks.angle) return snap && snap.status==='world_lost' ? '3D-точки неустойчивы. Открой суставы или выбери «Только счёт повторов» в меню «Ещё»' : STATUS_TEXT[snap&&snap.status] || 'Не удалось распознать рабочие суставы';
   if (!checks.position) return calibText();
   return 'Замри ещё на мгновение — начну автоматически';
 }
 function renderSetup() {
-  const panel = $('#setupCheck'), active = state.on && state.preflight && !state.file && !state.recOnly;
-  panel.hidden = !active;
-  $('#setupCount').hidden = !active; $('#setupBar').hidden = !active;
-  if (!active) return;
-  const f = state.frame, checks = checkSetup(f && f.kp, f && f.W, f && f.H, state.snap, state.ex);
-  for (const item of panel.querySelectorAll('[data-setup]')) item.dataset.ok = String(checks[item.dataset.setup]);
-  $('#setupStart').disabled = !state.preflightReady;
-  $('#setupCount').disabled = !checks.body;
-  const text = setupReason(checks,state.snap) + '. Счёт включится после проверки автоматически.';
-  if ($('#setupStatus').textContent !== text) $('#setupStatus').textContent = text;
+  const active = state.on && state.preflight && !state.file && !state.recOnly;
+  const count = $('#setupCount'), f = state.frame;
+  count.hidden = !active;
+  count.disabled = !active || !checkSetup(f && f.kp, f && f.W, f && f.H, state.snap, state.ex).body;
 }
 function renderLive() {
   renderSetup();
@@ -120,7 +119,7 @@ function renderLive() {
     ? '2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
     : '3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
   const analysisInfo = $('#analysisInfo');
-  const versionedAnalysis = 'Версия 2.7.8 · ' + analysisText;
+  const versionedAnalysis = 'Версия 2.8.0 · ' + analysisText;
   if (analysisInfo.textContent !== versionedAnalysis) analysisInfo.textContent = versionedAnalysis;
   el.hud.hidden = !state.on || !!state.recOnly || state.preflight;
   if (snap) {
@@ -129,29 +128,40 @@ function renderLive() {
     el.repLabel.textContent = hold ? plural(n, 'секунда', 'секунды', 'секунд') : plural(n, 'повтор', 'повтора', 'повторов');
   }
 }
-const ICON_PLAY = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6 4.5v11l9-5.5-9-5.5z"/></svg>';
-const ICON_CHECK = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8"/></svg>';
+function cameraAction() {
+  const A = state.analyzer;
+  if (state.cameraRequest || (!el.msg.hidden && el.msg.dataset.loading === 'true') || state.analyzing || state.file && !state.on)
+    return ['cancel', 'Отменить', 'secondary'];
+  if (state.bar?.picking) return ['cancel-point', 'Отменить', 'secondary'];
+  if (state.on && state.recOnly) return ['finish', 'Стоп и разобрать', 'rec'];
+  if (state.on && !state.file && !state.preflight && A && A.reps.length && !A.setEnded)
+    return ['end', 'Завершить подход', 'stop'];
+  if (resultHandoff()) return ['save', state.file && state.videoSummary?.reps ? 'Сохранить разбор' : 'Сохранить подходы'];
+  if (state.file) return ['stop', 'Закрыть видео', 'secondary'];
+  if (state.on) return ['stop', 'Выключить камеру', 'secondary'];
+  return MODE_VIDEO ? ['pick', 'Выбрать видео'] : ['start', state.sets.length ? 'Следующий подход' : 'Начать с камерой'];
+}
 function renderMain() {
-  const A = state.analyzer, inSet = state.on && A && A.reps.length && !A.setEnded;
-  const b = el.main;
-  $('#altBtns').hidden = state.on;
+  const [action, label, style] = cameraAction(), b = el.main;
+  b.disabled = false;
+  b.className = 'main-btn' + (style ? ' ' + style : '');
+  if (b.textContent !== label) b.textContent = label;
+  $('#vidBtn').hidden = action !== 'start';
   $('#videoAutoRow').hidden = state.on;
-  if (state.on && state.preflight) { b.className = 'main-btn secondary'; b.innerHTML = 'Выключить камеру'; return; }
-  if (state.on && state.recOnly) { b.className = 'main-btn rec'; b.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="2"/></svg>Стоп — разобрать видео'; return; }
-  b.className = 'main-btn' + (inSet ? ' stop' : state.on ? ' secondary' : '');
-  b.innerHTML = !state.on ? ICON_PLAY + (state.sets.length ? 'Следующий подход с камерой' : 'Начать подход с камерой')
-    : inSet ? ICON_CHECK + 'Подход закончен' : state.file ? 'Закрыть видео' : 'Выключить камеру';
 }
 el.main.addEventListener('click', () => {
-  const A = state.analyzer;
-  if (!state.on) { state.recOnly = false; return startCamera(); }
-  if (state.preflight) return stopCamera();
-  if (state.recOnly) return finishRecording();
-  if (A && A.reps.length && !A.setEnded) { A.endSet(); processEvents(A.drain()); return; }
-  if (!state.file && A && !A.isBar && !A.reps.length && el.msg.hidden) return showLiveHelp('Подход не распознан', 'Повторы не удалось определить. ' + (state.snap && state.snap.status==='world_lost' ? STATUS_TEXT.world_lost : missingHint(state.frame&&state.frame.kp)));
+  const A = state.analyzer, [action] = cameraAction();
+  if (action === 'start') { state.recOnly = false; return startCamera(); }
+  if (action === 'pick') return pickVideo();
+  if (action === 'save') return commitResults();
+  if (action === 'cancel') return stopCamera();
+  if (action === 'cancel-point') return cancelBarPick();
+  if (action === 'finish') return finishRecording();
+  if (action === 'end') { A.endSet(); processEvents(A.drain()); return; }
+  if (!state.preflight && !state.file && A && !A.isBar && !A.reps.length && el.msg.hidden)
+    return showLiveHelp('Подход не распознан', 'Повторы не удалось определить. ' + (state.snap && state.snap.status==='world_lost' ? STATUS_TEXT.world_lost : missingHint(state.frame&&state.frame.kp)));
   stopCamera();
 });
-$('#recBtn').addEventListener('click', () => startRecordMode());
 function beginPreparedSet(countOnly = false) {
   if (!state.on || !state.preflight) return;
   const f = state.frame;
@@ -168,10 +178,6 @@ function beginPreparedSet(countOnly = false) {
   state.flash = null; lastStatus = ''; renderMain(); renderLive();
   if (Voice.on) Voice.say(countOnly ? 'Считаю повторы, без оценки техники' : 'Счёт включён. Начинай подход', 'start', true);
 }
-$('#setupStart').addEventListener('click', () => beginPreparedSet());
-$('#setupCount').addEventListener('click', () => beginPreparedSet(true));
-$('#setupBar').addEventListener('click', () => barPick('live'));
-$('#vidBtn').addEventListener('click', () => pickVideo());
 $('#voiceSel').addEventListener('change', e => { store.set(VOICE_KEY, e.target.value); pickVoice(); });
 $('#voiceTest').addEventListener('click', () => { const was = Voice.on; Voice.on = true; Voice.say('Привет! Отойди подальше, чтобы было видно всё тело. Начинаем подход.', 'test', true); Voice.on = was; });
 

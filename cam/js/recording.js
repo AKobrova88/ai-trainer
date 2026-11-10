@@ -62,25 +62,14 @@ function showLiveHelp(title, why, onContinue) {
 async function analyzeLive() {
   const blob = await Rec.take();
   stopStream(); releaseWake();
-  if (!blob || blob.size < 2000) { showCameraMode(false); return showMsg('Запись не сохранилась', 'Телефон не дал записать видео. Сними подход обычной камерой телефона и выбери его здесь.', [{ label: 'Выбрать видео', primary: true, run: () => { hideMsg(); pickVideo(true); } }, { label: 'Закрыть', run: hideMsg }]); }
+  if (!blob || blob.size < 2000) { showCameraMode(false); return showMsg('Запись не сохранилась', 'Телефон не дал записать видео. Сними подход обычной камерой телефона и выбери его здесь.', [{ label: 'Выбрать видео', primary: true, run: () => { hideMsg(); pickVideo(); } }, { label: 'Закрыть', run: hideMsg }]); }
   analyzeVideo(blob, 'rec');
 }
 async function startRecordMode() { state.recOnly = true; await startCamera(); if (!state.on) state.recOnly = false; renderMain(); }
 async function finishRecording() { state.recOnly = false; renderMain(); return analyzeLive(); }
-/* before a video: how to film it, so the coach can read it */
-function pickVideo(skipGuide) {
-  state.barNext = false;
-  if (skipGuide) return $('#fileInput').click();
-  showMsg('Как снять, чтобы я разобрала',
-    (state.ex==='leg_ext' ? '• Разгибания ног: в кадре нужны таз, колено и стопа одной ноги. Голова и руки для подсчёта не обязательны.\n' : '• Поставь телефон в 2–3 м: рабочие суставы должны оставаться в кадре весь подход.\n') +
-    '• Подходит съёмка спереди, сбоку, сзади и под углом, если видны нужные суставы. Не закрывай их оборудованием.\n' +
-    '• Телефон неподвижно и ровно, без наклона вбок, на уровне пояса — на полке, скамье или штативе.\n' +
-    '• Свет спереди, не против окна. Одно видео — один подход, до минуты.\n' +
-    '• Тренажёр или блины закрывают тело? Выбери «Тело закрыто тренажёром» — посчитаю повторы по движению веса.\n\n' +
-    'Видео обрабатывается на устройстве. 3D из одной камеры — предварительная оценка: скрытые суставы и контакт с полом надёжно проверить нельзя. Если точек недостаточно, анализ приостановится.',
-    [{ label: 'Выбрать видео', primary: true, run: () => { hideMsg(); $('#fileInput').click(); } },
-     { label: 'Тело закрыто тренажёром', run: () => { hideMsg(); state.barNext = true; $('#fileInput').click(); } },
-     { label: 'Снять сейчас', run: () => { hideMsg(); startRecordMode(); } },
-     { label: 'Отмена', run: hideMsg }]);
+/* Keep the native picker in the original tap, including on iPhone. */
+function pickVideo(byWeight = false) {
+  hideMsg();
+  state.barNext = byWeight;
+  $('#fileInput').click();
 }
-

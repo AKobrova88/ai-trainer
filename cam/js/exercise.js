@@ -8,18 +8,23 @@ function fillSelect() {
   el.sel.value = state.ex;
   const query = $('#exerciseSearch'), results = $('#exerciseMatches');
   const normName = s => s.toLowerCase().replace(/ё/g, 'е');
-  query.addEventListener('input', () => {
+  const search = () => {
     const words = normName(query.value).trim().split(/\s+/).filter(Boolean);
-    if (!words.length) { results.innerHTML = ''; return; }
-    const matches = sorted.filter(k => [EX.ex[k].name, ...(SYN[k] || [])].some(name => words.every(w => normName(name).includes(w))));
-    results.innerHTML = matches.slice(0, 12).map(k => '<button class="sub-btn" type="button" data-ex="' + esc(k) + '">' +
-      esc(EX.ex[k].name) + (FREE_KEYS.has(k) ? ' · счёт' : '') + '</button>').join('') || '<p>Упражнения не найдены</p>';
+    const matches = words.length ? sorted.filter(k => [EX.ex[k].name, ...(SYN[k] || [])].some(name => words.every(w => normName(name).includes(w))))
+      : [...new Set([state.ex, ...PLAN.map(p => p.k), ...sorted])].filter(k => cameraHas(k));
+    results.innerHTML = matches.map(k => '<button type="button" data-ex="' + esc(k) + '"' +
+      (k === state.ex ? ' aria-current="true"' : '') + '>' + esc(EX.ex[k].name) +
+      (k === state.ex ? '<span aria-hidden="true">✓</span>' : '') + '</button>').join('') || '<p>Упражнения не найдены</p>';
+  };
+  query.addEventListener('input', search);
+  $('#exerciseBtn').addEventListener('click', () => {
+    query.value = ''; search(); openSheet($('#exerciseFinder'));
   });
   results.addEventListener('click', e => {
     const button = e.target.closest('button[data-ex]');
-    if (!button) return;
+    if (!button || !cameraHas(button.dataset.ex)) return;
     setExercise(button.dataset.ex);
-    query.value = ''; results.innerHTML = ''; $('#exerciseFinder').open = false;
+    closeSheet($('#exerciseFinder'));
   });
 }
 function setExercise(key, keepVideo = false) {
@@ -27,10 +32,10 @@ function setExercise(key, keepVideo = false) {
   if (!keepVideo && state.on && !state.preflight && state.analyzer && state.analyzer.reps.length && !state.analyzer.setEnded) {
     state.analyzer.endSet(); processEvents(state.analyzer.drain());
   }
-  state.ex = key; el.sel.value = key;
+  state.ex = key; el.sel.value = key; $('#exerciseName').textContent = info().name;
   if (key !== FREE) store.set('aitrainer.v2', Object.assign(prefs, { ex: key }));
-  el.camTip.textContent = '📱 ' + (isFree() ? 'Поставь телефон в 2–3 м так, чтобы работающий сустав было хорошо видно (лучше сбоку)'
-    : state.ex === 'leg_ext' ? '📍 Разгибания ног: нужны таз, колено и стопа одной ноги. Голова и руки для подсчёта не обязательны. Телефон можно поставить под углом'
+  el.camTip.textContent = (isFree() ? 'Поставь телефон в 2–3 м так, чтобы работающий сустав было хорошо видно (лучше сбоку)'
+    : state.ex === 'leg_ext' ? 'Разгибания ног: нужны таз, колено и стопа одной ноги. Голова и руки для подсчёта не обязательны. Телефон можно поставить под углом'
     : 'Поставь телефон ровно в 2–3 м. Можно спереди, сбоку, сзади или под углом, если рабочие суставы видны');
   if (isFree()) { el.howto.removeAttribute('src'); try { el.howto.load(); } catch (e) { /* fine */ } }
   else {

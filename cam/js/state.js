@@ -9,6 +9,7 @@ const qp = new URLSearchParams(location.search);
 /* Opened from the web app on the same site: ret= is where to go back, results travel in localStorage 'aitrainer.inbox'. */
 const RET = (() => { const r = qp.get('ret') || ''; return /^\/[^/\\]/.test(r) ? r : null; })();
 const MODE_VIDEO = qp.get('mode') === 'video';
+const MODE_LIVE = !MODE_VIDEO && (qp.get('mode') === 'live' && (qp.get('src') === 'app' || IN_TG) || IN_TG && qp.has('ex') && !RET && qp.get('src') !== 'app');
 const APP_INBOX = 'aitrainer.inbox' + TG_SLOT;
 const pickOpt = (v, list, d) => list.includes(v) ? v : d;
 const keys = Object.keys(EX.ex).filter(k => AT.analyzerFor(k));
@@ -40,6 +41,7 @@ for (const entry of Object.values(CAT)) {
 const cameraHas = k => keys.includes(k) || FREE_KEYS.has(k);
 const isFree = () => FREE_KEYS.has(state.ex);
 const FACING = { front: 'user', back: 'environment' };
+const savedFacing = pickOpt(prefs.facing, ['user', 'environment'], null);
 const state = {
   ex: FREE || (cameraHas(qp.get('ex')) ? qp.get('ex') : cameraHas(prefs.ex) ? prefs.ex : 'bw_squat'),
   depth: pickOpt(qp.get('d'), ['half', 'parallel', 'deep'], pickOpt(prefs.depth, ['half', 'parallel', 'deep'], 'parallel')),
@@ -47,14 +49,14 @@ const state = {
   urlW: num(qp.get('w')), fromBot: qp.has('ex'),
   analyzer: null, snap: null, frame: null, flash: null, sets: [], view: null,
   preflight: false, preflightReady: false, preflightSince: null, revision: 0,
-  detector: null, detectorLoading: null, stream: null, facing: FACING[qp.get('cam')] || (['user', 'environment'].includes(prefs.facing) ? prefs.facing : 'user'), on: false, busy: false, file: null
+  detector: null, detectorLoading: null, stream: null, facing: (qp.get('src') === 'app' && savedFacing) || FACING[qp.get('cam')] || savedFacing || 'user', on: false, cameraRequest: null, busy: false, file: null
 };
 store.set('aitrainer.v2', Object.assign(prefs, { depth: state.depth, level: state.level }));
 const el = {
   sel: $('#exSel'), stage: $('#stage'), howto: $('#howto'), vid: $('#vid'), cv: $('#cv'), hud: $('#hud'), repNum: $('#repNum'), repLabel: $('#repLabel'),
   cue: $('#cue'), cueText: $('#cueText'), camTip: $('#camTip'), main: $('#mainBtn'), flip: $('#flipBtn'), voice: $('#voiceBtn'),
   setsBox: $('#setsBox'), setList: $('#setList'), sendBox: $('#sendBox'), setsTitle: $('#setsTitle'),
-  note: $('#stageNote'), camNote: $('#camNote'), camBtns: [...document.querySelectorAll('.camsel button')],
+  note: $('#stageNote'),
   msg: $('#stageMsg'), msgTitle: $('#msgTitle'), msgText: $('#msgText'), msgActions: $('#msgActions'), msgSpin: $('#msgSpin')
 };
 const info = () => EX.ex[state.ex];
