@@ -58,7 +58,7 @@ const Rec = {
     return this.finish('set').then(clip=>{if(stream && state.stream===stream && state.on && !state.file && generation===this.generation)this.start(stream);return clip;});
   },
   async drain() { while(this.pending.size)await Promise.all([...this.pending]); },
-  async take() { const clip=await this.finish('retry');await this.drain();return (clip || Clips.latest())?.blob || null; }
+  async take() { const clip=await this.finish('retry');await this.drain();return clip?.blob || null; }
 };
 const framed = kp => !!kp && AT.requiredChains(state.ex).some(chain=>chain.every(i=>kp[i]&&kp[i].score>.5));
 const viewWord = () => { const v = AT.viewOf(state.ex); return v === 'front' ? 'лицом к телефону' : v === 'side' ? 'боком к телефону' : 'боком или лицом к телефону'; };
