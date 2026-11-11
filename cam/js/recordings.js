@@ -49,7 +49,7 @@ const Clips = {
       const file=this.file(clip);
       if (!this.downloadFallback && navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
         return navigator.share({files:[file],title:clip.name || 'Видео подхода'}).then(()=>{
-          clip.shared=true;this.notice=clip.persistent ? 'Запись остаётся в приложении. Для обрезки открой сохранённое видео в «Фото».' : 'Видео передано выбранному приложению. Копию в памяти браузера сохранить не удалось.';this.render();
+          clip.shared=true;this.notice=clip.persistent ? 'Запись остаётся в приложении. Для обрезки открой сохранённое видео в галерее или видеоредакторе.' : 'Видео передано выбранному приложению. Копию в памяти браузера сохранить не удалось.';this.render();
         }).catch(e=>{
           if (e?.name==='AbortError') return;
           this.downloadFallback=true;
@@ -58,7 +58,7 @@ const Clips = {
       }
     } catch (e) { /* native sharing is optional; keep the original container */ }
     this.downloadFallback=true;this.open(clip.id); $('#clipDownload').click();
-    this.notice='Начато сохранение файла. Проверь «Файлы» или «Загрузки». На iPhone можно открыть видео и выбрать «Поделиться → Сохранить видео».';this.render();
+    this.notice='Начато сохранение файла. Проверь «Файлы» или «Загрузки». На телефоне видео можно сохранить в галерею через меню «Поделиться».';this.render();
   },
   open(id) {
     const clip=this.get(id) || this.latest();

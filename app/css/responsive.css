@@ -1,0 +1,55 @@
+/* Shared mobile forms and roomy, keyboard-friendly desktop layouts. */
+.view,.sheet,.sheet-h,.sheet-f,.menu button>span,.stat,.fld,.nums>label{min-width:0}
+.sheet-wrap{top:var(--viewport-top,0px);bottom:auto;height:100vh;height:var(--viewport-height,100dvh)}
+.sheet-b{scroll-padding-block:16px}
+.sheet-h h2,.menu button>span,.fchip,.stat b{overflow-wrap:anywhere}
+.sheet-f{flex-wrap:wrap}
+.sheet-f .btn{min-width:120px}
+.input,textarea.input,select{font-size:16px}
+.nums{grid-template-columns:repeat(3,minmax(0,1fr))}
+.nums input{width:100%;min-width:0}
+.plan-list li{flex-wrap:wrap;row-gap:3px}
+.plan-list .nm{flex-basis:55%}
+.plan-list .ds{white-space:normal;max-width:100%}
+.wx-h .badge{flex-shrink:0}
+.grip:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.day,.ex{scroll-margin-top:100px}
+:root[data-keyboard="true"] .tabs,:root[data-keyboard="true"] .restbar{visibility:hidden;pointer-events:none}
+@media (pointer:coarse){
+  .icon-btn,.chip,.seg button,.btn.sm,.grip,.mic,.rest button,.lim-chips button{min-height:48px}
+  .focus-row .lvl button{min-height:44px;min-width:44px}
+  .icon-btn,.grip{min-width:44px}
+  .check{width:48px;height:48px}
+}
+@media (max-width:380px){
+  .nums{gap:5px}
+  .nums .input{padding-inline:5px;font-size:16px}
+  .focus-row{flex-wrap:wrap}
+  .focus-row .nm{flex-basis:100%}
+  .stat{padding:9px}
+}
+@media (max-width:360px) and (pointer:coarse){.set{grid-template-columns:16px minmax(0,1fr) minmax(0,1fr) 48px}}
+@media (min-width:900px){
+  :root{--col:960px}
+  .top-in{padding-block:20px 16px}
+  .top h1{font-size:24px}
+  .view{gap:20px;padding-top:12px}
+  .view[data-screen="today"],.view[data-screen="diary"],.view[data-screen="profile"]{max-width:800px}
+  .days{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:18px}
+  .tabs{max-width:640px}
+  .tab{flex-direction:row;gap:9px;font-size:15px}
+  .tab svg{width:22px;height:22px}
+  .tab .dot{left:auto;right:12px;top:12px}
+  .sheet-wrap{align-items:center;padding:24px}
+  .sheet{max-width:640px;max-height:100%;border:1px solid var(--line);border-radius:24px;box-shadow:var(--lift)}
+  .sheet.full{max-width:880px;height:min(840px,100%);max-height:100%}
+  .sheet-h{padding-top:18px}
+  .onb{max-width:680px;padding-top:48px}
+  .wish textarea{min-height:240px}
+}
+@media (max-height:500px) and (orientation:landscape){
+  .sheet-wrap{align-items:stretch}
+  .sheet,.sheet.full{height:100%;max-height:100%;border-radius:0}
+  .sheet-h{padding-block:5px}
+  .sheet-f{padding-block:5px}
+}

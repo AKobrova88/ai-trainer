@@ -51,7 +51,7 @@ const state = {
   urlW: num(qp.get('w')), fromBot: qp.has('ex'),
   analyzer: null, snap: null, frame: null, flash: null, sets: [], view: null,
   preflight: false, preflightReady: false, preflightSince: null, revision: 0,
-  detector: null, detectorLoading: null, stream: null, facing: (qp.get('src') === 'app' && savedFacing) || FACING[qp.get('cam')] || savedFacing || 'user', on: false, cameraRequest: null, busy: false, file: null
+  detector: null, detectorLoading: null, stream: null, facing: (qp.get('src') === 'app' && savedFacing) || FACING[qp.get('cam')] || savedFacing || 'user', deviceId:prefs.cameraDevice || '', on: false, cameraRequest: null, busy: false, file: null
 };
 store.set('aitrainer.v2', Object.assign(prefs, { depth: state.depth, level: state.level }));
 const el = {

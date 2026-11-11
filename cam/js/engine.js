@@ -339,7 +339,7 @@ function showCameraMode(on) {
   state.on = on;
   const example = $('#showHowto');
   if (example) example.hidden = on || isFree() || !HOWTO_HAVE.has(state.ex);
-  el.howto.hidden = on; el.flip.hidden = !on || !!state.file; el.note.hidden = on || !isFree();
+  el.howto.hidden = on; el.flip.hidden = !on || !!state.file || !canFlipCamera(); el.note.hidden = on || !isFree();
   if (on) {
     try { el.howto.pause(); } catch (e) { /* fine */ }
     H.still = 0; H.lastT = -1; H.errors = 0; H.ok = 0;
@@ -353,23 +353,26 @@ async function startCamera(automatic = false) {
   hideMsg(); state.cameraDenied = false;
   stopFile(); state.usedFile = false; state.fallback = false; lastStatus = '';
   if (Voice.on) Voice.say('Включаю камеру', 'cam', true);   // said inside the tap, so the phone lets the coach speak later
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { if (!automatic) cameraBlocked(); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { cameraBlocked({name:'UnsupportedError'}); return; }
   const request = {}; state.cameraRequest = request; renderMain(); renderLive();
   let stream;
   const closing=stopStream(); // Finish the original video before opening another camera.
   if(closing)await closing;
   if(state.cameraRequest!==request)return;
-  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: state.facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }); }
+  try { stream = await openCameraStream(request); }
   catch (e) {
     if (state.cameraRequest !== request) return;
     state.cameraRequest = null; state.recOnly = false; state.preflight = false;
     showCameraMode(false);
-    if (!automatic) cameraBlocked();
+    cameraBlocked(e);
     return;
   }
   if (state.cameraRequest !== request) { for (const t of stream.getTracks()) t.stop(); return; }
   state.cameraRequest = null;
   stopStream(); state.stream = stream;
+  const settings=stream.getVideoTracks?.()[0]?.getSettings?.();
+  if(settings?.facingMode==='environment' || settings?.facingMode==='user')state.facing=settings.facingMode;
+  refreshCameraDevices();
   state.preflight = !state.recOnly;
   if (!state.recOnly) startPreparation();
   el.vid.autoplay = true; el.vid.muted = true; el.vid.setAttribute('playsinline', ''); el.vid.srcObject = stream;
@@ -411,16 +414,50 @@ function stopCamera() {
   const saving=stopStream(); stopFile(); releaseWake(); state.frame = null; showCameraMode(false);
   return saving;
 }
-function cameraBlocked() {
+async function openCameraStream(request) {
+  const video={width:{ideal:1280},height:{ideal:720}};
+  if(state.deviceId)video.deviceId={exact:state.deviceId};else video.facingMode={ideal:state.facing};
+  try { return await navigator.mediaDevices.getUserMedia({video,audio:false}); }
+  catch(error) {
+    if(state.cameraRequest!==request || !state.deviceId || !['NotFoundError','OverconstrainedError'].includes(error.name))throw error;
+    state.deviceId='';store.set('aitrainer.v2',Object.assign(prefs,{cameraDevice:''}));
+    return navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:state.facing},width:{ideal:1280},height:{ideal:720}},audio:false});
+  }
+}
+function cameraBlocked(error = {}) {
   state.cameraDenied = true;
   renderMain(); renderLive();
+  const messages={NotAllowedError:'Браузер не разрешил доступ к камере. Проверь разрешение для этого сайта или выбери готовую запись.',NotFoundError:'Камера не найдена. Подключи веб-камеру или выбери готовую запись.',NotReadableError:'Камера занята другой программой. Закрой видеозвонок и попробуй снова.',UnsupportedError:'Этот браузер не поддерживает камеру. Можно открыть сайт в другом браузере или выбрать готовую запись.'};
+  showMsg('Камера недоступна',messages[error.name] || 'Не удалось включить камеру. Проверь подключение и доступ к ней.',[
+    {label:'Повторить',primary:true,run:()=>{hideMsg();startCamera();}},
+    {label:'Записать вручную',run:()=>{hideMsg();manualSet();}}
+  ]);
 }
 el.stage.addEventListener('click', () => { if (state.on && el.vid.paused) { try { el.vid.play(); } catch (e) { /* fine */ } } });
+function canFlipCamera() { return appleMobile() || /Android/i.test(navigator.userAgent); }
+async function refreshCameraDevices() {
+  if(!navigator.mediaDevices?.enumerateDevices)return;
+  try {
+    const devices=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput' && d.deviceId);
+    const row=$('#cameraDeviceRow'),select=$('#cameraDevice');if(!row || !select)return;
+    row.hidden=!!state.file || devices.length<2 && !state.deviceId;
+    select.disabled=!!state.cameraRequest;
+    const options=['<option value="">Автоматически</option>'];
+    devices.forEach((d,i)=>options.push('<option value="'+esc(d.deviceId)+'">'+esc(d.label || 'Камера '+(i+1))+'</option>'));
+    select.innerHTML=options.join('');select.value=devices.some(d=>d.deviceId===state.deviceId) ? state.deviceId : '';
+  } catch(e) { /* Enumeration is optional and never requests permission by itself. */ }
+}
+function selectCameraDevice(id) {
+  if(state.cameraRequest)return;
+  state.deviceId=id;store.set('aitrainer.v2',Object.assign(prefs,{cameraDevice:id}));
+  if(state.on && !state.file)startCamera();
+}
 function renderFacing() {
   $('#facingLabel').textContent = state.facing === 'user' ? 'Фронтальная' : 'Основная';
 }
 function setFacing(f) {
   if (f === state.facing || state.cameraRequest) return;
+  state.deviceId='';prefs.cameraDevice='';
   state.facing = f; store.set('aitrainer.v2', Object.assign(prefs, { facing: f }));
   if (f === 'environment' && !Voice.on && 'speechSynthesis' in window) { Voice.on = true; el.voice.checked = true; Voice.say('Голос включён', 'on', true); }
   renderFacing();

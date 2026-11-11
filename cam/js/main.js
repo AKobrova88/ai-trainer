@@ -29,10 +29,13 @@ $('#moreBtn').addEventListener('click', () => {
   $('#recordingsOption').hidden=!Clips.items.length;
   $('#saveOption').hidden = !ready || action === 'save' || !resultHandoff();
   $('#setupBar').hidden = !ready || state.recOnly || isHold();
-  $('#facingOption').hidden = !idle;
+  $('#facingOption').hidden = !idle || !canFlipCamera();
+  refreshCameraDevices();
   $('#voiceOption').hidden = !('speechSynthesis' in window);
   renderSetup(); renderCoachMode(); if ('speechSynthesis' in window) renderVoices(); openSheet(optionsSheet);
 });
+$('#cameraDevice').addEventListener('change',e=>selectCameraDevice(e.target.value));
+if(navigator.mediaDevices?.addEventListener)navigator.mediaDevices.addEventListener('devicechange',refreshCameraDevices);
 el.voice.addEventListener('change', () => {
   if (!('speechSynthesis' in window)) return;
   Voice.on = el.voice.checked; store.set('aitrainer.v2', Object.assign(prefs, { voice: Voice.on }));

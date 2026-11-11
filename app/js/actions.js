@@ -208,6 +208,14 @@ const A = {
     if (idx !== G[0] && idx !== G[G.length - 1]) { day.items.splice(idx, 1); day.items.splice(G[G.length - 1], 0, it); }
     closeSheet(); render(); toast(`«${it.name}» — отдельно, по порядку`, true);
   },
+  'ex-move': v => {
+    const [d,id,dir]=v.split(':'),[day,index]=findItem(d,id);if(!day || index<0)return;
+    const group=groupOf(day.items,index), first=group[0], last=group[group.length-1];
+    const adjacent=+dir<0 ? first-1 : last+1;if(adjacent<0 || adjacent>=day.items.length)return;
+    const other=groupOf(day.items,adjacent), target=+dir<0 ? other[0] : other[other.length-1]-group.length+1;
+    snap();const moved=day.items.splice(first,group.length);day.items.splice(target,0,...moved);
+    closeSheet();render();toast('Порядок упражнений изменён',true);
+  },
   'ex-moveto': v => { const [d, i, to] = v.split(':'), [day, idx, it] = findItem(d, i); snap(); day.items.splice(idx, 1); delete it.ss; dayById(to).items.push(it); closeSheet(); S.open[to] = true; render(); toast(`Перенесла в «${dayById(to).title}»`, true); },
   'ex-swap': v => { const [d, i] = v.split(':'); closeSheet(); catSheet('swap', d, i); },
   'dz-adj': v => { const [k, d] = v.split(':'), inp = $('#dz-' + k); let n = parseNum(inp.value) + parseFloat(d); n = Math.max(k === 's' ? 1 : 0, Math.round(n * 10) / 10); inp.value = k === 'w' ? fmt(n) : n; },

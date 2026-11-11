@@ -19,11 +19,11 @@ function viewWelcome() {
       ${ckRow('terms', 'Мне есть 18 лет, принимаю <a class="linkish" href="#terms" data-act="doc" data-v="terms">пользовательское соглашение</a>', true)}
       ${ckRow('news', 'Хочу получать советы и новости на почту', false)}
       <button class="btn primary big" data-act="reg-go" id="reg-go" ${REG.pd && REG.terms ? '' : 'disabled'}>${TRENER.accounts && !TG.inside() ? 'Получить код' : 'Начать'}</button>
-      <span class="hint">* без этих отметок регистрация недоступна. Первые ${PRICING.trialDays} дней открыто всё, оплата в тесте отключена. ${TRENER.accounts ? `Программа и дневник сохраняются в аккаунте на сервере в России.${TG.inside() ? '' : ' Пароль не нужен — пришлём код на почту.'}` : 'Аккаунт пока хранится только на этом телефоне.'}</span>
+      <span class="hint">* без этих отметок регистрация недоступна. Первые ${PRICING.trialDays} дней открыто всё, оплата в тесте отключена. ${TRENER.accounts ? `Программа и дневник сохраняются в аккаунте на сервере в России.${TG.inside() ? '' : ' Пароль не нужен — пришлём код на почту.'}` : 'Аккаунт пока хранится только на этом устройстве.'}</span>
       ${TRENER.accounts && !TG.inside() ? '<button class="btn ghost" data-act="acc-login">Уже есть аккаунт — войти</button>' : ''}
     </section>
     <button class="btn big" data-act="demo">Посмотреть приложение на примере</button>
-    <div class="note blue">${I.phone}<span>Камера и видео работают только в твоём телефоне. Мы их не получаем и не храним.</span></div>
+    <div class="note blue">${I.phone}<span>Камера и видео обрабатываются на этом устройстве. Мы их не получаем и не храним.</span></div>
     <div class="foot-links"><button data-act="doc" data-v="consent">Как мы обращаемся с данными</button><button data-act="doc" data-v="health">Здоровье и безопасность</button></div>
   </div>`;
 }
@@ -37,7 +37,7 @@ function viewStart() {
       ${path('video', I.video, 'Разобрать видео', 'Выбери запись из галереи — разбор отдельно от тренировки')}
     </div>
     <button class="btn ghost" data-act="demo">Сначала посмотреть на примере</button>
-    <p class="privacy">${I.lock}<span>${S.acct ? 'Видео не покидает телефон. Программа и дневник сохраняются в аккаунте на сервере в России.' : 'Программа, дневник и видео хранятся только на этом телефоне — на сервер они не отправляются.'}</span></p>
+    <p class="privacy">${I.lock}<span>${S.acct ? 'Видео не покидает телефон. Программа и дневник сохраняются в аккаунте на сервере в России.' : 'Программа, дневник и видео хранятся только на этом устройстве — на сервер они не отправляются.'}</span></p>
   </div>`;
 }
 

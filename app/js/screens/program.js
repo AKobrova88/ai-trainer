@@ -59,6 +59,8 @@ function exMenu(dayId, itemId) {
   const nx = d.items[i + 1], G = groupOf(d.items, i), canJoin = nx && (!it.ss || it.ss !== nx.ss) && G.length + groupOf(d.items, i + 1).length <= SS_MAX;
   sheet(it.name, `${it.base && CAT[it.base] && CAT[it.base].cue ? `<p class="hint" style="margin:0">${esc(CAT[it.base].cue)}</p>` : ''}<div class="menu">
     ${mi('ex-dose', dayId + ':' + itemId, I.sliders, 'Подходы, повторы, вес, отдых')}
+    ${mi('ex-move', dayId + ':' + itemId + ':-1', I.up, 'Выше в этом дне', G[0]===0 ? 'disabled' : '')}
+    ${mi('ex-move', dayId + ':' + itemId + ':1', I.down, 'Ниже в этом дне', G[G.length-1]===d.items.length-1 ? 'disabled' : '')}
     ${canJoin ? mi('ss-join', dayId + ':' + itemId, I.copy, `В суперсет со следующим: «${esc(nx.name.length > 26 ? nx.name.slice(0, 25) + '…' : nx.name)}»`) : ''}
     ${it.ss ? mi('ss-split', dayId + ':' + itemId, I.swap, 'Убрать из суперсета') : ''}
     ${mi('ex-swap', dayId + ':' + itemId, I.swap, 'Заменить упражнение')}
@@ -144,17 +146,18 @@ document.addEventListener('pointerdown', e => {
   ghost.classList.add('drag-ghost'); ghost.classList.remove('flash');
   Object.assign(ghost.style, {width: r.width + 'px', left: r.left + 'px', top: r.top + 'px'});
   document.body.appendChild(ghost); el.classList.add('placeholder');
-  drag = {kind, el, ghost, dy: e.clientY - r.top, x: r.left + r.width / 2, y: e.clientY, from: el.closest('.day').dataset.day, moved: false};
+  drag = {kind, el, ghost, dx:e.clientX-r.left,dy: e.clientY - r.top, x:e.clientX,y:e.clientY, from: el.closest('.day').dataset.day, moved: false};
   snap(); requestAnimationFrame(autoScroll);
 });
-document.addEventListener('pointermove', e => { if (!drag) return; e.preventDefault(); drag.y = e.clientY; drag.moved = true; dragTo(); }, {passive: false});
+document.addEventListener('pointermove', e => { if (!drag) return; e.preventDefault(); drag.x=e.clientX;drag.y = e.clientY; drag.moved = true; dragTo(); }, {passive: false});
 function dragTo() {
   const {ghost, kind, el} = drag;
   ghost.style.top = (drag.y - drag.dy) + 'px';
+  ghost.style.left = (drag.x - drag.dx) + 'px';
   $$('.day.drop').forEach(x => x.classList.remove('drop'));
   if (kind === 'day') {
     const list = $('#days'), cards = $$('#days .day').filter(c => c !== el);
-    const before = cards.find(c => { const r = c.getBoundingClientRect(); return drag.y < r.top + r.height / 2; }) || null;
+    const before = cards.find(c => { const r = c.getBoundingClientRect(); return drag.y < r.top || drag.y < r.bottom && drag.x < r.left + r.width / 2; }) || null;
     if (el.nextSibling !== before) list.insertBefore(el, before);
     return;
   }
@@ -195,7 +198,12 @@ function endDrag() {
   if (to !== from) toast(`Перенесла в «${dayById(to).title}»`, true);
 }
 document.addEventListener('pointerup', endDrag);
-document.addEventListener('pointercancel', endDrag);
+function cancelDrag() {
+  if(!drag)return;
+  drag.ghost.remove();drag.el.classList.remove('placeholder');drag=null;render();
+}
+document.addEventListener('pointercancel', cancelDrag);
+window.addEventListener?.('blur',cancelDrag);
 /* «День 2 · Спина» keeps its number in sync with its place */
 function renumber() { S.program.days.forEach((d, i) => { if (/^День \d+( · |$)/.test(d.title)) d.title = d.title.replace(/^День \d+/, `День ${i + 1}`); }); }
 

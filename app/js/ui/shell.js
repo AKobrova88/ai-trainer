@@ -19,6 +19,7 @@ function render() {
   $('#title').textContent = title;
   $('#top-act').innerHTML = act || '';
   $('#view').innerHTML = (S.demo ? `<div class="demo-banner"><span><b>Пример программы и дневника</b>Здесь можно попробовать приложение.${S.demoReturn && S.user ? ' Твои данные сохранены.' : ''}</span><button data-act="demo-off">${S.user ? 'Выйти' : 'К началу'}</button></div>` : '') + html;
+  $('#view').dataset.screen=S.tab;
   if (S.tab === 'diary' && S.dtab === 'prog') mountChart();
   renderRest();
   document.documentElement.style.setProperty('--top-h', $('.top').offsetHeight + 'px');

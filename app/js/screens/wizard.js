@@ -29,7 +29,7 @@ function renderWizard() {
       <p class="hint" id="dictation-status" role="status" aria-live="polite">${hasSpeech() ? 'Говори свободно, без специальных команд. Можно дополнять текст несколькими записями.' : 'Можно написать текст или надиктовать его через микрофон клавиатуры.'}</p>
       <div class="eyebrow">Что уже есть в тексте</div><div class="found" id="wish-found">${foundChips(P)}</div>
       ${youngProgram() ? `<div class="note warn">${I.info}<span>Твоей программе ${youngProgram()} ${plural(youngProgram(), 'день', 'дня', 'дней')}. Программу стоит вести 4–6 недель, чтобы вес успевал расти. ${access().unlimited ? 'Пересборка доступна без лимита.' : 'Пересобрать можно — это 1 подбор из лимита.'}</span></div>` : ''}
-      <p class="hint">Пожелания разбираются на телефоне. Диктовка работает через службу распознавания браузера.</p>`;
+      <p class="hint">Пожелания разбираются на этом устройстве. Диктовка работает через службу распознавания браузера.</p>`;
     f.innerHTML = `<button class="btn" data-act="close">Отмена</button><button class="btn primary" data-act="wiz-next" id="wiz-next" ${W.text.trim().length >= 12 ? '' : 'disabled'}>Дальше</button>`;
     const ta = $('#wish-t');
     ta.addEventListener('beforeinput', () => { if (REC) stopMic(true); });

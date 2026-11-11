@@ -1,9 +1,10 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><script>(function(){var q=location.search,h=location.hash;if(!/[?&](ex|n|u|w|d|l|mode|plan|tg|cam|src|ret|camera)=?/.test(q)&&!/tgWebApp/.test(h)&&!/[?&]tg=1/.test(q))location.replace('app/'+h);})();</script><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#12151f"><script src="cam/js/theme.js?v=2.7.4"></script><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ИИ Тренер"><meta name="apple-mobile-web-app-status-bar-style" content="black"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png" type="image/png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>:root{color-scheme:dark;background:#12151f;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style><script>window.AI_TRAINER_STANDALONE=true</script></head><body><title>ИИ Тренер</title>
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><script>(function(){var q=location.search,h=location.hash;if(!/[?&](ex|n|u|w|d|l|mode|plan|tg|cam|src|ret|camera)=?/.test(q)&&!/tgWebApp/.test(h)&&!/[?&]tg=1/.test(q))location.replace('app/'+h);})();</script><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content"><meta name="theme-color" content="#12151f"><script src="cam/js/theme.js?v=2.7.4"></script><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ИИ Тренер"><meta name="apple-mobile-web-app-status-bar-style" content="black"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png" type="image/png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>:root{color-scheme:dark;background:#12151f;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style><script>window.AI_TRAINER_STANDALONE=true</script></head><body><title>ИИ Тренер</title>
 <link rel="stylesheet" href="cam/css/base.css?v=2.8.5">
 <link rel="stylesheet" href="cam/css/theme.css?v=2.7.4">
 <link rel="stylesheet" href="cam/css/plan.css?v=2.7.1">
 
 <link rel="stylesheet" href="cam/css/native.css?v=2.8.5">
+<link rel="stylesheet" href="cam/css/responsive.css?v=2.8.8">
 
 <div class="app">
   <header class="top">
@@ -39,6 +40,7 @@
         <button type="button" id="setupCount" disabled hidden>Только счёт повторов</button>
         <button type="button" id="setupBar" hidden>Считать по движению веса</button>
         <button type="button" id="facingOption">Камера <span id="facingLabel"></span></button>
+        <label id="cameraDeviceRow" class="device-row" hidden>Устройство камеры <select id="cameraDevice" aria-label="Выбрать камеру"><option value="">Автоматически</option></select></label>
         <label id="voiceOption">Голосовые подсказки <input type="checkbox" id="voiceBtn" role="switch"></label>
         <label id="videoAutoRow">Узнавать упражнение по видео <input type="checkbox" id="videoAuto" role="switch" checked></label>
         <div class="sheet-voice" id="voiceRow" hidden><label for="voiceSel">Голос тренера</label><select id="voiceSel" aria-describedby="voiceHelp"></select><button type="button" id="voiceTest" aria-label="Проверить произношение">▶</button></div>
@@ -46,7 +48,7 @@
         <label class="speech-rate" for="voiceRate">Темп речи <select id="voiceRate"><option value="0.85">Медленнее</option><option value="1">Обычный</option><option value="1.15">Быстрее</option></select></label>
         <label class="speech-rate" for="coachMode">Счёт вслух <select id="coachMode" aria-describedby="coachModeHelp"><option value="calm">Через 2 повтора</option><option value="every">Каждый повтор</option><option value="summary">Только итоги</option></select></label>
         <p class="voice-help" id="coachModeHelp"></p>
-        <details><summary>Как поставить телефон</summary><p id="camTip"></p><p>Поставь телефон ровно и направь свет на себя. Видео обрабатывается на этом устройстве.</p><p id="analysisInfo"></p></details>
+        <details><summary>Как поставить телефон</summary><p id="camTip"></p><p>Направь камеру на себя и проверь освещение. Видео обрабатывается на этом устройстве.</p><p id="analysisInfo"></p></details>
       </div>
     </div>
   </dialog>
@@ -99,6 +101,7 @@
   <input class="vh" id="fileInput" type="file" accept="video/*">
 </div>
 
+<script defer src="shared/viewport.js?v=2.8.8"></script>
 <script defer src="shared/startup.js?v=2.7.4"></script>
 <script defer src="shared/coaching.js?v=2.8.2"></script>
 <script defer src="shared/video-input.js?v=2.8.5"></script>
@@ -107,18 +110,18 @@
 <script defer src="cam/js/core.js?v=2.8.7"></script>
 <script defer src="cam/js/voice.js?v=2.8.2"></script>
 <script defer src="app/js/data/catalog.js?v=2.7.4"></script>
-<script defer src="cam/js/state.js?v=2.8.7"></script>
-<script defer src="cam/js/exercise.js?v=2.8.5"></script>
+<script defer src="cam/js/state.js?v=2.8.8"></script>
+<script defer src="cam/js/exercise.js?v=2.8.8"></script>
 <script defer src="cam/js/canvas.js?v=2.7.1"></script>
 <script defer src="cam/js/live-loop.js?v=2.8.3"></script>
 <script defer src="cam/js/sets.js?v=2.8.2"></script>
 <script defer src="cam/js/plan.js?v=2.8.7"></script>
-<script defer src="cam/js/live-ui.js?v=2.8.7"></script>
-<script defer src="cam/js/engine.js?v=2.8.5"></script>
-<script defer src="cam/js/recordings.js?v=2.8.5"></script>
-<script defer src="cam/js/recording.js?v=2.8.3"></script>
+<script defer src="cam/js/live-ui.js?v=2.8.8"></script>
+<script defer src="cam/js/engine.js?v=2.8.8"></script>
+<script defer src="cam/js/recordings.js?v=2.8.8"></script>
+<script defer src="cam/js/recording.js?v=2.8.8"></script>
 <script defer src="cam/js/recognition.js?v=2.7.4"></script>
 <script defer src="cam/js/video.js?v=2.8.1"></script>
 <script defer src="cam/js/bar.js?v=2.8.0"></script>
-<script defer src="cam/js/main.js?v=2.8.7"></script>
+<script defer src="cam/js/main.js?v=2.8.8"></script>
 </body></html>

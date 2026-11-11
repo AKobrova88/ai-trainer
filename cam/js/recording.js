@@ -13,10 +13,13 @@ const Rec = {
       return;
     }
     const types=['video/mp4','video/mp4;codecs=avc1.42E01E','video/webm;codecs=vp8','video/webm','video/webm;codecs=vp9'];
-    const mime=types.find(t=>{try{return MediaRecorder.isTypeSupported(t);}catch(e){return false;}}) || '';
-    let mr;
-    try { mr=new MediaRecorder(stream,Object.assign({videoBitsPerSecond:1500000},mime?{mimeType:mime}:{})); }
-    catch(e) { Clips.notice='Не удалось начать запись видео. Анализ может работать, но для видеокопии потребуется обычная камера телефона.';Clips.render();return; }
+    const candidates=types.filter(t=>{try{return MediaRecorder.isTypeSupported(t);}catch(e){return false;}}).concat('');
+    let mr,mime='';
+    for(const type of candidates) {
+      try { mr=new MediaRecorder(stream,Object.assign({videoBitsPerSecond:1500000},type?{mimeType:type}:{}));mime=type;break; }
+      catch(e) { /* A supported container can still be unavailable with this camera or codec. */ }
+    }
+    if(!mr) { Clips.notice='Не удалось начать запись видео. Анализ может работать, но для видеокопии потребуется обычная камера устройства.';Clips.render();return; }
     let resolve;
     const session={mr,stream,chunks:[],t0:performance.now(),mime,
       meta:{exercise:state.ex,name:info().name,unit:info().inc==='time'?'time':weighted()?'w':'bw'},done:new Promise(r=>{resolve=r;}),resolve:null,closed:false,timer:null};

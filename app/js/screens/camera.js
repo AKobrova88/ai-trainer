@@ -81,7 +81,7 @@ async function openCameraVideo(file) {
   location.href=url.href;
 }
 function videoEntry() {
-  return `<section class="cam-entry" aria-label="Видео вне тренировки"><button class="cam-entry-row" type="button" data-act="video-select" ${openingCameraVideo?'disabled':''}><span class="cam-entry-icon">${I.video}</span><span class="grow"><b>${openingCameraVideo?'Открываю видео…':'Разобрать видео'}</b><small>Из галереи · отдельно от тренировки</small></span>${CHEV}</button></section>`;
+  return `<section class="cam-entry" aria-label="Видео вне тренировки"><button class="cam-entry-row" type="button" data-act="video-select" ${openingCameraVideo?'disabled':''}><span class="cam-entry-icon">${I.video}</span><span class="grow"><b>${openingCameraVideo?'Открываю видео…':'Разобрать видео'}</b><small>Выбери запись · отдельно от тренировки</small></span>${CHEV}</button></section>`;
 }
 const todayMore = () => `<button class="icon-btn" data-act="today-menu" aria-label="Записи и история разборов">${DOTS}</button>`;
 function todayMenu() {
