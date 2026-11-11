@@ -91,4 +91,4 @@ const Sync = (() => {
 })();
 /* every save of the app's data also schedules a sync (the original save stays as it was) */
 const saveLocal = save;
-save = function () { saveLocal(); if (API.hasSession()) Sync.schedule(); };
+save = function () { const ok = saveLocal(); if (ok && API.hasSession()) Sync.schedule(); return ok; };

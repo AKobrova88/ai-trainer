@@ -37,11 +37,12 @@ function setExercise(key, keepVideo = false) {
   el.camTip.textContent = (isFree() ? 'Поставь телефон в 2–3 м так, чтобы работающий сустав было хорошо видно (лучше сбоку)'
     : state.ex === 'leg_ext' ? 'Разгибания ног: нужны таз, колено и стопа одной ноги. Голова и руки для подсчёта не обязательны. Телефон можно поставить под углом'
     : 'Поставь телефон ровно в 2–3 м. Можно спереди, сбоку, сзади или под углом, если рабочие суставы видны');
-  if (isFree()) { el.howto.removeAttribute('src'); try { el.howto.load(); } catch (e) { /* fine */ } }
-  else {
-    if (HOWTO_HAVE.has(key)) el.howto.src = 'howto/' + key + '.mp4'; else { el.howto.removeAttribute('src'); try { el.howto.load(); } catch (e) { /* fine */ } }
-    if (!state.on) try { const p = el.howto.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* autoplay blocked */ }
-  }
+  try { el.howto.pause(); } catch (e) { /* fine */ }
+  el.howto.controls = false;
+  el.howto.removeAttribute('src');
+  try { el.howto.load(); } catch (e) { /* fine */ }
+  const example = $('#showHowto');
+  if (example) example.hidden = isFree() || !HOWTO_HAVE.has(key) || state.on;
   state.fallback = false; barReset();
   if (state.on && !state.file && !state.recOnly) { Rec.drop(); startPreparation(false); }
   el.note.hidden = !isFree() || state.on;
@@ -61,3 +62,12 @@ function newAnalyzer(resetPose = true) {
 }
 el.sel.addEventListener('change', () => setExercise(el.sel.value));
 
+
+const exampleButton = $('#showHowto');
+if (exampleButton) exampleButton.addEventListener('click', () => {
+  if (isFree() || !HOWTO_HAVE.has(state.ex) || state.on) return;
+  el.howto.src = 'howto/' + state.ex + '.mp4';
+  el.howto.controls = true;
+  const play = el.howto.play(); if (play && play.catch) play.catch(() => {});
+  exampleButton.hidden = true;
+});

@@ -1,6 +1,6 @@
 'use strict';
 /* ---------- backup ---------- */
-const BACKUP_KEYS = ['program', 'diary', 'next', 'profile', 'videoLog', 'theme', 'usage', 'sub', 'user', 'healthOk'];
+const BACKUP_KEYS = ['program', 'diary', 'next', 'profile', 'videoLog', 'camReceipts', 'theme', 'usage', 'sub', 'user', 'healthOk'];
 /* a file download works in the browser; inside a preview frame or Telegram the copy goes through the clipboard */
 const canDownload = () => window.parent === window && !(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
 function backupText() {

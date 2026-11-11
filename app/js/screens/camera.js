@@ -105,11 +105,36 @@ function camPickSheet() {
 /* results from the camera page: sets go into today's workout or the diary; video checks into «Недавние разборы» */
 function processInbox() {
   let box;
-  try { box = JSON.parse(localStorage.getItem(INBOX) || '[]'); } catch (e) { box = []; }
+  try { box = JSON.parse(localStorage.getItem(INBOX) || '[]'); } catch (e) { return; }
   if (!Array.isArray(box) || !box.length) return;
-  try { localStorage.removeItem(INBOX); } catch (e) { /* ignore */ }
-  const msgs = box.map(applyCamResult).filter(Boolean);
-  if (S.stage !== 'app' && S.user) S.stage = 'app';
+  const previous = S, msgs = [], acknowledged = new Set();
+  const receipt = m => typeof m.id === 'string' && m.id ? m.id : 'legacy:' + JSON.stringify(m);
+  S = JSON.parse(JSON.stringify(S));
+  S.camReceipts = Array.isArray(S.camReceipts) ? S.camReceipts : [];
+  try {
+    for (const m of box) {
+      if (!m || typeof m !== 'object') continue;
+      const id = receipt(m);
+      if (S.camReceipts.includes(id)) { acknowledged.add(id); continue; }
+      const message = applyCamResult(m);
+      if (!message) continue;
+      msgs.push(message); S.camReceipts.push(id); acknowledged.add(id);
+    }
+    if (S.stage !== 'app' && S.user) S.stage = 'app';
+    if (!save()) { S = previous; return; }
+  } catch (e) {
+    S = previous;
+    toast('Результат камеры сохранён в очереди. Попробуй открыть приложение ещё раз');
+    return;
+  }
+  try {
+    const latest = JSON.parse(localStorage.getItem(INBOX) || '[]');
+    if (Array.isArray(latest)) {
+      const pending = latest.filter(m => !m || !acknowledged.has(receipt(m)));
+      if (pending.length) localStorage.setItem(INBOX, JSON.stringify(pending));
+      else localStorage.removeItem(INBOX);
+    }
+  } catch (e) { /* The receipt and the diary were saved together; a retry will only acknowledge the queue. */ }
   render();
   if (msgs.length > 1) {
     const ok = box.filter(m => m && Array.isArray(m.sets) && m.sets.some(x => x && x.r > 0));

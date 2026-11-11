@@ -106,7 +106,9 @@ function loadSets() {
 function saveSets() {
   const all = store.get(SETS_KEY, {});
   for (const k of Object.keys(all)) if (!all[k] || all[k].date !== today()) delete all[k];
-  if (state.sets.length) all[state.ex] = { date: today(), sets: state.sets }; else delete all[state.ex];
+  if (state.sets.length) all[state.ex] = { date: today(), sets: state.sets,
+    resultId: all[state.ex] && all[state.ex].resultId || 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2) };
+  else delete all[state.ex];
   store.set(SETS_KEY, all);
 }
 

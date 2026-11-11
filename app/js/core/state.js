@@ -8,7 +8,7 @@ function fresh() {
   return {v: 1, stage: 'welcome', user: null, tab: 'today', program: {days: []}, diary: [], next: null, pick: null, workout: null, rest: null,
     open: {}, dtab: 'hist', calM: [now().getFullYear(), now().getMonth()], prog: null, theme: 'dusk', profile: blankProfile(),
     sub: {promo: '', since: 0, paidUntil: 0, aiPlus: false, plusPick: false, packs: []}, usage: {m: '', prog: 0, photo: 0, ask: 0}, healthOk: false,
-    camFacing: 'front', camEx: null, videoLog: [], demo: false};
+    camFacing: 'front', camEx: null, videoLog: [], camReceipts: [], demo: false};
 }
 function load() {
   try {
@@ -26,8 +26,8 @@ function load() {
 }
 let saveFailed = false;
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(S)); saveFailed = false; }
-  catch (e) { if (!saveFailed) { saveFailed = true; setTimeout(() => toast('Не получается сохранить на телефоне — освободи место или выйди из режима «инкогнито»'), 300); } }
+  try { localStorage.setItem(KEY, JSON.stringify(S)); saveFailed = false; return true; }
+  catch (e) { if (!saveFailed) { saveFailed = true; setTimeout(() => toast('Не получается сохранить на телефоне — освободи место или выйди из режима «инкогнито»'), 300); } return false; }
 }
 S = load();
 S.renaming = null; S.wiz = null;

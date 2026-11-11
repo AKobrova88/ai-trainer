@@ -102,6 +102,7 @@ function toApp() {
   if (state.on) stopCamera();
   saveSets();
   const entries = [];
+  const saved = store.get(SETS_KEY, {});
   for (const k of appKeys()) {
     const ss = setsOf(k).filter(s => s.r > 0); if (!ss.length || !EX.ex[k]) continue;
     const free = FREE_KEYS.has(k) || ss.every(s => s.countOnly), A = k === state.ex && state.analyzer ? state.analyzer : free ? new AT.FreeAnalyzer() : AT.analyzerFor(k);
@@ -111,11 +112,13 @@ function toApp() {
       return { w: wtd ? (s.w || 0) : 0, r: s.r, n: free ? 0 : (s.n || 0), c: free ? 0 : (s.c || 0), g: free ? [] : (s.g || []), cue: free ? '' : (s.cue || ''), ft,
         partial: !!s.partial, analysisMode: s.analysisMode, note: s.note || '' };
     });
-    entries.push({ id: 'c' + Date.now().toString(36) + entries.length, at: Date.now(), ex: k, name: p ? p.n : EX.ex[k].name, pos: p ? p.pos : null, free, mode: ss.some(s => s.file) ? 'video' : 'live', sets });
+    if (!saved[k]) saved[k] = {date: today(), sets: ss};
+    if (!saved[k].resultId) saved[k].resultId = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    entries.push({ id: saved[k].resultId, at: Date.now(), ex: k, name: p ? p.n : EX.ex[k].name, pos: p ? p.pos : null, free, mode: ss.some(s => s.file) ? 'video' : 'live', sets });
   }
-  let box = []; try { box = JSON.parse(localStorage.getItem(APP_INBOX) || '[]'); if (!Array.isArray(box)) box = []; } catch (err) { box = []; }
-  box.push(...entries);
-  try { localStorage.setItem(APP_INBOX, JSON.stringify(box)); } catch (err) { el.sendBox.insertAdjacentHTML('afterbegin', '<p>Не получилось сохранить на телефоне. Освободи место и попробуй ещё раз.</p>'); return; }
+  let box; try { box = JSON.parse(localStorage.getItem(APP_INBOX) || '[]'); if (!Array.isArray(box)) throw Error('Invalid queue'); } catch (err) { el.sendBox.insertAdjacentHTML('afterbegin', '<p>Не удалось прочитать сохранённые результаты. Сохрани резервную копию перед повторной отправкой.</p>'); return; }
+  for (const entry of entries) if (!box.some(m => m && m.id === entry.id)) box.push(entry);
+  try { localStorage.setItem(SETS_KEY, JSON.stringify(saved)); localStorage.setItem(APP_INBOX, JSON.stringify(box)); } catch (err) { el.sendBox.insertAdjacentHTML('afterbegin', '<p>Не получилось сохранить на телефоне. Освободи место и попробуй ещё раз.</p>'); return; }
   const all = store.get(SETS_KEY, {}); for (const k of appKeys()) delete all[k]; store.set(SETS_KEY, all);
   state.sets = [];
   Clips.leave(()=>{location.href=RET;});

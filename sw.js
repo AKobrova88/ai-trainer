@@ -1,6 +1,6 @@
 // Camera code is refreshed separately from the large model files already on the device.
 const ASSETS = 'aitrainer-20261105-v271';
-const CAMERA = 'aitrainer-camera-278';
+const CAMERA = 'aitrainer-camera-281';
 const scope = new URL(self.registration.scope);
 const entry = new URL('index.html', scope).href;
 
@@ -11,7 +11,10 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys
     .filter(key => key.startsWith('aitrainer-camera-') && key !== CAMERA).map(key => caches.delete(key))))
-    .then(() => self.clients.claim()));
+    .then(() => caches.keys()).then(keys => Promise.all(keys.filter(k => k.startsWith('aitrainer-')).map(async k => {
+    const cache = await caches.open(k);
+    for (const req of await cache.keys()) if (/^\/v1(?:\/|$)/.test(new URL(req.url).pathname)) await cache.delete(req);
+  }))).then(() => self.clients.claim()));
 });
 
 function save(cache, key, response) {
@@ -32,6 +35,7 @@ self.addEventListener('fetch', event => {
   const req = event.request, url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== scope.origin || !url.pathname.startsWith(scope.pathname)) return;
   const path = url.pathname.slice(scope.pathname.length);
+  if (path === 'v1' || path.startsWith('v1/')) return;
   if (path === '' || path === 'index.html') return networkFirst(event, entry);
   if (path.startsWith('cam/') || path.startsWith('shared/') || path === 'app/js/data/catalog.js') return networkFirst(event, req);
   if (path.startsWith('app/') || path === 'app' || path.endsWith('.mp4') || req.mode === 'navigate') return;

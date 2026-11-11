@@ -22,8 +22,8 @@ function loadScript(src) {
 }
 const ENGINE_KEY = 'aitrainer.engine';
 const ENGINE_VERSION = 3;
-const LOCAL = !!window.AI_TRAINER_STANDALONE;
-const MP_PATH = LOCAL ? new URL('vendor/mediapipe', location.href).href : 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404';
+const LOCAL = true; // all runtime resources are served from this origin
+const MP_PATH = new URL('vendor/mediapipe', location.href).href;
 function appleMobile() {
   return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
     || new URLSearchParams(location.hash.slice(1)).get('tgWebAppPlatform') === 'ios';
@@ -165,9 +165,9 @@ async function createEngine(kind, mode, signal, report = () => {}) {
   try {
     if (kind === 'tfjs') {
       report('library');
-      if (!window.tf) await loadScript(LOCAL ? 'vendor/tf.min.js' : 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js');
+      if (!window.tf) await loadScript('vendor/tf.min.js');
       checkDeadline();
-      if (!window.poseDetection) await loadScript(LOCAL ? 'vendor/pose-detection.min.js' : 'https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js');
+      if (!window.poseDetection) await loadScript('vendor/pose-detection.min.js');
       checkDeadline();
       report('runtime');
       if (mode === 'wasm') {
@@ -337,13 +337,15 @@ async function loadModelWithUi(current, retry, videoFallback) {
 }
 function showCameraMode(on) {
   state.on = on;
+  const example = $('#showHowto');
+  if (example) example.hidden = on || isFree() || !HOWTO_HAVE.has(state.ex);
   el.howto.hidden = on; el.flip.hidden = !on || !!state.file; el.note.hidden = on || !isFree();
   if (on) {
     try { el.howto.pause(); } catch (e) { /* fine */ }
     H.still = 0; H.lastT = -1; H.errors = 0; H.ok = 0;
     if (state.stream) { try { const p = el.vid.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* watchdog retries */ } }
   }
-  else { setAspect(1, 1); try { const p = el.howto.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* fine */ } }
+  else { setAspect(1, 1); }
   renderMain(); renderLive();
 }
 async function startCamera(automatic = false) {
