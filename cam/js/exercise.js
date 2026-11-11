@@ -43,7 +43,7 @@ function setExercise(key, keepVideo = false) {
     if (!state.on) try { const p = el.howto.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* autoplay blocked */ }
   }
   state.fallback = false; barReset();
-  if (state.on && !state.file && !state.recOnly) { Rec.drop(); state.preflight = true; }
+  if (state.on && !state.file && !state.recOnly) { Rec.drop(); startPreparation(); }
   el.note.hidden = !isFree() || state.on;
   loadSets();
   newAnalyzer(!keepVideo);
@@ -51,7 +51,8 @@ function setExercise(key, keepVideo = false) {
 }
 function newAnalyzer(resetPose = true) {
   state.revision++;
-  state.analyzer = state.fallback && state.ex === 'leg_ext' ? new AT.LegExtensionAnalyzer(state.level,true)
+  state.analyzer = AT.isLunge(state.ex) ? new AT.LungeAnalyzer(state.ex, state.level, state.depth, !!state.fallback)
+    : state.fallback && state.ex === 'leg_ext' ? new AT.LegExtensionAnalyzer(state.level,true)
     : isFree() || state.fallback ? new AT.FreeAnalyzer(state.level, state.ex, !!state.fallback) : AT.analyzerFor(state.ex, state.depth, state.level);
   state.snap = null; state.flash = null;
   state.preflightReady = false; state.preflightSince = null;

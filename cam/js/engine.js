@@ -366,6 +366,7 @@ async function startCamera(automatic = false) {
   state.cameraRequest = null;
   stopStream(); state.stream = stream;
   state.preflight = !state.recOnly;
+  if (!state.recOnly) startPreparation();
   el.vid.autoplay = true; el.vid.muted = true; el.vid.setAttribute('playsinline', ''); el.vid.srcObject = stream;
   el.vid.classList.toggle('mirror', state.facing === 'user');
   newAnalyzer(); showCameraMode(true);          // the video is on screen before play(): hidden videos stay frozen on some phones
@@ -391,6 +392,7 @@ function stopStream() {
   if (el.vid.srcObject) el.vid.srcObject = null;
 }
 function stopCamera() {
+  Voice.cancel(); state.prepareUntil = null;
   state.cameraRequest = null;
   hideMsg();
   state.recOnly = false;

@@ -53,12 +53,16 @@ async function infer() {
     H.ok++; H.noPose = kp ? 0 : H.noPose + 1;
     if (state.recOnly) state.snap = { status: framed(kp) ? 'rec' : 'nobody', live: [], view: 'side', side: 'l', reps: 0, phase: 'top' };
     else if (state.preflight) {
+      preparationRemaining();
+      if (!preparationRemaining() && !state.preparedCalibration) {
+        newAnalyzer(false); state.preparedCalibration = true;
+      }
       state.snap = state.analyzer.update(kp, t);
       state.analyzer.drain(); // Preparation movements never become recorded sets.
       const checks = checkSetup(kp, v.videoWidth, v.videoHeight, state.snap, state.ex);
-      if (!checks.ready) state.preflightSince = null;
+      if (preparationRemaining() || !checks.ready) state.preflightSince = null;
       else if (state.preflightSince == null) state.preflightSince = t;
-      state.preflightReady = checks.ready && t - state.preflightSince >= .7;
+      state.preflightReady = !preparationRemaining() && checks.ready && t - state.preflightSince >= .7;
       if (state.preflightReady) beginPreparedSet();
     } else handleSnap(state.analyzer.update(kp, t));
   } catch (e) {
@@ -82,9 +86,11 @@ function processEvents(evts) {
         : r.partial ? { cls: 'info', text: 'Повтор ' + r.n + ' · 3D: в доступных проверках замечаний нет', until: now + 1800 }
         : { cls: 'good', text: 'Повтор ' + r.n + ' — ' + (Math.random() < 0.3 ? pick(T.praise).toLowerCase() : 'чисто'), until: now + 1400 };
       if (!state.file) Voice.say(String(r.n), 'rep' + r.n, false, true);
-    } else if (e.type === 'setEnd') recordSet();
+    } else if (e.type === 'setEnd') {
+      recordSet();
+      if (state.on && !state.file && !state.recOnly) startPreparation(false);
+    }
     else if (e.type === 'newSet') renderMain();
-    else if (e.type === 'status' && e.id === 'ready') { if (!state.file) Voice.say('Поехали', 'ready'); }
   }
   if (evts.length) renderMain();
 }

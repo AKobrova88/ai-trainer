@@ -96,7 +96,7 @@ async function analyzeVideo(blob, from, bar = false) {
   function startAnalysis() {
     if (auto) {
       const key = recognizeVideoExercise(buffer), movement = videoMovements[key];
-      if (movement && key !== state.ex && !movement.related.includes(state.ex)) {
+      if (movement && !AT.isLunge(state.ex) && key !== state.ex && !movement.related.includes(state.ex)) {
         setExercise(key, true);
         state.videoExercise = 'Распознала движение: ' + movement.name + '.';
         Voice.say(state.videoExercise, 'video-exercise', true);
@@ -108,7 +108,7 @@ async function analyzeVideo(blob, from, bar = false) {
       if (key === 'db_curl' && state.ex === key) curlTracks = Object.values(AT.SIDE).map(side => ({side, rows: []}));
     }
     setStart = state.sets.length;
-    shadow = isFree() ? null : state.ex === 'leg_ext' ? new AT.LegExtensionAnalyzer(state.level, true) : new AT.FreeAnalyzer(state.level, state.ex, true);
+    shadow = isFree() || AT.isLunge(state.ex) ? null : state.ex === 'leg_ext' ? new AT.LegExtensionAnalyzer(state.level, true) : new AT.FreeAnalyzer(state.level, state.ex, true);
     state.recognizingVideo = false;
     for (const [kp, t] of buffer) feed(kp, t);
     buffer.length = 0;

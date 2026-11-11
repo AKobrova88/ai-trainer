@@ -682,6 +682,110 @@ class GenericAnalyzer extends BaseAnalyzer {
   }
 }
 
+const LUNGE_KEYS = new Set(['lunge_db', 'reverse_lunge', 'walking_lunge', 'split_squat_db', 'bulgarian']);
+const isLunge = key => LUNGE_KEYS.has(key);
+/* A lunge is one complete descent and return, not two independently moving knees.
+   Keep a leg's own baseline and lock it throughout the cycle. The pelvis must also
+   descend: lifting a foot, walking into frame and landmark swaps are not lunges. */
+class LungeAnalyzer extends GenericAnalyzer {
+  constructor(key, level = 'normal', depth = 'parallel', imageOnly = false) { super(key, level, depth); this.imageOnly = imageOnly; }
+  reset() {
+    super.reset(); this.baselines = {}; this.smoothed = {}; this.lastSeen = {};
+    this.returnSince = null;
+  }
+  update(kp, t) {
+    if (this.prevT != null && (t <= this.prevT || t - this.prevT > .5)) this.recalibrate();
+    if (this.imageOnly && kp) kp = kp.map(p => ({x:p.x,y:p.y,z:p.z,score:p.score}));
+    kp = this.prepare(kp, t, 'joints');
+    const dt = this.tick(t);
+    if (!kp) return this.lost(t);
+    const signals = {};
+    for (const side of ['l', 'r']) {
+      if (!this.sideOk(kp, side, ANGLES.knee)) { delete this.smoothed[side]; continue; }
+      const S = SIDE[side], hip = kp[S.hip], knee = kp[S.kn], ankle = kp[S.an];
+      const length = dist(hip, knee) + dist(knee, ankle);
+      const raw = {angle: angle(hip, knee, ankle), height: (ankle.y - hip.y) / Math.max(1, length)};
+      if (!Number.isFinite(raw.angle) || !Number.isFinite(raw.height)) continue;
+      const old = this.smoothed[side], continuous = old && t - this.lastSeen[side] <= .3;
+      const k = 1 - Math.exp(-dt / .065);
+      const signal = continuous ? {angle: lerp(old.angle, raw.angle, k), height: lerp(old.height, raw.height, k)} : raw;
+      signal.stable = !continuous || Math.abs(signal.angle - old.angle) / dt < 25 && Math.abs(signal.height - old.height) / dt < .15;
+      signal.confidence = Math.min(...ANGLES.knee.map(j => sc(kp[S[j]])));
+      this.smoothed[side] = signal; this.lastSeen[side] = t; signals[side] = signal;
+    }
+    const sides = Object.keys(signals);
+    if (!sides.length || this.rep && !signals[this.rep.extra.side]) return this.lost(t);
+    this.kp = kp; this.lostSince = null;
+    this.updateView(kp);
+    if (this.analysisMode === '2d' && this.view !== 'side') {
+      this.status = 'turn'; this.rep = null; this.cal = null; this.phase = 'setup'; this.standSince = null;
+      return this.snapshot();
+    }
+    const standing = sides.filter(s => signals[s].angle >= 150 && signals[s].height > .65 && signals[s].stable);
+    if (!this.cal) {
+      this.status = 'calib'; this.phase = 'setup';
+      if (!standing.length) this.standSince = null;
+      else {
+        if (this.standSince == null) this.standSince = t;
+        if (t - this.standSince >= .5) {
+          for (const s of standing) this.baselines[s] = {angle: signals[s].angle, height: signals[s].height};
+          this.side = standing.sort((a, b) => signals[b].confidence - signals[a].confidence)[0];
+          this.cal = {s0: this.baselines[this.side].angle}; this.phase = 'top'; this.status = 'track';
+          this.emit({type:'status', id:'ready'});
+        }
+      }
+      return this.snapshot();
+    }
+    this.status = 'track';
+    const stance = ['l','r'].every(s => signals[s]) ? Math.abs(kp[27].x - kp[28].x) /
+      Math.max(1, ...['l','r'].map(s => {const S=SIDE[s];return dist(kp[S.hip],kp[S.kn])+dist(kp[S.kn],kp[S.an]);})) : null;
+    if (!this.rep) {
+      for (const side of standing) {
+        const s = signals[side], b = this.baselines[side];
+        if (!b) this.baselines[side] = {angle:s.angle, height:s.height};
+        else if (Math.abs(b.angle - s.angle) < 8 && Math.abs(b.height - s.height) < .035) {
+          b.angle = lerp(b.angle, s.angle, .025); b.height = lerp(b.height, s.height, .025);
+        }
+      }
+      const candidates = sides.filter(s => this.baselines[s] && this.baselines[s].angle - signals[s].angle >= 16 && this.baselines[s].height - signals[s].height >= .06);
+      if (candidates.length) {
+        const side = candidates.sort((a,b) => signals[b].confidence - signals[a].confidence)[0];
+        const s = signals[side], b = this.baselines[side]; this.side = side;
+        this.startRep(t, {side, baseline:{...b}, ext:b.angle-s.angle, ext_sig:s.angle, t_ext:t,
+          drop:b.height-s.height, stance, sec0:{}, sec_dev:{}, near_ext:0, t_leave:t});
+        this.returnSince = null; this.secStart(kp);
+      }
+    } else {
+      const R = this.rep.extra, s = signals[R.side], bend = R.baseline.angle - s.angle;
+      this.side = R.side;
+      if (bend >= R.ext) { R.ext = bend; R.ext_sig = s.angle; R.t_ext = t; this.rep.tBottom = t; }
+      R.drop = Math.max(R.drop, R.baseline.height - s.height);
+      if (stance != null) R.stance = Math.max(R.stance || 0, stance);
+      if (bend >= R.ext - 6) { R.near_ext += dt; R.t_leave = t; }
+      this.secTrack(kp);
+      if (this.phase === 'down' && R.ext - bend >= 8) {
+        if (R.ext < 32 || R.drop < .12 || R.stance != null && R.stance < .18) { this.rep = null; this.phase = 'top'; this.clearLive(); }
+        else { this.phase = 'up'; this.atExtreme(kp); }
+      }
+      if (this.rep && this.phase === 'up') {
+        const returned = bend < 12 && s.height >= R.baseline.height - .055;
+        this.returnSince = returned ? this.returnSince ?? t : null;
+        if (this.returnSince != null && t - this.returnSince >= .08) {
+          if (R.t_ext - this.rep.t0 >= .16 && t - R.t_ext >= .18 && t - this.rep.t0 >= .65) this.complete(t);
+          else { this.rep = null; this.phase = 'top'; this.clearLive(); }
+          this.returnSince = null;
+        }
+      }
+    }
+    this.idleCheck(t); return this.snapshot();
+  }
+  lost(t) {
+    // A hidden or swapped leg cannot supply the missing half of a cycle.
+    if (this.cal || this.rep) this.recalibrate();
+    return super.lost(t);
+  }
+}
+
 /* Seated extensions often start below the working range. Track successive extrema
    on the same leg instead of requiring a still frame or a return to the first angle. */
 class LegExtensionAnalyzer extends GenericAnalyzer {
@@ -1075,6 +1179,7 @@ function requiredChains(key) {
   return ['knee','hip','elbow','shoulder'].flatMap(j=>perSide(ANGLES[j]));
 }
 function analyzerFor(key, depth = 'parallel', level = 'normal') {
+  if (isLunge(key)) return new LungeAnalyzer(key, level, depth);
   if (key === 'leg_ext') return new LegExtensionAnalyzer(level);
   if (key in D.squat) return new SquatAnalyzer(D.squat[key] === 'parallel' ? depth : 'half', level);
   if (key in D.pushup) { const a = new PushupAnalyzer(depth, level); a.incline = D.pushup[key]; return a; }
@@ -1085,6 +1190,6 @@ function viewOf(key) { return key in D.squat ? 'any' : key in D.pushup ? 'side' 
 function isHold(key) { return !!(D.specs[key] && D.specs[key].hold); }
 function family(key) { return key in D.squat ? 'squat' : key in D.pushup ? 'pushup' : 'generic'; }
 
-return { setData(d) { D = d; }, data: () => D, analyzerFor, viewOf, isHold, family, requiredChains, SIDE, poseToKeypoints, projectWorld, angle, BaseAnalyzer, SquatAnalyzer, PushupAnalyzer, GenericAnalyzer, LegExtensionAnalyzer, FreeAnalyzer, BarTracker, BarAnalyzer };
+return { setData(d) { D = d; }, data: () => D, analyzerFor, viewOf, isHold, isLunge, family, requiredChains, SIDE, poseToKeypoints, projectWorld, angle, BaseAnalyzer, SquatAnalyzer, PushupAnalyzer, GenericAnalyzer, LungeAnalyzer, LegExtensionAnalyzer, FreeAnalyzer, BarTracker, BarAnalyzer };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = AT;

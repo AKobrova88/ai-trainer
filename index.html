@@ -3,7 +3,7 @@
 <link rel="stylesheet" href="cam/css/theme.css?v=2.7.4">
 <link rel="stylesheet" href="cam/css/plan.css?v=2.7.1">
 
-<link rel="stylesheet" href="cam/css/native.css?v=2.8.0">
+<link rel="stylesheet" href="cam/css/native.css?v=2.8.1">
 
 <div class="app">
   <header class="top">
@@ -42,7 +42,9 @@
         <button type="button" id="facingOption">Камера <span id="facingLabel"></span></button>
         <label id="voiceOption">Голосовые подсказки <input type="checkbox" id="voiceBtn" role="switch"></label>
         <label id="videoAutoRow">Узнавать упражнение по видео <input type="checkbox" id="videoAuto" role="switch" checked></label>
-        <div class="sheet-voice" id="voiceRow" hidden><label for="voiceSel">Голос</label><select id="voiceSel"></select><button type="button" id="voiceTest" aria-label="Послушать голос">▶</button></div>
+        <div class="sheet-voice" id="voiceRow" hidden><label for="voiceSel">Голос тренера</label><select id="voiceSel" aria-describedby="voiceHelp"></select><button type="button" id="voiceTest" aria-label="Проверить произношение">▶</button></div>
+        <p class="voice-help" id="voiceHelp"></p>
+        <label class="speech-rate" for="voiceRate">Темп речи <select id="voiceRate"><option value="0.85">Медленнее</option><option value="1">Обычный</option><option value="1.15">Быстрее</option></select></label>
         <details><summary>Как поставить телефон</summary><p id="camTip"></p><p>Поставь телефон ровно и направь свет на себя. Видео обрабатывается на этом устройстве.</p><p id="analysisInfo"></p></details>
       </div>
     </div>
@@ -89,22 +91,22 @@
 </div>
 
 <script defer src="shared/startup.js?v=2.7.4"></script>
-<script defer src="cam/js/analyzers.js?v=2.7.1"></script>
+<script defer src="cam/js/analyzers.js?v=2.8.1"></script>
 <script defer src="cam/js/data/exercises.js?v=2.7.1"></script>
 <script defer src="cam/js/core.js?v=2.7.2"></script>
-<script defer src="cam/js/voice.js?v=2.7.1"></script>
+<script defer src="cam/js/voice.js?v=2.8.1"></script>
 <script defer src="app/js/data/catalog.js?v=2.7.4"></script>
-<script defer src="cam/js/state.js?v=2.8.0"></script>
-<script defer src="cam/js/exercise.js?v=2.8.0"></script>
+<script defer src="cam/js/state.js?v=2.8.1"></script>
+<script defer src="cam/js/exercise.js?v=2.8.1"></script>
 <script defer src="cam/js/canvas.js?v=2.7.1"></script>
-<script defer src="cam/js/live-loop.js?v=2.7.1"></script>
-<script defer src="cam/js/sets.js?v=2.7.1"></script>
+<script defer src="cam/js/live-loop.js?v=2.8.1"></script>
+<script defer src="cam/js/sets.js?v=2.8.1"></script>
 <script defer src="cam/js/plan.js?v=2.8.0"></script>
-<script defer src="cam/js/live-ui.js?v=2.8.0"></script>
-<script defer src="cam/js/engine.js?v=2.8.0"></script>
+<script defer src="cam/js/live-ui.js?v=2.8.1"></script>
+<script defer src="cam/js/engine.js?v=2.8.1"></script>
 <script defer src="cam/js/recording.js?v=2.8.0"></script>
 <script defer src="cam/js/recognition.js?v=2.7.4"></script>
-<script defer src="cam/js/video.js?v=2.8.0"></script>
+<script defer src="cam/js/video.js?v=2.8.1"></script>
 <script defer src="cam/js/bar.js?v=2.8.0"></script>
-<script defer src="cam/js/main.js?v=2.8.0"></script>
+<script defer src="cam/js/main.js?v=2.8.1"></script>
 </body></html>

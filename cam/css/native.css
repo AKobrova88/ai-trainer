@@ -51,3 +51,8 @@ body{font-size:15px}
 .set-main input{font-size:16px}
 @media (min-width:561px){.native-sheet{bottom:12px;border-radius:20px}}
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+.voice-help{font-size:12px!important;line-height:1.4;color:var(--muted)}
+.speech-rate select{min-height:40px;border:0;border-radius:8px;background:var(--surface-2);color:var(--ink);padding:4px;font-size:16px}
+#voiceRow label{max-width:30%;font-size:14px}
+#voiceRow select{flex:1;border:0;border-radius:8px;background:var(--surface-2);color:var(--ink);padding:4px}

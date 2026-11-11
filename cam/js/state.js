@@ -65,23 +65,27 @@ const isHold = () => AT.isHold(state.ex);
 const urlW = () => { const p = PLAN.find(x => x.k === state.ex); if (p && p.w) return p.w; return state.ex === qp.get('ex') ? state.urlW : null; };   // the weight in the link belongs to that exercise
 /* voice: on by default when the camera is opened from the app or with the back camera; the choice is remembered */
 Voice.on = 'speechSynthesis' in window && (prefs.voice != null ? !!prefs.voice : (!!RET || qp.get('src') === 'app' || state.facing === 'environment'));
-Voice.queue = function (text) { if (!this.on || !('speechSynthesis' in window)) return; try { const u = new SpeechSynthesisUtterance(text); u.lang = 'ru-RU'; u.rate = 1.0; if (this.voice) u.voice = this.voice; speechSynthesis.speak(u); this.last = performance.now(); } catch (e) { /* speech unavailable */ } };
 /* The phone's voices differ a lot: neural and «enhanced» voices put the stress right far more often. The best one is picked, the person can change it. */
 const VOICE_KEY = 'aitrainer.voice';
-const ruVoices = () => { try { return speechSynthesis.getVoices().filter(v => /^ru([-_]|$)/i.test(v.lang || '')); } catch (e) { return []; } };
+Voice.rate = pickOpt(store.get('aitrainer.voice-rate', 1), [.85, 1, 1.15], 1);
+const ruVoices = () => { try { return speechSynthesis.getVoices().filter(v => /^ru([-_]|$)/i.test(v.lang || '')).filter((v,i,list) => list.findIndex(x => (x.voiceURI || x.name) === (v.voiceURI || v.name) && x.lang === v.lang) === i); } catch (e) { return []; } };
 const voiceRank = v => { const n = v.name || ''; return (/natural|neural|нейро/i.test(n) ? 60 : 0) + (/enhanced|premium|улучш|высок/i.test(n) ? 50 : 0) + (/online/i.test(n) ? 20 : 0) + (/google/i.test(n) ? 30 : 0) + (/milena|милена|svetlana|светлана|dariya|дарья|alena|алёна|алена/i.test(n) ? 10 : 0) + (/compact|eloquence|novelty|whisper/i.test(n) ? -40 : 0); };
 function pickVoice() {
   const list = ruVoices(); if (!list.length) { Voice.voice = null; return list; }
   const saved = store.get(VOICE_KEY, '');
-  Voice.voice = list.find(v => v.name === saved) || list.slice().sort((a, b) => voiceRank(b) - voiceRank(a))[0];
+  Voice.voice = list.find(v => (v.voiceURI || v.name) === saved || v.name === saved) || list.slice().sort((a, b) => voiceRank(b) - voiceRank(a))[0];
   return list;
 }
 function renderVoices() {
   const list = pickVoice(), row = $('#voiceRow'); if (!row) return;
-  row.hidden = list.length < 2;
-  if (list.length < 2) return;
+  row.hidden = false;
   const sorted = list.slice().sort((a, b) => voiceRank(b) - voiceRank(a));
-  $('#voiceSel').innerHTML = sorted.map(v => '<option value="' + esc(v.name) + '"' + (Voice.voice && v.name === Voice.voice.name ? ' selected' : '') + '>' + esc(v.name.replace(/^Microsoft |^Google /, '').replace(/ - Russian.*$| \(Russia\)/i, '')) + '</option>').join('');
+  const select = $('#voiceSel');
+  select.disabled = list.length < 2;
+  select.innerHTML = sorted.length ? sorted.map(v => '<option value="' + esc(v.voiceURI || v.name) + '"' + (Voice.voice === v ? ' selected' : '') + '>' + esc(v.name.replace(/^Microsoft |^Google /, '').replace(/ - Russian.*$| \(Russia\)/i, '')) + '</option>').join('')
+    : '<option>Системный голос · русский</option>';
+  $('#voiceHelp').textContent = list.length < 2 ? 'Браузер предоставляет один русский голос. Здесь появятся дополнительные голоса, когда они станут доступны приложению.' : 'Выбери голос и прослушай произношение.';
+  $('#voiceRate').value = String(Voice.rate);
 }
 if ('speechSynthesis' in window) { renderVoicesSoon(); try { speechSynthesis.addEventListener('voiceschanged', renderVoices); } catch (e) { speechSynthesis.onvoiceschanged = renderVoices; } }
 function renderVoicesSoon() { setTimeout(renderVoices, 0); setTimeout(renderVoices, 800); }

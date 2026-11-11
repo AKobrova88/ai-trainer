@@ -1,7 +1,10 @@
 'use strict';
 /* ---------- sets ---------- */
+const recordedSetArrays = new WeakSet();
 function recordSet() {
   const A = state.analyzer; if (!A || !A.reps.length) return;
+  if (recordedSetArrays.has(A.reps)) return;
+  recordedSetArrays.add(A.reps);
   const reps = A.reps, hold = isHold(), countOnly = isFree() || !!state.fallback, partial = !countOnly && reps.some(r => r.partial);
   const graded = !countOnly && !partial;
   const faults = {}; for (const r of reps) for (const id of r.faultList) faults[id] = (faults[id] || 0) + 1;

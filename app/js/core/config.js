@@ -1,6 +1,6 @@
 'use strict';
-const APP_VERSION = '2.8.0 · тест';
-const CAMERA_REV = '2.8.0';
+const APP_VERSION = '2.8.1 · тест';
+const CAMERA_REV = '2.8.1';
 /* storage keys: one set per Telegram account on this phone (TG.slot() is empty in a browser) */
 const LEGACY_KEY = 'ai-trainer-app-1';
 const KEY = LEGACY_KEY + TG.slot();

@@ -15,6 +15,18 @@ function calibText() {
   if (isHold()) return 'Прими положение — время пойдёт само';
   return 'Замри на секунду в начальном положении';
 }
+const PREPARE_MS = 12000;
+function startPreparation(announce = true) {
+  const now = performance.now();
+  state.preflight = true; state.preflightReady = false; state.preflightSince = null;
+  state.prepareUntil = now + PREPARE_MS; state.preparedCalibration = false;
+  state.preparationHintAt = now; state.startAnnounced = false;
+  if (announce) Voice.say('У тебя двенадцать секунд на подготовку. Поставь телефон и встань в кадр.', 'prepare', true);
+}
+function preparationRemaining() {
+  if (state.prepareUntil == null) startPreparation(false);
+  return Math.max(0, Math.ceil((state.prepareUntil - performance.now()) / 1000));
+}
 /* Say what exactly is missing, so the person knows whether to step back, lower the phone or turn. */
 function missingHint(kp) {
   if (!kp) return 'Не вижу человека. Проверь свет и направь камеру на рабочие суставы';
@@ -41,6 +53,7 @@ function cueState() {
     ? 'Разреши Telegram доступ к камере в настройках телефона или выбери видео.'
     : 'Разреши камеру в настройках сайта или выбери видео.'};
   if (!state.on) return state.flash && state.flash.until > now ? state.flash : { cls: 'tip', text: info().tips[0] };
+  if (state.preflight && preparationRemaining()) return {cls:'info', text:'Подготовка · ' + preparationRemaining() + ' с. Счёт ещё не идёт'};
   if (!el.msg.hidden && el.msg.dataset.loading === 'true') return { cls: 'info', text: 'Держи рабочие суставы в кадре' };
   if (!snap) return { cls: 'info', text: state.detector ? 'Включаю камеру…' : 'Готовлю тренера…' };
   if (state.preflight) {
@@ -56,22 +69,27 @@ function cueState() {
   if (snap.phase === 'top') return { cls: 'info', text: snap.reps && !snap.setEnded ? 'Следующий повтор' : 'Готово. Начинай' };
   return { cls: 'info', text: 'Под контролем' };
 }
-let lastStatus = '', lastStatusSay = 0, calibSaid = false, turnSince = null;
+let lastStatus = '', lastStatusSay = -Infinity, turnSince = null;
 function speakStatus() {
   const snap = state.snap; if (!state.on || !snap || state.file) { lastStatus = ''; turnSince = null; return; }
   const now = performance.now(), s = snap.status;
+  if (!el.msg.hidden || state.recOnly) return;
+  if (state.preflight) {
+    if (preparationRemaining() || now - state.preparationHintAt < PREPARE_MS) return;
+    const f = state.frame, checks = checkSetup(f && f.kp, f && f.W, f && f.H, snap, state.ex);
+    const hint = !checks.body ? missingHint(f && f.kp) : !checks.angle && s !== 'calib' ? setupReason(checks, snap) : calibText();
+    if (Voice.say(hint, 'preparation-hint', false, true)) state.preparationHintAt = now;
+    return;
+  }
   const text = s === 'nobody' ? missingHint(state.frame && state.frame.kp) : STATUS_TEXT[s] || (s === 'calib' ? calibText() : null);
   if (s !== lastStatus) {
-    if (lastStatus === 'nobody') Voice.say('Вижу тебя', 'see', false, true);
-    lastStatus = s; lastStatusSay = now - 4200; calibSaid = false;   // the first hint 2 s after the change, then every 6 s
+    lastStatus = s;
   }
-  if (text && Voice.on && !speechSynthesis.speaking) {
-    if (s === 'calib') { if (!calibSaid) { Voice.say(text, null, true); calibSaid = true; } }   // said once
-    else if (now - lastStatusSay > 6000) { Voice.say(text, null, true); lastStatusSay = now; }
+  if (text && now - lastStatusSay >= PREPARE_MS) {
+    if (Voice.say(text, 'position-hint', false, true)) lastStatusSay = now;
   }
-  if (state.preflight) return;
   /* the phone stands at an angle the rules cannot judge: keep counting reps instead of waiting */
-  if (!isFree() && !state.fallback && (s === 'turn' || s === 'turn_front')) {
+  if (!isFree() && !state.fallback && !AT.isLunge(state.ex) && (s === 'turn' || s === 'turn_front')) {
     if (turnSince == null) turnSince = now;
     else if (now - turnSince > 5000) {
       if (state.analyzer.reps.length && !state.analyzer.setEnded) {state.analyzer.endSet();processEvents(state.analyzer.drain());}
@@ -119,7 +137,7 @@ function renderLive() {
     ? '2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
     : '3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
   const analysisInfo = $('#analysisInfo');
-  const versionedAnalysis = 'Версия 2.8.0 · ' + analysisText;
+  const versionedAnalysis = 'Версия 2.8.1 · ' + analysisText;
   if (analysisInfo.textContent !== versionedAnalysis) analysisInfo.textContent = versionedAnalysis;
   el.hud.hidden = !state.on || !!state.recOnly || state.preflight;
   if (snap) {
@@ -165,19 +183,27 @@ el.main.addEventListener('click', () => {
 function beginPreparedSet(countOnly = false) {
   if (!state.on || !state.preflight) return;
   const f = state.frame;
-  if (countOnly ? !checkSetup(f && f.kp, f && f.W, f && f.H, state.snap, state.ex).body : !state.preflightReady) return;
+  if (countOnly) {
+    if (!checkSetup(f && f.kp, f && f.W, f && f.H, state.snap, state.ex).body) return;
+    state.fallback = true; newAnalyzer(false);
+    state.preparedCalibration = !preparationRemaining(); renderMain(); renderLive(); return;
+  }
+  if (preparationRemaining() || !state.preflightReady) return;
   const previous=state.analyzer;
-  if (countOnly) state.fallback = true;
   state.preflight = false;
   newAnalyzer();
-  if (!countOnly && previous && previous.cal && previous.status==='track') {
+  if (previous && previous.cal && previous.status==='track') {
     Object.assign(state.analyzer,{cal:previous.cal,analysisMode:previous.analysisMode,worldExpected:previous.worldExpected,
       view:previous.view,side:previous.side,phase:'top',status:'track'});
+    if (AT.isLunge(state.ex)) state.analyzer.baselines = previous.baselines;
   }
+  Voice.announceStart();
+  state.startAnnounced = true;
   Rec.start(state.stream); attemptT0 = performance.now(); helperAt = 12000;
-  state.flash = null; lastStatus = ''; renderMain(); renderLive();
-  if (Voice.on) Voice.say(countOnly ? 'Считаю повторы, без оценки техники' : 'Счёт включён. Начинай подход', 'start', true);
+  state.flash = {cls:'info', text:'Начинаю отсчёт' + (state.fallback || isFree() ? ' · без оценки техники' : ''), until:performance.now()+2600};
+  lastStatus = ''; lastStatusSay = performance.now(); renderMain(); renderLive();
 }
 $('#voiceSel').addEventListener('change', e => { store.set(VOICE_KEY, e.target.value); pickVoice(); });
-$('#voiceTest').addEventListener('click', () => { const was = Voice.on; Voice.on = true; Voice.say('Привет! Отойди подальше, чтобы было видно всё тело. Начинаем подход.', 'test', true); Voice.on = was; });
+$('#voiceRate').addEventListener('change', e => { Voice.rate = pickOpt(Number(e.target.value), [.85,1,1.15], 1); store.set('aitrainer.voice-rate', Voice.rate); });
+$('#voiceTest').addEventListener('click', () => { const was = Voice.on; Voice.on = true; Voice.say('Замри на секунду. Начинаю отсчёт. Один, два, три. Выпады. Держи корпус ровно.', 'test', true); Voice.on = was; });
 
