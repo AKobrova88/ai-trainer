@@ -118,7 +118,7 @@ function toApp() {
   try { localStorage.setItem(APP_INBOX, JSON.stringify(box)); } catch (err) { el.sendBox.insertAdjacentHTML('afterbegin', '<p>Не получилось сохранить на телефоне. Освободи место и попробуй ещё раз.</p>'); return; }
   const all = store.get(SETS_KEY, {}); for (const k of appKeys()) delete all[k]; store.set(SETS_KEY, all);
   state.sets = [];
-  location.href = RET;
+  Clips.leave(()=>{location.href=RET;});
 }
 function commitResults() {
   const destination = resultHandoff();
@@ -130,8 +130,11 @@ function commitResults() {
       return isFree() || s.partial || s.countOnly ? { w: weighted() ? s.w : null, r: s.r, n: 0, c: 0, f: {} } : { w: weighted() ? s.w : null, r: s.r, n: s.n, c: s.c, f };
     });
     const payload = JSON.stringify({ v: 2, ex: state.ex, view: (A && A.view) || state.view, sets });
-    try { W.sendData(payload); state.sets = []; saveSets(); renderSets(); }
-    catch (err) { el.sendBox.insertAdjacentHTML('afterbegin', '<p>Не получилось отправить. Скопируй результат и пришли боту сообщением.</p>'); }
+    stopCamera();
+    Clips.leave(()=>{
+      try { W.sendData(payload); state.sets = []; saveSets(); renderSets(); }
+      catch (err) { el.sendBox.insertAdjacentHTML('afterbegin', '<p>Не получилось отправить. Скопируй результат и пришли боту сообщением.</p>'); }
+    });
   }
 }
 el.sendBox.addEventListener('click', async e => {

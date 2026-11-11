@@ -47,6 +47,7 @@ function setExercise(key, keepVideo = false) {
   el.note.hidden = !isFree() || state.on;
   loadSets();
   newAnalyzer(!keepVideo);
+  if(state.on && state.stream && !state.file)Rec.start(state.stream);
   renderSets(); renderMain();
 }
 function newAnalyzer(resetPose = true) {

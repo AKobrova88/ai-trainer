@@ -7,7 +7,7 @@ function closeSheet(sheet) {
   if (sheet.close && sheet.open) sheet.close(); else sheet.removeAttribute('open');
 }
 const optionsSheet = $('#cameraOptions');
-for (const dialog of [optionsSheet, $('#exerciseFinder')]) {
+for (const dialog of [optionsSheet, $('#exerciseFinder'), $('#recordingsDialog')]) {
   dialog.addEventListener('click', e => {
     if (e.target === dialog || e.target.closest('[data-dismiss]')) closeSheet(dialog);
   });
@@ -45,7 +45,7 @@ const back = $('#navBack');
 back.hidden = !RET;
 if (RET) {
   back.setAttribute('href', RET);
-  back.addEventListener('click', () => { stopCamera(); saveSets(); });
+  back.addEventListener('click', e => { e.preventDefault();stopCamera();saveSets();Clips.leave(()=>{location.href=RET;}); });
 }
 let cameraTelegram = null;
 if (cameraColorScheme.addEventListener) cameraColorScheme.addEventListener('change', () => syncCameraTheme(cameraTelegram));
@@ -53,6 +53,19 @@ new MutationObserver(readColors).observe(document.documentElement, { attributes:
 
 fillSelect(); setAspect(1, 1); resize(); setExercise(state.ex); renderFacing(); renderPlan();
 el.voice.checked = Voice.on;
+Clips.init().then(()=>{if(qp.get('mode')==='recordings')Clips.open();});
+$('#recordingsBtn').addEventListener('click',()=>Clips.open());
+$('#clipSave').addEventListener('click',()=>Clips.export(Clips.selected));
+$('#clipRetry').addEventListener('click',()=>Clips.retry(Clips.selected));
+$('#clipDelete').addEventListener('click',()=>Clips.remove(Clips.selected));
+$('#recordingsList').addEventListener('click',e=>{const b=e.target.closest('[data-clip]');if(b)Clips.open(b.dataset.clip);});
+$('#recordingsDialog').addEventListener('close',()=>{$('#clipPreview').pause();});
+window.addEventListener('pagehide',()=>{Rec.drop();});
+function preserveRecordingVisibility() {
+  if(document.visibilityState==='hidden')Rec.drop();
+  else if(document.visibilityState==='visible' && state.on && state.stream && !state.file)Rec.start(state.stream);
+}
+document.addEventListener('visibilitychange',preserveRecordingVisibility);
 requestAnimationFrame(loop);
 if (MODE_LIVE) startCamera(true);
 

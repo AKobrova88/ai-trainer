@@ -16,7 +16,7 @@ const H = { lastT: -1, still: 0, errors: 0, ok: 0, lastErr: '', noPose: 0 };
 function health() {
   if (!state.on || state.file || !state.stream || !el.msg.hidden) return;
   if (state.engine === 'mp-full' && H.nInf > 60 && H.ms > 110) swapEngine('mp-lite');
-  if (Rec.secs() > 180 && !(state.analyzer && state.analyzer.reps.length)) Rec.restart();   // keep only the current attempt
+  if (Rec.secs() > 180 && !(state.analyzer && state.analyzer.reps.length)) Rec.restart();   // Archive long attempts before starting the next recording.
   helperCheck();
   const v = el.vid;
   if (v.paused || v.ended) { try { const p = v.play(); if (p && p.catch) p.catch(() => tapToStart()); } catch (e) { tapToStart(); } }

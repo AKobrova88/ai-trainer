@@ -3,7 +3,7 @@
 <link rel="stylesheet" href="cam/css/theme.css?v=2.7.4">
 <link rel="stylesheet" href="cam/css/plan.css?v=2.7.1">
 
-<link rel="stylesheet" href="cam/css/native.css?v=2.8.2">
+<link rel="stylesheet" href="cam/css/native.css?v=2.8.3">
 
 <div class="app">
   <header class="top">
@@ -74,6 +74,16 @@
     <div class="cue info" id="cue" role="status" aria-live="polite"><i></i><span id="cueText"></span></div>
   </section>
   <p class="camtip" id="videoExercise" role="status" hidden></p>
+  <div class="recording-strip" id="recordingStrip" hidden><span id="recordingStatus" role="status"></span><button type="button" id="recordingsBtn" hidden>Открыть записи</button><p id="recordingNotice" role="status" hidden></p></div>
+  <dialog class="native-sheet" id="recordingsDialog" aria-labelledby="clipTitle">
+    <div class="sheet-body">
+      <div class="sheet-head"><h2 id="clipTitle">Видео подходов</h2><button class="native-icon" type="button" data-dismiss aria-label="Закрыть">×</button></div>
+      <video id="clipPreview" controls playsinline preload="metadata" hidden></video>
+      <div class="clip-actions" id="clipActions" hidden><button class="main-btn" type="button" id="clipSave">Сохранить видео</button><button class="sub-btn" type="button" id="clipRetry">Разобрать повторно</button><a id="clipDownload" class="clip-download" download>Скачать файл</a><button class="clip-delete" id="clipDelete" type="button">Удалить из приложения</button></div>
+      <p class="voice-help" id="clipsHelp"></p>
+      <div class="sheet-list" id="recordingsList"></div>
+    </div>
+  </dialog>
 
   <div class="camera-dock">
     <button class="main-btn" id="mainBtn" type="button" disabled>Камера</button>
@@ -89,7 +99,7 @@
     <div class="send" id="sendBox"></div>
   </section>
 
-  <p class="foot">Видео остаётся на устройстве.</p>
+  <p class="foot">Видео остаётся на устройстве. Готовые записи доступны в «Видео подходов».</p>
   <input class="vh" id="fileInput" type="file" accept="video/*">
 </div>
 
@@ -100,17 +110,18 @@
 <script defer src="cam/js/core.js?v=2.7.2"></script>
 <script defer src="cam/js/voice.js?v=2.8.2"></script>
 <script defer src="app/js/data/catalog.js?v=2.7.4"></script>
-<script defer src="cam/js/state.js?v=2.8.2"></script>
-<script defer src="cam/js/exercise.js?v=2.8.2"></script>
+<script defer src="cam/js/state.js?v=2.8.3"></script>
+<script defer src="cam/js/exercise.js?v=2.8.3"></script>
 <script defer src="cam/js/canvas.js?v=2.7.1"></script>
-<script defer src="cam/js/live-loop.js?v=2.8.2"></script>
+<script defer src="cam/js/live-loop.js?v=2.8.3"></script>
 <script defer src="cam/js/sets.js?v=2.8.2"></script>
-<script defer src="cam/js/plan.js?v=2.8.2"></script>
-<script defer src="cam/js/live-ui.js?v=2.8.2"></script>
-<script defer src="cam/js/engine.js?v=2.8.1"></script>
-<script defer src="cam/js/recording.js?v=2.8.0"></script>
+<script defer src="cam/js/plan.js?v=2.8.3"></script>
+<script defer src="cam/js/live-ui.js?v=2.8.3"></script>
+<script defer src="cam/js/engine.js?v=2.8.3"></script>
+<script defer src="cam/js/recordings.js?v=2.8.3"></script>
+<script defer src="cam/js/recording.js?v=2.8.3"></script>
 <script defer src="cam/js/recognition.js?v=2.7.4"></script>
 <script defer src="cam/js/video.js?v=2.8.1"></script>
 <script defer src="cam/js/bar.js?v=2.8.0"></script>
-<script defer src="cam/js/main.js?v=2.8.2"></script>
+<script defer src="cam/js/main.js?v=2.8.3"></script>
 </body></html>

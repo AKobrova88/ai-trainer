@@ -68,6 +68,9 @@ function viewCamera() {
       <a class="cam-entry-row" href="${esc(camLink(it, 'video'))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go">
         <span class="cam-entry-icon">${I.video}</span><span class="grow"><b>Разбор видео</b><small>Из галереи</small></span>${CHEV}
       </a>
+      <a class="cam-entry-row" href="${esc(camLink(it, 'recordings'))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go">
+        <span class="cam-entry-icon">${I.video}</span><span class="grow"><b>Видео подходов</b><small>Сохранить или разобрать повторно</small></span>${CHEV}
+      </a>
     </section>
     ${SAME_SITE ? '' : `<div class="note blue">${I.info}<span>Здесь, в предпросмотре, камера откроется в новой вкладке, и подходы оттуда нужно будет записать вручную. В установленной версии они вернутся сюда сами.</span></div>`}
     ${vlog.length ? `<div class="eyebrow">Недавние разборы</div><div class="vlog">${vlog.map(v => `<button class="vrow" data-act="vres" data-v="${v.id}"><span class="grow"><b>${esc(v.name)}</b><small>${ruDate(v.at)} · ${v.reps} ${plural(v.reps, 'повтор', 'повтора', 'повторов')}${v.mode === 'video' ? ' · видео' : ''}${v.partial ? ' · 3D, предварительно' : ''}</small></span>${v.n && !v.partial ? `<span class="q ${q(v)}">чисто ${v.c} из ${v.n}</span>` : ''}</button>`).join('')}</div>` : ''}`];

@@ -328,6 +328,7 @@ async function loadModelWithUi(current, retry, videoFallback) {
       ? 'Видео открылось. Проверь интернет и повтори разбор этого видео. Можно также посчитать повторы по движению веса.'
       : 'Проверь интернет и повтори запуск. Можно записать подход вручную.',
       [{ label: videoFallback ? 'Повторить разбор' : 'Повторить', primary: true, run: () => { hideMsg(); retry(); } },
+       ...(Rec.pending.size || Clips.latest() ? [{label:'Открыть записи',run:()=>{hideMsg();Rec.drain().then(()=>Clips.open());}}] : []),
        ...(videoFallback ? [{ label: 'Считать по движению веса', run: () => { hideMsg(); videoFallback(); } }] : []),
        manual,
        { label: 'Закрыть', run: hideMsg }]);
@@ -353,7 +354,9 @@ async function startCamera(automatic = false) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { if (!automatic) cameraBlocked(); return; }
   const request = {}; state.cameraRequest = request; renderMain(); renderLive();
   let stream;
-  stopStream();                                   // many phones cannot open the second camera while the first one is busy
+  const closing=stopStream(); // Finish the original video before opening another camera.
+  if(closing)await closing;
+  if(state.cameraRequest!==request)return;
   try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: state.facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }); }
   catch (e) {
     if (state.cameraRequest !== request) return;
@@ -370,10 +373,10 @@ async function startCamera(automatic = false) {
   el.vid.autoplay = true; el.vid.muted = true; el.vid.setAttribute('playsinline', ''); el.vid.srcObject = stream;
   el.vid.classList.toggle('mirror', state.facing === 'user');
   newAnalyzer(); showCameraMode(true);          // the video is on screen before play(): hidden videos stay frozen on some phones
+  Rec.start(stream); // Recording is independent of model download, visibility and calibration.
   setAspect(el.vid.videoWidth || 720, el.vid.videoHeight || 1280);
   requestWake();
   if (state.recOnly) {
-    Rec.start(stream);
     if (!Rec.mr) {
       stopCamera();
       return showMsg('Запись недоступна', 'Сними подход обычной камерой телефона и выбери запись из галереи.',
@@ -387,9 +390,12 @@ async function startCamera(automatic = false) {
 }
 function stopStream() {
   barReset();
-  Rec.drop();
-  if (state.stream) { for (const t of state.stream.getTracks()) t.stop(); state.stream = null; }
+  const stream=state.stream, pending=!!Rec.mr || Rec.pending.size>0;
+  Rec.drop();state.stream=null;
+  const stop=()=>{if(stream)for(const t of stream.getTracks())t.stop();};
   if (el.vid.srcObject) el.vid.srcObject = null;
+  if(pending)return Rec.drain().then(stop,stop);
+  stop();
 }
 function stopCamera() {
   Voice.cancel(); state.prepareUntil = null;
@@ -399,7 +405,8 @@ function stopCamera() {
   const A = state.analyzer;
   if (!state.file && !state.preflight && A && A.reps.length && !A.setEnded) { A.endSet(); processEvents(A.drain()); }
   state.preflight = false; state.preflightReady = false; state.preflightSince = null;
-  stopStream(); stopFile(); releaseWake(); state.frame = null; showCameraMode(false);
+  const saving=stopStream(); stopFile(); releaseWake(); state.frame = null; showCameraMode(false);
+  return saving;
 }
 function cameraBlocked() {
   state.cameraDenied = true;
