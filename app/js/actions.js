@@ -1,7 +1,7 @@
 'use strict';
 /* ---------- actions: every button carries data-act (+ data-v) ---------- */
 const sheetTop = () => $('#sheets').lastElementChild;
-const closeTop = () => { const t = sheetTop(); if (!t) return; if (t.querySelector('#wiz')) { if (REC) toggleMic(); S.wiz = null; } if (t.querySelector('#imp')) IMP = null; const returnTo = t._returnFocus; t.remove(); syncSheets(returnTo); };
+const closeTop = () => { const t = sheetTop(); if (!t) return; if (t.querySelector('#wiz')) { if (REC) stopMic(true); S.wiz = null; } if (t.querySelector('#imp')) IMP = null; const returnTo = t._returnFocus; t.remove(); syncSheets(returnTo); };
 const scrollSheet = () => { const b = $('.sheet-b', sheetTop() || document); if (b) b.scrollTop = 0; };
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 function useProgram(days, profile, tab) {
@@ -9,7 +9,7 @@ function useProgram(days, profile, tab) {
   if (S.demo && S.user) { S.diary = S.demoReturn ? JSON.parse(S.demoReturn).diary : S.diary.filter(w => !w.demo); S.demo = false; delete S.demoReturn; S.workout = null; S.rest = null; }
   else if (S.demo) { S.diary = []; S.workout = null; S.rest = null; }
   S.program = {days, at: Date.now(), by: profile ? 'wish' : 'other'}; S.next = days[0] ? days[0].id : null; S.pick = null;
-  if (profile) { const {found, ...p} = profile; S.profile = {...blankProfile(), ...p, filled: true}; }
+  if (profile) { const {found, ...p} = profile; S.profile = {...blankProfile(), ...p, filled: true}; S.wishRulesStamp = wishProfileStamp(S.profile); }
   S.stage = 'app'; S.tab = tab; S.open = {};
 }
 const A = {
@@ -80,12 +80,19 @@ const A = {
   /* wishes → program */
   wish: () => openWizard(),
   mic: () => toggleMic(),
-  'wiz-next': () => {
+  'wiz-next': async () => {
     const W = S.wiz; if (!W) return;
-    if (REC) toggleMic();
+    if (W.nextPending) return;
+    if (REC) {
+      W.nextPending = true;
+      const next = $('#wiz-next'); if (next) { next.disabled = true; next.textContent = 'Завершаю диктовку…'; }
+      await stopMic();
+      delete W.nextPending;
+      if (S.wiz !== W || W.step !== 1) return;
+    }
     const P = parseWishes(W.text);
-    /* same text as last time: keep what she corrected by hand */
-    W.P = S.profile.filled && norm(S.profile.text) === norm(W.text) ? {...JSON.parse(JSON.stringify(S.profile)), found: P.found, flags: P.flags, expMonths: P.expMonths, daysAsked: P.daysAsked} : P;
+    /* Preserve current-rule manual edits; re-read older interpretations only in this new draft. */
+    W.P = S.wishRulesStamp === wishProfileStamp(S.profile) && S.profile.filled && norm(S.profile.text) === norm(W.text) ? {...JSON.parse(JSON.stringify(S.profile)), found: P.found, flags: P.flags, expMonths: P.expMonths, daysAsked: P.daysAsked} : P;
     W.step = 2; renderWizard(); scrollSheet();
   },
   'wiz-back': () => { const W = S.wiz; if (!W) return; W.step = W.step === 3 ? 2 : 1; renderWizard(); scrollSheet(); },

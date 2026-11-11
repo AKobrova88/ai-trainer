@@ -8,7 +8,11 @@ function openWizard(fromText) {
 }
 function stepsBar(n) { return `<div class="row"><div class="steps" aria-hidden="true">${[1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}</div><span class="hint">${n} из 3</span></div>`; }
 function foundChips(P) {
-  return FOUND_CHIPS.map(([k, l]) => `<span class="fchip ${P.found[k] ? 'ok' : ''}">${P.found[k] ? '✓ ' : '+ '}${l}</span>`).join('');
+  return FOUND_CHIPS.map(([k, l]) => {
+    if (k === 'focus' && P.found.focus) l = 'акцент: ' + Object.keys(MUSCLES).filter(g => P.focus[g]).map(g => MUSCLES[g].toLowerCase()).join(', ');
+    if (k === 'limits' && P.found.limits) l = P.limits.length || P.other.length ? 'ограничения: ' + [...P.limits.map(g => LIMIT_NAMES[g]), ...P.other.map(g => OTHER_NAMES[g])].join(', ') : P.flags?.pregnant || P.flags?.medical ? 'особые условия нагрузки' : 'ограничений нет';
+    return `<span class="fchip ${P.found[k] ? 'ok' : ''}">${P.found[k] ? '✓ ' : '+ '}${esc(l)}</span>`;
+  }).join('');
 }
 function renderWizard() {
   const W = S.wiz, b = $('#wiz'), f = $('#wiz-f');
@@ -21,17 +25,19 @@ function renderWizard() {
       <p class="lead">Своими словами, как тренеру. Чем подробнее — тем точнее программа.</p>
       <div class="wish"><label class="sr" for="wish-t">Твои пожелания</label>
         <textarea id="wish-t" rows="8" placeholder="Например: вес 62 кг, рост 168. Хожу в зал около двух лет, 3 раза в неделю по часу. Хочу подкачать ягодицы и заднюю поверхность бедра, подтянуть спину. Иногда побаливает колено — глубокие приседы не люблю.">${esc(W.text)}</textarea>
-        <div class="row"><span class="hint" id="wish-n">${W.text.length} ${plural(W.text.length, 'знак', 'знака', 'знаков')}</span>${hasSpeech() ? `<button class="mic" data-act="mic" id="mic">${I.mic}Надиктовать</button>` : ''}</div></div>
+        <div class="row"><span class="hint" id="wish-n">${W.text.length} ${plural(W.text.length, 'знак', 'знака', 'знаков')}</span>${hasSpeech() ? `<button class="mic" data-act="mic" id="mic" aria-pressed="false">${I.mic}Надиктовать</button>` : ''}</div></div>
+      <p class="hint" id="dictation-status" role="status" aria-live="polite">${hasSpeech() ? 'Говори свободно, без специальных команд. Можно дополнять текст несколькими записями.' : 'Можно написать текст или надиктовать его через микрофон клавиатуры.'}</p>
       <div class="eyebrow">Что уже есть в тексте</div><div class="found" id="wish-found">${foundChips(P)}</div>
       ${youngProgram() ? `<div class="note warn">${I.info}<span>Твоей программе ${youngProgram()} ${plural(youngProgram(), 'день', 'дня', 'дней')}. Программу стоит вести 4–6 недель, чтобы вес успевал расти. ${access().unlimited ? 'Пересборка доступна без лимита.' : 'Пересобрать можно — это 1 подбор из лимита.'}</span></div>` : ''}
-      <p class="hint">Подбор идёт по правилам тренера прямо на телефоне: текст никуда не отправляется.</p>`;
+      <p class="hint">Пожелания разбираются на телефоне. Диктовка работает через службу распознавания браузера.</p>`;
     f.innerHTML = `<button class="btn" data-act="close">Отмена</button><button class="btn primary" data-act="wiz-next" id="wiz-next" ${W.text.trim().length >= 12 ? '' : 'disabled'}>Дальше</button>`;
     const ta = $('#wish-t');
+    ta.addEventListener('beforeinput', () => { if (REC) stopMic(true); });
     ta.addEventListener('input', () => {
       W.text = ta.value; const p = parseWishes(W.text);
       $('#wish-found').innerHTML = foundChips(p);
       $('#wish-n').textContent = `${W.text.length} ${plural(W.text.length, 'знак', 'знака', 'знаков')}`;
-      $('#wiz-next').disabled = W.text.trim().length < 12;
+      $('#wiz-next').disabled = !!W.nextPending || W.text.trim().length < 12;
     });
     return;
   }
@@ -88,14 +94,92 @@ function renderWizard() {
   f.innerHTML = `<button class="btn" data-act="wiz-accept" data-v="program">Поправить</button><button class="btn primary" data-act="wiz-accept" data-v="today">${S.demo && !S.user ? 'Попробовать программу' : had ? 'Заменить мою программу' : 'Начать'}</button>`;
 }
 let REC = null;
+function micStatus(message, phase = '') {
+  const btn = $('#mic'), status = $('#dictation-status');
+  if (status) status.textContent = message;
+  if (!btn) return;
+  btn.classList.toggle('on', phase === 'listening');
+  btn.setAttribute('aria-pressed', String(!!phase));
+  btn.disabled = phase === 'stopping';
+  btn.innerHTML = I.mic + ({starting: 'Подключаю…', listening: 'Остановить', stopping: 'Завершаю…'}[phase] || 'Надиктовать');
+}
+function stopMic(cancel = false) {
+  const s = REC;
+  if (!s) return Promise.resolve();
+  if (cancel) {
+    s.finish('Текст сохранён. Его можно исправить или дополнить.');
+    try { s.rec.abort(); } catch (e) { /* already stopped */ }
+  } else if (!s.stopping) {
+    s.stopping = true;
+    clearTimeout(s.startTimer);
+    micStatus('Завершаю последнюю фразу…', 'stopping');
+    // Keep receiving the final result after stop(); preserve the visible interim text if the browser stalls.
+    s.stopTimer = setTimeout(() => {
+      s.finish('Диктовка завершена. Проверь текст перед продолжением.');
+      try { s.rec.abort(); } catch (e) { /* already stopped */ }
+    }, 1800);
+    try { s.rec.stop(); } catch (e) { s.finish('Текст сохранён. Можно продолжить.'); }
+  }
+  return s.done;
+}
 function toggleMic() {
-  const btn = $('#mic'), ta = $('#wish-t');
-  if (REC) { try { REC.stop(); } catch (e) { /* stopped */ } REC = null; btn && btn.classList.remove('on'); return; }
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR || !ta) return;
-  const r = new SR(); r.lang = 'ru-RU'; r.continuous = true; r.interimResults = false;
-  r.onresult = e => { for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) { ta.value = (ta.value.trim() + ' ' + e.results[i][0].transcript.trim()).trim(); ta.dispatchEvent(new Event('input')); } };
-  r.onend = () => { REC = null; const b = $('#mic'); b && b.classList.remove('on'); };
-  r.onerror = e => { if (e.error === 'not-allowed') toast('Разреши микрофон для этой страницы — или напиши текстом'); };
-  try { r.start(); REC = r; btn.classList.add('on'); } catch (e) { toast('Диктовка недоступна — напиши текстом'); }
+  if (REC) return stopMic();
+  const ta = $('#wish-t'), owner = S.wiz, SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR || !ta || !owner || owner.step !== 1) return;
+  let rec;
+  try { rec = new SR(); } catch (e) { micStatus('Диктовка недоступна. Можно использовать микрофон клавиатуры.'); return; }
+  const s = {rec, owner, ta, base: ta.value.trim(), lastText: ta.value, heard: false, stopping: false};
+  s.done = new Promise(resolve => { s.resolve = resolve; });
+  const current = () => REC === s && S.wiz === owner && owner.step === 1 && $('#wish-t') === ta;
+  s.finish = message => {
+    if (REC !== s) return;
+    clearTimeout(s.startTimer); clearTimeout(s.stopTimer);
+    const visible = current(); REC = null;
+    if (visible) micStatus(message);
+    s.resolve();
+  };
+  REC = s;
+  rec.lang = 'ru-RU'; rec.continuous = true; rec.interimResults = true;
+  const listening = () => {
+    if (!current() || s.stopping) return;
+    clearTimeout(s.startTimer);
+    micStatus('Слушаю. Говори в обычном темпе; текст появляется по мере распознавания.', 'listening');
+  };
+  rec.onstart = listening; rec.onaudiostart = listening;
+  rec.onresult = e => {
+    if (!current()) return;
+    // The browser supplies the whole session: interim hypotheses replace each other, not append.
+    if (ta.value !== s.lastText) { stopMic(true); return; }
+    const parts = [];
+    for (let i = 0; i < e.results.length; i++) {
+      const text = e.results[i][0]?.transcript?.trim();
+      if (text) parts.push(text);
+    }
+    if (parts.length) s.heard = true;
+    s.lastText = [s.base, ...parts].filter(Boolean).join(' ');
+    ta.value = s.lastText; ta.dispatchEvent(new Event('input', {bubbles: true}));
+  };
+  rec.onend = () => s.finish(s.heard ? 'Диктовка завершена. Можно дополнить текст или нажать «Дальше».' : 'Речь не распознана. Нажми «Надиктовать» ещё раз или используй микрофон клавиатуры.');
+  rec.onerror = e => {
+    if (!current()) return;
+    const messages = {
+      'not-allowed': 'Разреши доступ к микрофону для этой страницы. Можно использовать микрофон клавиатуры.',
+      'service-not-allowed': 'Браузер не разрешил диктовку. Можно использовать микрофон клавиатуры.',
+      'audio-capture': 'Не удалось включить микрофон. Проверь доступ к нему и повтори запись.',
+      network: 'Служба диктовки не ответила. Проверь соединение и повтори запись; набранный текст сохранён.',
+      'no-speech': 'Речь не распознана. Нажми «Надиктовать» и дождись надписи «Слушаю».',
+      'language-not-supported': 'Русская диктовка недоступна в этом браузере. Можно использовать микрофон клавиатуры.',
+      aborted: 'Диктовка остановлена. Текст сохранён; можно продолжить запись.'
+    };
+    s.finish(messages[e.error] || 'Диктовка прервалась. Текст сохранён; можно повторить запись.');
+    try { rec.abort(); } catch (err) { /* already stopped */ }
+  };
+  micStatus('Подключаю микрофон. Дождись надписи «Слушаю» и начинай говорить.', 'starting');
+  s.startTimer = setTimeout(() => {
+    if (!current()) return;
+    s.finish('Не удалось запустить диктовку. Проверь доступ к микрофону или используй микрофон клавиатуры.');
+    try { rec.abort(); } catch (e) { /* already stopped */ }
+  }, 20000);
+  try { rec.start(); } catch (e) { s.finish('Не удалось начать диктовку. Повтори запись или используй микрофон клавиатуры.'); }
 }
 

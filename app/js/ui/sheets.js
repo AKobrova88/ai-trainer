@@ -24,7 +24,8 @@ function sheet(title, body, foot = '', size = '', stack = false) {
 }
 function closeSheet(restoreFocus = true) {
   const returnTo = $('#sheets').firstElementChild?._returnFocus;
-  $('#sheets').innerHTML = ''; if (REC) toggleMic(); S.wiz = null;
+  if (REC) stopMic(true);
+  $('#sheets').innerHTML = ''; S.wiz = null;
   syncSheets(restoreFocus ? returnTo : null);
 }
 let toastT;

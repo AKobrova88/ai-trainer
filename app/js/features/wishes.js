@@ -11,10 +11,15 @@ const OTHER_NAMES = {wrists: 'запястья', elbows: 'локти', neck: 'ш
 const MUSCLES = {glutes: 'Ягодицы', hams: 'Задняя поверхность бедра', quads: 'Передняя поверхность бедра', calves: 'Икры', back: 'Спина',
   chest: 'Грудь', shoulders: 'Плечи', arms: 'Руки', core: 'Пресс и кор'};
 const LEVELS3 = {1: 'поддержка', 2: 'сильный', 3: 'главный'};
+const WISH_RULES_VERSION = 2;
+const wishProfileStamp = profile => WISH_RULES_VERSION + ':' + JSON.stringify(profile);
 
 const NUMW = {'один': 1, 'одна': 1, 'одну': 1, 'два': 2, 'две': 2, 'двух': 2, 'три': 3, 'трех': 3, 'четыре': 4, 'четырех': 4, 'пять': 5, 'пяти': 5, 'шесть': 6, 'семь': 7, 'десять': 10, 'полтора': 1.5, 'полгода': 0.5};
 const toN = s => s == null ? NaN : (NUMW[s] ?? parseFloat(String(s).replace(',', '.')));
-const PAIN = /(бол(ит|ят|ь|и|ью|ел|езн)|побалива|травм|грыж|протруз|операц|ноет|ноют|хрустит|нельзя|противопоказ|не люблю|не могу|проблем\S* с|разрыв|растяжени|артроз|артрит|сколиоз|остеохондр|защемл|вылет)/;
+// Match Russian words, not substrings: «больше пяти лет» does not mean «боль».
+const PAIN = /(?<![а-яё])(?:боль(?:ю|и|ей|ная|ной|ные|ное)?(?![а-яё])|бол(?:ит|ят|ело|ели|ел[аи]?)(?![а-яё])|болезн|побалива|травм|грыж|протруз|операц|ноет|ноют|хрустит|нельзя|противопоказ|не люблю|не могу|проблем\S* с|разрыв|растяжени|артроз|артрит|сколиоз|остеохондр|защемл|вылет)/;
+const NO_PAIN = /(?<![а-яё])(?:не\s+(?:болит|болят|болело|болели)|(?:нет|без)\s+(?:болей|боли|травм\S*|ограничени\S*|противопоказани\S*)|(?:болей|боли|травм\S*|ограничени\S*|противопоказани\S*)\s+нет)(?![а-яё])/g;
+const WISH_INTENT = /хочу|хотел|подкач|накач|развит|укреп|акцент|упор|приоритет|особенно|подтян/;
 const JOINTS = [['knees', /колен|мениск|крестообраз/], ['back', /спин|поясниц|позвон|грыж|протруз|сколиоз|остеохондр/], ['shoulders', /плеч|ротатор/],
   ['wrists', /запяст/], ['elbows', /локт/], ['neck', /шея|шеи|шею|шейн/], ['hips', /тазобедр/]];
 const FOCUS_RX = [['hams', /задн\S* (поверхн|част)\S*( бедр\S*)?|бицепс\S* бедр|бицуху бедр/], ['glutes', /ягодиц|попа|попу|попы|попой|ягодичн/],
@@ -22,12 +27,18 @@ const FOCUS_RX = [['hams', /задн\S* (поверхн|част)\S*( бедр\S
   ['chest', /груд/], ['shoulders', /плеч|дельт/], ['arms', /(?<![а-яё])рук|бицепс|трицепс/], ['core', /пресс|живот|талию|талия|(?<![а-яё])кор(?![а-яёa-z])|кубики|бок/]];
 
 function parseWishes(text) {
-  const raw = ' ' + String(text || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ') + ' ';
+  const raw = ' ' + String(text || '').toLowerCase().replace(/ё/g, 'е').replace(/[^\S\n]+/g, ' ') + ' ';
   const P = blankProfile(); P.text = String(text || '').trim();
   const found = {};
-  const clauses = raw.split(/[.;!?\n]|,\s*(?:но|а|однако)\s|\s—\s|\s-\s/).map(c => c.trim()).filter(Boolean);
-  const pain = clauses.filter(c => PAIN.test(c));
-  const calm = clauses.filter(c => !PAIN.test(c)).join(' . ');
+  // Dictation often has no punctuation. A new request or a separate symptom starts a new clause.
+  const clauses = raw.split(/[.;!?\n]|(?:,\s*|\s+)(?:но|а|однако)\s+|\s—\s|\s-\s|\s+(?=(?:хочу|акцент|упор|приоритет)(?![а-яё])|(?:иногда|периодически)\s+(?:болит|болят|побалива))/).map(c => c.trim()).filter(Boolean);
+  let noPain = false;
+  const contexts = clauses.map(c => {
+    const clean = c.replace(NO_PAIN, () => { noPain = true; return ''; });
+    return {text: clean, noPain: clean !== c};
+  });
+  const pain = contexts.filter(c => PAIN.test(c.text)).map(c => c.text);
+  const calm = contexts.filter(c => !PAIN.test(c.text) && (!c.noPain || WISH_INTENT.test(c.text))).map(c => c.text).join(' . ');
 
   /* body */
   let m = raw.match(/(?:вес\S*|вешу|масса тела)\D{0,10}?(\d{2,3}(?:[.,]\d)?)/) ;
@@ -42,14 +53,16 @@ function parseWishes(text) {
 
   /* age vs experience: «2 года в зале» is experience, «мне 34» is age */
   const TRAIN_CTX = /зал|занима|трениру|опыт|стаж|хожу|спорт|фитнес|качаюсь/;
-  m = raw.match(/(?:мне|возраст\S*)\s*(?:уже|почти|около)?\s*(\d{2})\b/);
+  let ageAt = -1;
+  m = raw.match(/(?:мне|возраст\S*|женщина|мужчина|девушка|парень)\s*(?:уже|почти|около)?\s*(\d{2})\b/);
   if (!m) { const re = /\b(\d{2})\s*(?:лет|год(?:а)?)(?![а-яёa-z])/g; let x; while ((x = re.exec(raw))) { const ctx = raw.slice(Math.max(0, x.index - 25), x.index + 30); if (!TRAIN_CTX.test(ctx)) { m = x; break; } } }
-  if (m && +m[1] >= 14 && +m[1] <= 90) { P.age = +m[1]; found.age = true; }
+  if (m && +m[1] >= 14 && +m[1] <= 90) { P.age = +m[1]; ageAt = m.index + m[0].indexOf(m[1]); found.age = true; }
 
   let months = null;
   if (/новичок|новенька|начинающ|никогда не (занима|трениров|ходил)|ни разу|только начина|первый раз в зал|с нуля|не занимал/.test(raw)) months = 0;
   const yre = /(?:около|примерно|почти|уже|больше|более|меньше|чуть больше)?\s*(\d+(?:[.,]5)?|один|одного|двух|два|три|трех|четыре|пяти|пять|десять|полтора|несколько)?\s*(год|года|лет)(?![а-яёa-z])/g; let y;
   while (months == null && (y = yre.exec(raw))) {
+    if (ageAt >= y.index && ageAt < y.index + y[0].length) continue;
     const ctx = raw.slice(Math.max(0, y.index - 30), y.index + 40);
     if (!TRAIN_CTX.test(ctx)) continue;
     const n = y[1] === 'несколько' ? 3 : y[1] === 'одного' ? 1 : y[1] ? toN(y[1]) : 1;
@@ -100,7 +113,7 @@ function parseWishes(text) {
   /* limitations from the «it hurts / I can't» sentences */
   for (const c of pain) for (const [k, r] of JOINTS) if (r.test(c)) { if (LIMIT_NAMES[k]) { if (!P.limits.includes(k)) P.limits.push(k); } else if (!P.other.includes(k)) P.other.push(k); }
   if (!P.limits.includes('knees') && /глубок\S* присед/.test(pain.join(' '))) P.limits.push('knees');
-  if (P.limits.length || P.other.length) found.limits = true;
+  if (P.limits.length || P.other.length || noPain) found.limits = true;
   if (/беремен|после родов|кормлю груд/.test(raw)) { P.flags = {...(P.flags || {}), pregnant: true}; found.limits = true; }
   if (/гипертон|давлени|сердц|диабет|астм|эпилеп|варикоз/.test(raw)) { P.flags = {...(P.flags || {}), medical: true}; found.limits = true; }
   P.found = found;
