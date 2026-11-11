@@ -9,6 +9,8 @@ const qp = new URLSearchParams(location.search);
 /* Opened from the web app on the same site: ret= is where to go back, results travel in localStorage 'aitrainer.inbox'. */
 const RET = (() => { const r = qp.get('ret') || ''; return /^\/[^/\\]/.test(r) ? r : null; })();
 const MODE_VIDEO = qp.get('mode') === 'video';
+const WORKOUT_CONTEXT = qp.get('workout') || '';
+const VIDEO_STANDALONE = qp.get('scope') === 'standalone';
 const MODE_LIVE = !MODE_VIDEO && qp.get('mode') !== 'recordings' && (qp.get('mode') === 'live' && (qp.get('src') === 'app' || IN_TG) || IN_TG && qp.has('ex') && !RET && qp.get('src') !== 'app');
 const APP_INBOX = 'aitrainer.inbox' + TG_SLOT;
 const pickOpt = (v, list, d) => list.includes(v) ? v : d;

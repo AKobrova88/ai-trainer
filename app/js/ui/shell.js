@@ -4,6 +4,7 @@ function renderTabs() {
   $('#tabs').innerHTML = TABS.map(([k, l]) => `<button class="tab" data-act="tab" data-v="${k}" ${S.tab === k ? 'aria-current="page"' : ''}>${I[k]}<span>${l}</span>${k === 'today' && S.workout ? '<i class="dot"></i>' : ''}</button>`).join('');
 }
 function render() {
+  if (S.tab === 'camera') S.tab = 'today';
   applyTheme();
   const camOf = it => { if (it.base && CAT[it.base]) it.cam = CAT[it.base].cam; };   // the camera learns new exercises: old programs follow
   for (const d of S.program.days) { normSS(d.items); d.items.forEach(camOf); }
@@ -13,7 +14,7 @@ function render() {
   $('#onb').hidden = !onb; $('#view').hidden = onb;
   if (onb) { $('#onb').innerHTML = S.stage === 'welcome' ? viewWelcome() : viewStart(); $('#restbar').hidden = true; save(); TG.syncChrome(); return; }
   renderTabs();
-  const views = {today: viewToday, program: viewProgram, camera: viewCamera, diary: viewDiary, profile: viewProfile};
+  const views = {today: viewToday, program: viewProgram, diary: viewDiary, profile: viewProfile};
   const [title, html, act] = (views[S.tab] || viewToday)();
   $('#title').textContent = title;
   $('#top-act').innerHTML = act || '';

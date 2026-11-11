@@ -98,7 +98,8 @@ function renderSend() {
   }
   renderMain();
 }
-function toApp() {
+function queueAppResults() {
+  if (!RET) return false;
   if (state.on) stopCamera();
   saveSets();
   const entries = [];
@@ -114,13 +115,18 @@ function toApp() {
     });
     if (!saved[k]) saved[k] = {date: today(), sets: ss};
     if (!saved[k].resultId) saved[k].resultId = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2);
-    entries.push({ id: saved[k].resultId, at: Date.now(), ex: k, name: p ? p.n : EX.ex[k].name, pos: p ? p.pos : null, free, mode: ss.some(s => s.file) ? 'video' : 'live', sets });
+    entries.push({ id: saved[k].resultId, at: Date.now(), ex: k, name: p ? p.n : EX.ex[k].name, pos: p ? p.pos : null, free, mode: ss.some(s => s.file) ? 'video' : 'live', scope: VIDEO_STANDALONE ? 'standalone' : 'workout', workout: WORKOUT_CONTEXT || null, sets });
   }
+  if (!entries.length) return true;
   let box; try { box = JSON.parse(localStorage.getItem(APP_INBOX) || '[]'); if (!Array.isArray(box)) throw Error('Invalid queue'); } catch (err) { el.sendBox.insertAdjacentHTML('afterbegin', '<p>Не удалось прочитать сохранённые результаты. Сохрани резервную копию перед повторной отправкой.</p>'); return; }
   for (const entry of entries) if (!box.some(m => m && m.id === entry.id)) box.push(entry);
   try { localStorage.setItem(SETS_KEY, JSON.stringify(saved)); localStorage.setItem(APP_INBOX, JSON.stringify(box)); } catch (err) { el.sendBox.insertAdjacentHTML('afterbegin', '<p>Не получилось сохранить на телефоне. Освободи место и попробуй ещё раз.</p>'); return; }
   const all = store.get(SETS_KEY, {}); for (const k of appKeys()) delete all[k]; store.set(SETS_KEY, all);
   state.sets = [];
+  return true;
+}
+function toApp() {
+  if (!queueAppResults()) return;
   Clips.leave(()=>{location.href=RET;});
 }
 function commitResults() {

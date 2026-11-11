@@ -42,7 +42,8 @@ const back = $('#navBack');
 back.hidden = !RET;
 if (RET) {
   back.setAttribute('href', RET);
-  back.addEventListener('click', e => { e.preventDefault();stopCamera();saveSets();Clips.leave(()=>{location.href=RET;}); });
+  back.setAttribute('aria-label', WORKOUT_CONTEXT ? 'Вернуться к тренировке' : 'Вернуться на Сегодня');
+  back.addEventListener('click', e => { e.preventDefault();stopCamera();toApp(); });
 }
 let cameraTelegram = null;
 if (cameraColorScheme.addEventListener) cameraColorScheme.addEventListener('change', () => syncCameraTheme(cameraTelegram));
@@ -57,7 +58,7 @@ $('#clipRetry').addEventListener('click',()=>Clips.retry(Clips.selected));
 $('#clipDelete').addEventListener('click',()=>Clips.remove(Clips.selected));
 $('#recordingsList').addEventListener('click',e=>{const b=e.target.closest('[data-clip]');if(b)Clips.open(b.dataset.clip);});
 $('#recordingsDialog').addEventListener('close',()=>{$('#clipPreview').pause();});
-window.addEventListener('pagehide',()=>{Rec.drop();});
+window.addEventListener('pagehide',()=>{Rec.drop();if(RET)queueAppResults();});
 function preserveRecordingVisibility() {
   if(document.visibilityState==='hidden')Rec.drop();
   else if(document.visibilityState==='visible' && state.on && state.stream && !state.file)Rec.start(state.stream);

@@ -20,5 +20,6 @@ const TG_SLOT = (() => {
     return u && /^\d{1,20}$/.test(String(u.id)) ? ':tg' + u.id : '';
   } catch (e) { return ''; }
 })();
-const SETS_KEY = 'aitrainer.sets' + TG_SLOT;
+const CAMERA_CONTEXT = new URLSearchParams(location.search).get('ctx') || '';
+const SETS_KEY = 'aitrainer.sets' + TG_SLOT + (/^[a-z0-9_-]{1,80}$/.test(CAMERA_CONTEXT) ? ':'+CAMERA_CONTEXT : '');
 const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };

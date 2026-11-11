@@ -12,7 +12,7 @@ telegramBridge.then(W => {
   applyTheme();
   TG.onReady();
 });
-if (location.hash === '#from-camera') { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ } }
+if (location.hash === '#from-camera') { S.tab='today'; try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ } }
 if (S.stage !== 'welcome' && !S.user && !S.demo) S.stage = 'welcome';
 render();
 processInbox();

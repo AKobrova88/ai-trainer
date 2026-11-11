@@ -138,7 +138,7 @@ function renderLive() {
     ? '2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
     : '3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
   const analysisInfo = $('#analysisInfo');
-  const versionedAnalysis = 'Версия 2.8.5 · ' + analysisText;
+  const versionedAnalysis = 'Версия 2.8.7 · ' + analysisText;
   if (analysisInfo.textContent !== versionedAnalysis) analysisInfo.textContent = versionedAnalysis;
   el.hud.hidden = !state.on || !!state.recOnly || state.preflight;
   if (snap) {
@@ -155,7 +155,7 @@ function cameraAction() {
   if (state.on && state.recOnly) return ['finish', 'Стоп и разобрать', 'rec'];
   if (state.on && !state.file && !state.preflight && A && A.reps.length && !A.setEnded)
     return ['end', 'Завершить подход', 'stop'];
-  if (resultHandoff()) return ['save', state.file && state.videoSummary?.reps ? 'Сохранить разбор' : 'Сохранить подходы'];
+  if (resultHandoff()) return ['save', WORKOUT_CONTEXT ? 'Готово, к тренировке' : state.file && state.videoSummary?.reps ? 'Сохранить разбор' : 'Сохранить подходы'];
   if (state.file) return ['stop', 'Закрыть видео', 'secondary'];
   if (state.on) return ['stop', 'Выключить камеру', 'secondary'];
   return MODE_VIDEO ? ['pick', 'Выбрать видео'] : ['start', state.sets.length ? 'Следующий подход' : 'Начать с камерой'];

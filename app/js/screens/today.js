@@ -5,7 +5,7 @@ function viewToday() {
   if (!S.program.days.length) return ['Сегодня', `
     <section class="empty-card"><h2>Программы пока нет</h2><p class="hint" style="margin:0">Подберу её по твоим пожеланиям или разберу твою из другого приложения.</p>
       <div class="row" style="flex-wrap:wrap"><button class="btn primary" data-act="import">${I.photo}Добавить программу</button><button class="btn" data-act="wish">${I.spark}Подобрать с тренером</button></div></section>
-`];
+${videoEntry()}`,todayMore()];
   const d = dayById(S.pick) || nextDay();
   const T0 = Date.now(), weekStart = (() => { const x = new Date(); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x.getTime(); })();
   const week = S.diary.filter(w => w.date >= weekStart && !w.camOnly).length, last = S.diary.find(w => !w.camOnly);
@@ -26,7 +26,7 @@ function viewToday() {
       <button class="btn primary big" data-act="start" data-v="${d.id}" ${d.items.length ? '' : 'disabled'}>Начать тренировку</button>
       ${ups.length ? `<p class="coach up" style="margin:0">${ups.length === 1 ? `В «${esc(ups[0].name)}» прибавляем вес` : `Прибавляем вес в ${ups.length} ${plural(ups.length, 'упражнении', 'упражнениях', 'упражнениях')}`}: прошлый раз ты закрыла все подходы.</p>` : ''}
       <ul class="plan-list">${items || '<li class="muted">В этом дне пока нет упражнений</li>'}</ul>
-    </section>`];
+    </section>${videoEntry()}`,todayMore()];
 }
 function startWorkout(dayId) {
   if (!S.healthOk) return healthSheet(() => startWorkout(dayId));
@@ -40,8 +40,8 @@ function startWorkout(dayId) {
 }
 function camBtn(it, i) {
   if (it.sec && !it.cam) return '';
-  if (!canCamera()) return `<button class="btn" data-act="paywall" data-v="cam">${I.lock}Камера</button>`;
-  return `<a class="btn" href="${esc(camLink(it))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go" data-v="${i}">${I.camera}Камера</a>`;
+  if (!canCamera()) return `<button class="btn" data-act="paywall" data-v="cam">${I.lock}Снять подход</button>`;
+  return `<a class="btn" href="${esc(camLink(it))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go" data-v="${i}">${I.camera}Снять подход</a>`;
 }
 function viewWorkout() {
   const W = S.workout, all = W.items.flatMap(i => i.sets), done = all.filter(s => s.done).length;
@@ -72,8 +72,8 @@ function viewWorkout() {
     <div class="wo-head"><div class="row"><span class="grow hint">${done} из ${all.length} подходов</span><span class="clock" id="clock">${clock(Date.now() - W.start)}</span></div><div class="bar"><i style="width:${all.length ? done / all.length * 100 : 0}%"></i></div></div>
     ${cards}
     <button class="btn" data-act="wx-add">${I.plus}Добавить упражнение на сегодня</button>
-    <button class="btn primary big" data-act="finish">Завершить тренировку</button>`,
-    ''];
+    <button class="btn primary big" data-act="finish">Завершить тренировку</button>${videoEntry()}`,
+    todayMore()];
 }
 function renderRest() {
   const el = $('#restbar');

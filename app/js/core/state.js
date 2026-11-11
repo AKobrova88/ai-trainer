@@ -30,6 +30,7 @@ function save() {
   catch (e) { if (!saveFailed) { saveFailed = true; setTimeout(() => toast('Не получается сохранить на телефоне — освободи место или выйди из режима «инкогнито»'), 300); } return false; }
 }
 S = load();
+if (S.tab === 'camera') S.tab = 'today';
 S.renaming = null; S.wiz = null;
 
 const dayById = id => S.program.days.find(d => d.id === id);

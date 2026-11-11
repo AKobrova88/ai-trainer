@@ -1,5 +1,5 @@
 /* ---------- working version: onboarding, wishes, camera tab, limits, subscription ---------- */
-.tabs-in{grid-template-columns:repeat(5,1fr)}
+.tabs-in{grid-template-columns:repeat(4,1fr)}
 .tab{font-size:10.5px}
 .menu button svg,.prow svg.ico{width:20px;height:20px;flex:none;color:var(--muted)}
 .menu button.danger svg{color:var(--bad)}

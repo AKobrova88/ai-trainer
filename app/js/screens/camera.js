@@ -1,5 +1,5 @@
 'use strict';
-/* ---------- camera tab: live coach and video check (both run in the camera page, results come back here) ---------- */
+/* ---------- camera from today's exercise; independent gallery reviews ---------- */
 const hash = s => { let h = 0; for (const ch of norm(s)) h = (h * 31 + ch.charCodeAt(0)) | 0; return (h >>> 0).toString(36); };
 /* today's workout goes to the camera too: there you switch exercises and alternate sets (supersets) */
 const b64u = t => btoa(unescape(encodeURIComponent(t))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -17,8 +17,9 @@ function camPlan() {
   });
   return out;
 }
-function camLink(it, mode = 'live') {
-  const u = new URL(CAM_URL), plan = camPlan();
+const workoutContext = W => W ? 'w' + hash(W.dayId || W.title || 'day') + '_' + Math.trunc(W.start || 0).toString(36) : '';
+function camLink(it, mode = 'live', {standalone = false} = {}) {
+  const u = new URL(CAM_URL), plan = standalone ? [] : camPlan();
   u.searchParams.set('rev', CAMERA_REV);
   if (it) {
     const W = S.workout, pos = W ? W.items.findIndex(x => x === it || norm(x.name) === norm(it.name)) : -1, mine = plan.find(p => p[4] === pos);
@@ -31,6 +32,13 @@ function camLink(it, mode = 'live') {
     if (w) u.searchParams.set('w', String(w));
   }
   if (plan.length > 1) u.searchParams.set('plan', b64u(JSON.stringify(plan)));
+  if (standalone) {
+    u.searchParams.set('scope','standalone');
+    u.searchParams.set('ctx','v'+Date.now().toString(36)+Math.random().toString(36).slice(2,8));
+  } else if (S.workout) {
+    const context=workoutContext(S.workout);
+    u.searchParams.set('scope','workout');u.searchParams.set('workout',context);u.searchParams.set('ctx',context);
+  }
   u.searchParams.set('cam', S.camFacing === 'back' ? 'back' : 'front');
   u.searchParams.set('theme', S.theme === 'bento' ? 'bento' : 'dusk');
   u.searchParams.set('l', S.profile.exp || 'normal');
@@ -58,39 +66,26 @@ let openingCameraVideo=false;
 function chooseCameraVideo() {
   if(openingCameraVideo)return;
   if(!canCamera())return paywallSheet('Разбор видео — в подписке.');
-  if(!SAME_SITE){location.href=camLink(currentCamEx(),'video');return;}
+  if(!SAME_SITE){location.href=camLink(null,'video',{standalone:true});return;}
   $('#cameraFileInput').click();
 }
 async function openCameraVideo(file) {
   if(!file || openingCameraVideo)return;
   openingCameraVideo=true;
   const button=$('[data-act="video-select"]');if(button){button.disabled=true;const title=button.querySelector('b');if(title)title.textContent='Открываю видео…';}
-  const url=new URL(camLink(currentCamEx(),'video')),account=TG.slot();
+  const url=new URL(camLink(null,'video',{standalone:true})),account=TG.slot();
+  S.tab='today';save();
   toast('Открываю выбранное видео…');
   try {const id=await VideoInput.put(file,account);url.searchParams.set('input',id);}
   catch(e){url.searchParams.set('input-error','1');}
   location.href=url.href;
 }
-function viewCamera() {
-  if (!canCamera()) return ['Камера', `
-    <section class="camcard"><div class="hd"><span class="pi">${I.lock}</span><span><b>Камера-тренер — в подписке</b><span>Пробный период закончился</span></span></div>
-      <p style="margin:0">Камера онлайн и разбор видео без лимитов — ${rub(PRICING.sub.price)} в месяц. Своя программа, дневник и прогресс работают и без подписки.</p>
-      <button class="btn primary big" data-act="paywall" data-v="cam">Подписка и промокод</button></section>`];
-  const it = currentCamEx();
-  return ['Камера', `
-    <section class="cam-entry" aria-label="Камера и видео">
-      <a class="cam-entry-row" href="${esc(camLink(it))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go">
-        <span class="cam-entry-icon">${I.camera}</span><span class="grow"><b>Камера</b><small>${esc(it.name)}</small></span>${CHEV}
-      </a>
-      <button class="cam-entry-row" type="button" data-act="video-select" ${openingCameraVideo?'disabled':''}>
-        <span class="cam-entry-icon">${I.video}</span><span class="grow"><b>${openingCameraVideo?'Открываю видео…':'Разобрать видео'}</b><small>Выбрать из галереи</small></span>${CHEV}
-      </button>
-    </section>
-    ${SAME_SITE ? '' : `<div class="note blue">${I.info}<span>Здесь, в предпросмотре, камера откроется в новой вкладке, и подходы оттуда нужно будет записать вручную. В установленной версии они вернутся сюда сами.</span></div>`}
-    `,`<button class="icon-btn" data-act="camera-menu" aria-label="Ещё о камере">${DOTS}</button>`];
+function videoEntry() {
+  return `<section class="cam-entry" aria-label="Видео вне тренировки"><button class="cam-entry-row" type="button" data-act="video-select" ${openingCameraVideo?'disabled':''}><span class="cam-entry-icon">${I.video}</span><span class="grow"><b>${openingCameraVideo?'Открываю видео…':'Разобрать видео'}</b><small>Из галереи · отдельно от тренировки</small></span>${CHEV}</button></section>`;
 }
-function cameraMenu() {
-  sheet('Камера',`<div class="menu"><a class="menu-link" href="${esc(camLink(currentCamEx(),'recordings'))}">${I.video}<span>Мои записи камеры</span></a>${mi('video-history','',I.diary,'История разборов')}</div>`);
+const todayMore = () => `<button class="icon-btn" data-act="today-menu" aria-label="Записи и история разборов">${DOTS}</button>`;
+function todayMenu() {
+  sheet('Записи и разборы',`<div class="menu"><a class="menu-link" href="${esc(camLink(null,'recordings',{standalone:true}))}">${I.video}<span>Мои записи камеры</span></a>${mi('video-history','',I.diary,'История разборов')}</div>`);
 }
 function videoHistorySheet() {
   sheet('История разборов',`<div class="vlog">${S.videoLog.map(v=>`<button class="vrow" data-act="vres" data-v="${v.id}"><span class="grow"><b>${esc(v.name)}</b><small>${ruDate(v.at)} · ${v.reps} ${plural(v.reps,'повтор','повтора','повторов')}</small></span>${CHEV}</button>`).join('') || '<p class="hint">Здесь появятся результаты разборов.</p>'}</div>`);
@@ -140,6 +135,8 @@ function processInbox() {
     const ok = box.filter(m => m && Array.isArray(m.sets) && m.sets.some(x => x && x.r > 0));
     toast('Из камеры: ' + ok.map(m => `${(m.name || 'упражнение').length > 22 ? m.name.slice(0, 21) + '…' : m.name} — ${m.sets.filter(x => x && x.r > 0).length}`).join(', ') + '. ' + CoachText.praise(ok.reduce((n,m)=>n+m.sets.filter(s=>s && s.r>0).length,0)));
   } else if (msgs.length) toast(msgs[0]);
+  const review=S.videoLog.find(v=>v.mode==='review' && !previous.videoLog.some(old=>old.id===v.id));
+  if(review && msgs.length===1)videoSheet(review.id);
 }
 function applyCamResult(m) {
   if (!m || !Array.isArray(m.sets)) return null;
@@ -149,15 +146,16 @@ function applyCamResult(m) {
   const faults = {};
   for (const s of sets) for (const f of s.ft) { const k = f.t || f.id; faults[k] = faults[k] || {t: f.t, c: f.c, n: 0}; faults[k].n += f.n || 1; }
   const partial = sets.some(s => s.partial);
-  const v = {id: nid('v'), at: m.at || Date.now(), ex: m.ex, pos: Number.isInteger(m.pos) ? m.pos : null, name, mode: m.mode || 'live', sets, reps: sets.reduce((a, s) => a + (s.n || s.r), 0), n: sets.reduce((a, s) => a + s.n, 0), c: sets.reduce((a, s) => a + s.c, 0), g: partial ? [] : sets.flatMap(s => s.g), faults: Object.values(faults).sort((a, b) => b.n - a.n), partial, logged: false};
+  const v = {id: nid('v'), at: m.at || Date.now(), ex: m.ex, pos: Number.isInteger(m.pos) ? m.pos : null, name, mode: m.scope==='standalone' ? 'review' : m.mode || 'live', sets, reps: sets.reduce((a, s) => a + (s.n || s.r), 0), n: sets.reduce((a, s) => a + s.n, 0), c: sets.reduce((a, s) => a + s.c, 0), g: partial ? [] : sets.flatMap(s => s.g), faults: Object.values(faults).sort((a, b) => b.n - a.n), partial, logged: false};
   S.videoLog.unshift(v); S.videoLog = S.videoLog.slice(0, 30);
-  if (m.mode === 'video' && !S.workout) return (partial ? `3D-разбор готов: ${v.reps} повторов, предварительные подсказки` : v.n ? `Разбор видео готов: чисто ${v.c} из ${v.n}` : `Посчитано повторов: ${v.reps}, без оценки техники`) + '. ' + CoachText.praise(sets.length);
+  if (v.mode==='review' || m.mode === 'video' && !S.workout) return (partial ? `3D-разбор готов: ${v.reps} повторов, предварительные подсказки` : v.n ? `Разбор видео готов: чисто ${v.c} из ${v.n}` : `Посчитано повторов: ${v.reps}, без оценки техники`) + '. ' + CoachText.praise(sets.length);
+  if(m.workout && m.workout!==workoutContext(S.workout))return logCamSets(v,false);
   return logCamSets(v);
 }
-function logCamSets(v) {
+function logCamSets(v, attachToWorkout = true) {
   const sets = v.sets.map(s => ({w: s.w, r: s.r, c: s.c, n: s.n, partial: !!s.partial, analysisMode: s.analysisMode, note: s.note || '', cue:s.cue || '', ft:s.ft || []}));
   v.logged = true;
-  if (S.workout) {
+  if (S.workout && attachToWorkout && v.mode!=='review') {
     const W = S.workout, at = v.pos != null && W.items[v.pos], same = at && (norm(at.name) === norm(v.name) || (v.ex && at.base === v.ex));
     const i = same ? v.pos : W.items.findIndex(it => norm(it.name) === norm(v.name) || (v.ex && it.base === v.ex));
     if (i >= 0) {
@@ -168,8 +166,9 @@ function logCamSets(v) {
       return `Из камеры: ${k} ${plural(k, 'подход', 'подхода', 'подходов')} — «${it.name}». ${CoachText.praise(k)}`;
     }
   }
-  const today = S.diary.find(w => w.camOnly && sameDay(w.date, Date.now()));
-  const entry = today || {id: nid('w'), date: Date.now(), title: 'С камерой', dur: 0, camOnly: true, items: []};
+  const title=v.mode==='review' ? 'Разбор видео' : 'С камерой';
+  const today = S.diary.find(w => w.camOnly && w.title===title && sameDay(w.date, Date.now()));
+  const entry = today || {id: nid('w'), date: Date.now(), title, dur: 0, camOnly: true, items: []};
   if (!today) S.diary.unshift(entry);
   const e = entry.items.find(x => norm(x.name) === norm(v.name));
   if (e) e.sets.push(...sets); else entry.items.push({name: v.name, base: CAT[v.ex] ? v.ex : null, sets});
@@ -179,7 +178,7 @@ function videoSheet(id) {
   const v = S.videoLog.find(x => x.id === id); if (!v) return;
   const partial = v.partial || v.sets.some(s => s.partial);
   const g = partial ? [] : v.g.length ? v.g : v.sets.flatMap(s => Array.from({length: s.n}, (_, i) => i < s.c ? 0 : 1));
-  sheet(v.name, `<div class="hint">${ruDate(v.at, {day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'})} · ${v.mode === 'video' ? 'разбор видео' : 'камера онлайн'}</div>
+  sheet(v.name, `<div class="hint">${ruDate(v.at, {day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'})} · ${v.mode === 'live' ? 'камера онлайн' : 'разбор видео'}</div>
     <p class="coach up">${esc(CoachText.summary(v.sets,{analysis:true}).text)}</p>
     <div class="kpis"><div class="stat"><b>${v.reps}</b><span>повторов</span></div>${v.n && !partial ? `<div class="stat"><b>${v.c}</b><span>чистых</span></div>` : '<div class="stat"><b>—</b><span>без общей оценки</span></div>'}<div class="stat"><b>${v.sets.length}</b><span>${plural(v.sets.length, 'подход', 'подхода', 'подходов')}</span></div></div>
     ${partial ? '<p class="hint">3D: предварительные подсказки по видимым суставам. Скрытые части тела и контакт с полом не проверены.</p>' : ''}

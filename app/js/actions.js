@@ -17,7 +17,7 @@ const A = {
   tab: v => { S.tab = v; render(); window.scrollTo({top: 0}); },
   'video-select':()=>chooseCameraVideo(),
   'video-history':()=>videoHistorySheet(),
-  'camera-menu':()=>cameraMenu(),
+  'today-menu':()=>todayMenu(),
   close: () => closeSheet(),
   'close-top': () => closeTop(),
   undo: () => { $('#toast-root').innerHTML = ''; undo(); },
@@ -54,8 +54,8 @@ const A = {
   'start-path': v => {
     if (v === 'wish') return openWizard();
     if (v === 'import') return importSheet();
-    S.stage = 'app'; S.tab = 'camera'; render(); window.scrollTo({top: 0});
-    if (v === 'video') toast('Нажми «Выбрать видео» — запись разберётся прямо на телефоне');
+    S.stage = 'app'; S.tab = 'today'; render(); window.scrollTo({top: 0});
+    if (v === 'video') chooseCameraVideo();
   },
   demo: () => {
     if (S.demo) return;
@@ -285,7 +285,7 @@ const A = {
   'cam-set': v => { const it = S.camChoices[+v]; if (it) S.camEx = {name: it.name, base: it.base, w: it.w || (it.sets && it.sets[0] ? it.sets[0].w : 0), inc: it.inc, sec: it.sec, cam: it.cam}; closeSheet(); render(); },
   'cam-cat': () => { closeSheet(); catSheet('cam'); },
   'cam-facing': v => { S.camFacing = v; render(); },
-  'cam-go': v => { if (v != null && S.workout) S.workout.active = +v; save(); return 'follow'; },
+  'cam-go': v => { if (v != null && S.workout) S.workout.active = +v; S.tab = 'today'; save(); return 'follow'; },
   vres: v => videoSheet(v),
   'vres-log': v => { const x = S.videoLog.find(y => y.id === v); if (!x) return; const msg = logCamSets(x); closeSheet(); render(); toast(msg); },
 
