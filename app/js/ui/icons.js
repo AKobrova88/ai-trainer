@@ -42,5 +42,5 @@ const GRIP = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><c
 const DOTS = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18.5" cy="12" r="1.8"/></svg>';
 const CHECK = I.check;
 const CHEV = I.chev;
-const TABS = [['today', 'Сегодня'], ['program', 'Программа'], ['diary', 'Дневник'], ['profile', 'Профиль']];
+const TABS = [['program', 'Программа'], ['diary', 'Дневник'], ['profile', 'Личный кабинет']];
 

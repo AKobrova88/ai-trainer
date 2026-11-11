@@ -16,13 +16,13 @@ const TG = (() => {
   const data = () => initData || (app() && app().initData) || '';
   const call = (f, ...a) => { const W = app(); try { if (W && typeof W[f] === 'function') return W[f](...a); } catch (e) { /* older Telegram */ } };
   let backBound = false;
-  /* the system «Back» button: closes the top sheet, otherwise returns to «Сегодня» */
+  /* A workout is a child of the diary; native Back keeps all unfinished sets. */
   function syncChrome() {
     const W = app(); if (!W) return;
     const back = W.BackButton;
     if (back) {
-      if (!backBound) { backBound = true; back.onClick(() => { if (typeof sheetTop === 'function' && sheetTop()) closeTop(); else if (S.stage === 'app' && S.tab !== 'today') A.tab('today'); }); }
-      const need = !!(($('#sheets') || {}).children || []).length || (S.stage === 'app' && S.tab !== 'today');
+      if (!backBound) { backBound = true; back.onClick(() => { if (typeof sheetTop === 'function' && sheetTop()) closeTop(); else if (S.stage === 'app' && S.tab === 'today') A['diary-today'](); }); }
+      const need = !!(($('#sheets') || {}).children || []).length || (S.stage === 'app' && S.tab === 'today');
       try { need ? back.show() : back.hide(); } catch (e) { /* older Telegram */ }
     }
     call(S.workout ? 'enableClosingConfirmation' : 'disableClosingConfirmation');   // a workout in progress: ask before closing

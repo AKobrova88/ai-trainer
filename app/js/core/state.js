@@ -5,8 +5,8 @@ function blankProfile() {
   return {text: '', goal: 'muscle', weight: 0, height: 0, age: 0, exp: 'normal', days: 3, mins: 60, place: 'gym', focus: {}, limits: [], other: [], filled: false};
 }
 function fresh() {
-  return {v: 1, stage: 'welcome', user: null, tab: 'today', program: {days: []}, diary: [], next: null, pick: null, workout: null, rest: null,
-    open: {}, dtab: 'hist', calM: [now().getFullYear(), now().getMonth()], prog: null, theme: 'dusk', profile: blankProfile(),
+  return {v: 1, stage: 'welcome', user: null, tab: 'diary', program: {days: []}, diary: [], schedule: [], next: null, pick: null, workout: null, rest: null,
+    open: {}, dtab: 'hist', calM: [now().getFullYear(), now().getMonth()], calDay: null, prog: null, theme: 'dusk', profile: blankProfile(),
     sub: {promo: '', since: 0, paidUntil: 0, aiPlus: false, plusPick: false, packs: []}, usage: {m: '', prog: 0, photo: 0, ask: 0}, healthOk: false,
     camFacing: 'front', camEx: null, videoLog: [], camReceipts: [], demo: false};
 }
@@ -31,6 +31,9 @@ function save() {
 }
 S = load();
 if (S.tab === 'camera') S.tab = 'today';
+if (S.tab === 'today' && !S.workout) S.tab = 'diary';
+if (!Array.isArray(S.schedule)) S.schedule = [];
+S.justFinished = null;
 S.renaming = null; S.wiz = null;
 
 const dayById = id => S.program.days.find(d => d.id === id);

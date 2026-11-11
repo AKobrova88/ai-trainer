@@ -2,22 +2,91 @@
 /* ---------- diary ---------- */
 const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
 const WD = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+/* Local calendar dates stay local: UTC conversion shifts late-evening workouts to another day. */
+function dateKey(value = new Date()) {
+  const d = new Date(value);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function calendarDate(key) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key || '')) return null;
+  const [y, m, d] = key.split('-').map(Number), value = new Date(y, m - 1, d, 12);
+  return dateKey(value) === key ? value : null;
+}
+function selectDiaryDate(key = dateKey()) {
+  const d = calendarDate(key); if (!d) return false;
+  S.calDay = key; S.calM = [d.getFullYear(), d.getMonth()]; S.dtab = 'hist';
+  return true;
+}
+function workoutDay(w) {
+  if (w.camOnly) return null;
+  if (w.dayId) return w.dayId;
+  /* Old entries have only a title; infer it only when the current program is unambiguous. */
+  if (S.program.at && w.date < S.program.at) return null;
+  const days = S.program.days.filter(d => d.title === w.title);
+  return days.length === 1 ? days[0].id : null;
+}
+function diaryDayPanel(key, entries) {
+  const today = dateKey(), isToday = key === today, future = key > today, date = calendarDate(key);
+  const plans = (S.schedule || []).filter(p => p.date === key);
+  const finished = entries.filter(w => !w.camOnly), saved = entries.find(w => w.id === S.justFinished);
+  const W = S.workout;
+  const resume = isToday && W ? `<button class="btn primary big" data-act="resume-workout">Продолжить · ${esc(W.title)}</button><p class="hint">Подходы сохранены. Вернись к тренировке, когда будешь готова.</p>` : '';
+  const choices = isToday || future ? S.program.days.map(d => {
+    const completed = finished.filter(w => workoutDay(w) === d.id), plan = plans.find(p => p.dayId === d.id), active = isToday && W && W.dayId === d.id;
+    const label = future ? (plan ? 'Запланировано' : 'Запланировать') : active ? 'Продолжить' : completed.length ? 'Повторить' : 'Начать';
+    const status = [completed.length ? `✓ Выполнено${completed.length > 1 ? ' · ' + completed.length + ' раза' : ''}` : '', plan && !future ? 'По плану' : '', `${d.items.length} ${plural(d.items.length, 'упражнение', 'упражнения', 'упражнений')}`].filter(Boolean).join(' · ');
+    return `<button class="diary-choice ${completed.length ? 'completed' : ''} ${plan ? 'planned' : ''}" data-act="${future ? 'plan-day' : 'start'}" data-v="${esc(d.id)}" ${future ? `aria-pressed="${!!plan}"` : ''} ${d.items.length ? '' : 'disabled'}><span class="grow"><b>${esc(d.title)}</b><span class="hint">${esc(status)}</span></span><span class="diary-choice-action">${label}${future && plan ? ' ✓' : ''}</span></button>`;
+  }).join('') : '';
+  const orphanPlans = plans.filter(p => !dayById(p.dayId)).map(p => `<div class="row"><span class="grow hint">${esc(p.title)} · дня больше нет в программе</span><button class="icon-btn" data-act="plan-remove" data-v="${esc(p.id)}" aria-label="Убрать из плана">${I.trash}</button></div>`).join('');
+  const noProgram = !S.program.days.length && (isToday || future) ? `<p class="hint">Добавь программу — её дни можно будет выбирать здесь.</p><button class="btn" data-act="tab" data-v="program">Добавить программу</button>` : '';
+  return `<section class="card pad diary-day" id="diary-day"><div class="row"><h2 class="grow">${isToday ? 'Сегодня' : esc(ruDate(date, {day:'numeric',month:'long'}))}</h2>${!isToday ? '<button class="btn ghost" data-act="diary-today">Сегодня</button>' : ''}</div>
+    ${saved ? `<p class="diary-success" role="status">Тренировка сохранена. ${esc(CoachText.praise(saved.items.reduce((n,e) => n + e.sets.length, 0)))}</p>` : ''}
+    ${finished.length ? `<div class="diary-completed" aria-label="Выполнено за день">${finished.map(w => `<span class="badge next">✓ ${esc(w.title)}</span>`).join('')}</div>` : ''}
+    ${!entries.length && !future ? '<p class="hint">Пока нет записанных тренировок.</p>' : ''}
+    ${resume}${choices ? `<p class="eyebrow">${future ? 'План на этот день · нажми, чтобы выбрать или убрать' : W ? 'Дни программы' : 'Выбери день программы'}</p><div class="diary-choices">${choices}</div>` : ''}${noProgram}${orphanPlans}
+  </section>`;
+}
+function togglePlan(dayId) {
+  const day = dayById(dayId), date = S.calDay;
+  if (!day || !day.items.length || !calendarDate(date) || date < dateKey()) return;
+  const before = S.schedule || [], existing = before.find(p => p.date === date && p.dayId === dayId);
+  S.schedule = existing ? before.filter(p => p.id !== existing.id) : [...before, {id:nid('p'), date, dayId, title:day.title, at:Date.now()}];
+  if (!save()) { S.schedule = before; return toast('План не сохранён — освободи место и попробуй ещё раз'); }
+  render();
+  toast(existing ? 'Убрано из плана' : 'Тренировка запланирована');
+}
+function removePlan(id) {
+  const before = S.schedule || []; S.schedule = before.filter(p => p.id !== id);
+  if (!save()) { S.schedule = before; return toast('Не удалось сохранить изменение плана'); }
+  render();
+}
 function viewDiary() {
   const seg = `<div class="seg"><button data-act="dtab" data-v="hist" aria-pressed="${S.dtab === 'hist'}">История</button><button data-act="dtab" data-v="prog" aria-pressed="${S.dtab === 'prog'}">Прогресс</button></div>`;
   if (S.dtab === 'prog') return ['Дневник', seg + viewProgress()];
   const [y, m] = S.calM, first = new Date(y, m, 1), nDays = new Date(y, m + 1, 0).getDate(), shift = (first.getDay() + 6) % 7;
+  let selected = calendarDate(S.calDay);
+  if (!selected || selected.getFullYear() !== y || selected.getMonth() !== m) {
+    selected = new Date(y, m, y === now().getFullYear() && m === now().getMonth() ? now().getDate() : 1, 12);
+    S.calDay = dateKey(selected);
+  }
   const inMonth = S.diary.filter(w => { const d = new Date(w.date); return d.getFullYear() === y && d.getMonth() === m; });
   const has = new Set(inMonth.map(w => new Date(w.date).getDate()));
+  const planned = new Set((S.schedule || []).map(p => p.date));
   let cells = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'].map(d => `<div class="wd">${d}</div>`).join('');
   for (let i = 0; i < shift; i++) cells += '<div class="cal-d out"></div>';
-  for (let d = 1; d <= nDays; d++) cells += `<button class="cal-d ${has.has(d) ? 'has' : ''} ${sameDay(new Date(y, m, d), new Date()) ? 'today' : ''}" aria-label="${d} ${MONTHS[m]} ${y}${has.has(d) ? ', есть тренировка' : ', без тренировок'}" ${has.has(d) ? `data-act="cal-go" data-v="${y}-${m}-${d}"` : 'disabled'}>${d}</button>`;
+  for (let d = 1; d <= nDays; d++) {
+    const key = dateKey(new Date(y, m, d, 12)), plan = planned.has(key);
+    cells += `<button class="cal-d ${has.has(d) ? 'has' : ''} ${plan ? 'planned' : ''} ${key === dateKey() ? 'today' : ''}" aria-pressed="${key === S.calDay}" aria-label="${d} ${MONTHS[m]} ${y}${has.has(d) ? ', есть тренировка' : ''}${plan ? ', запланировано' : ''}" data-act="cal-go" data-v="${key}">${d}</button>`;
+  }
   const vol = inMonth.reduce((a, w) => a + w.items.reduce((b, e) => b + e.sets.reduce((c, s) => c + s.w * s.r, 0), 0), 0), mins = inMonth.reduce((a, w) => a + (w.dur || 0), 0);
-  const logs = inMonth.map(logCard).join('') || `<div class="empty">${S.diary.length ? 'В этом месяце тренировок пока нет. Выбери другой месяц в календаре.' : 'Здесь появятся твои тренировки.'}<br><button class="btn" data-act="tab" data-v="today">К тренировке</button></div>`;
+  const selectedEntries = inMonth.filter(w => dateKey(w.date) === S.calDay);
+  const otherEntries = inMonth.filter(w => dateKey(w.date) !== S.calDay);
+  const logs = selectedEntries.map(logCard).join('') + (otherEntries.length ? '<h2 class="diary-history-title">Другие тренировки месяца</h2>' + otherEntries.map(logCard).join('') : '');
   return ['Дневник', `${seg}
-    <section class="card cal"><div class="cal-h"><button class="icon-btn" data-act="cal-m" data-v="-1" aria-label="предыдущий месяц" style="transform:scaleX(-1)">${CHEV}</button><b>${MONTHS[m]} ${y}</b><button class="icon-btn" data-act="cal-m" data-v="1" aria-label="следующий месяц">${CHEV}</button></div>
+    <details class="card cal" id="diary-calendar" ${S.calExpanded ? 'open' : ''}><summary>Календарь · ${MONTHS[m]} ${y}</summary><div class="cal-h"><button class="icon-btn" data-act="cal-m" data-v="-1" aria-label="предыдущий месяц" style="transform:scaleX(-1)">${CHEV}</button><b>${MONTHS[m]} ${y}</b><button class="icon-btn" data-act="cal-m" data-v="1" aria-label="следующий месяц">${CHEV}</button></div>
       <div class="cal-g">${cells}</div>
-      <div class="sumline"><span><b>${inMonth.length}</b> ${plural(inMonth.length, 'тренировка', 'тренировки', 'тренировок')}</span><span><b>${Math.floor(mins / 60)} ч ${mins % 60} мин</b></span><span><b>${fmt(vol / 1000)} т</b> поднято</span></div></section>
-    ${logs}`];
+      <div class="sumline"><span><b>${inMonth.length}</b> ${plural(inMonth.length, 'тренировка', 'тренировки', 'тренировок')}</span><span><b>${Math.floor(mins / 60)} ч ${mins % 60} мин</b></span><span><b>${fmt(vol / 1000)} т</b> поднято</span></div></details>
+    ${diaryDayPanel(S.calDay, selectedEntries)}${logs}${videoEntry()}`,todayMore()];
 }
 function logCard(w) {
   const d = new Date(w.date), open = S.open[w.id], nSets = w.items.reduce((a, e) => a + e.sets.length, 0);

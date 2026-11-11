@@ -7,7 +7,7 @@
 .proto b{color:var(--warn);font-weight:600}
 .view{padding-block:4px calc(var(--tabs-h) + 96px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-.tabs-in{max-width:var(--col);margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);height:var(--tabs-h)}
+.tabs-in{max-width:var(--col);margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);height:var(--tabs-h)}
 .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:var(--muted);position:relative}
 .tab svg{width:24px;height:24px}
 .tab[aria-current="page"]{color:var(--accent)}

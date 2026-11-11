@@ -15,6 +15,32 @@
 .grip:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .day,.ex{scroll-margin-top:100px}
 :root[data-keyboard="true"] .tabs,:root[data-keyboard="true"] .restbar{visibility:hidden;pointer-events:none}
+/* Diary owns selection and planning; a running workout has one anchored completion action. */
+.cal-d{aspect-ratio:auto;min-height:42px}
+.cal-d[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:-3px;font-weight:700}
+.cal-d.planned::after{content:'';width:5px;height:5px;border-radius:50%;background:var(--ink);position:absolute;bottom:3px}
+.diary-day{scroll-margin-top:calc(var(--top-h,72px) + 12px);display:flex;flex-direction:column;gap:12px}
+.diary-day h2,.diary-day p{margin:0}
+.cal>summary{font-weight:600;padding:4px;cursor:pointer;min-height:32px;align-content:center}
+.cal[open]>summary{margin-bottom:12px}
+.diary-success{border-radius:14px;padding:12px;background:var(--accent-soft);color:var(--ink);border:1px solid var(--accent);line-height:1.5}
+.diary-choices{display:flex;flex-direction:column;gap:8px}
+.diary-choice{display:flex;align-items:center;gap:10px;text-align:left;padding:13px 12px;min-height:64px;border-radius:16px;border:1px solid var(--line);background:var(--surface-2)}
+.diary-choice b,.diary-choice .hint{display:block;overflow-wrap:anywhere}
+.diary-choice b{line-height:1.3}
+.diary-choice-action{font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0;max-width:40%;text-align:right;overflow-wrap:anywhere}
+.diary-choice.completed{border-color:var(--accent)}
+.diary-choice.planned{background:var(--accent-soft)}
+.diary-completed{display:flex;flex-wrap:wrap;gap:6px}
+.diary-completed .badge{white-space:normal;line-height:1.5}
+.diary-history-title{font-size:16px;margin:6px 0 0}
+body.workout-mode .tabs{display:none}
+body.workout-mode .view{padding-bottom:calc(170px + env(safe-area-inset-bottom,0px))}
+.workout-dock{position:fixed;bottom:0;left:0;right:0;z-index:30;max-width:var(--col);margin:0 auto;padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:var(--bg);border-top:1px solid var(--line)}
+body.workout-mode .restbar{bottom:calc(88px + env(safe-area-inset-bottom,0px))}
+body.workout-mode .toast{bottom:calc(162px + env(safe-area-inset-bottom,0px))}
+:root[data-keyboard="true"] .workout-dock{visibility:hidden;pointer-events:none}
+@media(min-width:900px){.workout-dock{max-width:800px}}
 @media (pointer:coarse){
   .icon-btn,.chip,.seg button,.btn.sm,.grip,.mic,.rest button,.lim-chips button{min-height:48px}
   .focus-row .lvl button{min-height:44px;min-width:44px}

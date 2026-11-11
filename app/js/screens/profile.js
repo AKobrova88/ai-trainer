@@ -48,7 +48,7 @@ function viewProfile() {
   const focus = Object.entries(P.focus || {}).filter(([, v]) => v).sort((x, y) => y[1] - x[1]).map(([k]) => MUSCLES[k]).join(', ');
   const row = (label, val, act = 'wish') => `<button class="prow" data-act="${act}"><span>${label}</span><span class="val">${val || '—'}</span><span style="width:18px;flex:none;color:var(--muted)">${CHEV}</span></button>`;
   const th = (k, name, sub, cols) => `<button class="th ${k}" data-act="theme" data-v="${k}" aria-pressed="${S.theme === k}"><span class="mini" aria-hidden="true">${cols.map((c, i) => `<i style="background:${c};width:${[70, 100, 55][i]}%"></i>`).join('')}</span><b>${S.theme === k ? '✓ ' : ''}${name}</b><small>${sub}</small></button>`;
-  return ['Профиль', `
+  return ['Личный кабинет', `
     ${subCard()}
     ${addonCards()}
     <button class="card pad help-card" data-act="support"><span class="hc-ico">${I.tg}</span><span><b>Поддержка</b><small>Что-то не работает или непонятно — напиши, ответим в Telegram</small></span><span style="width:18px;flex:none;color:var(--muted)">${CHEV}</span></button>

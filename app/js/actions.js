@@ -14,7 +14,11 @@ function useProgram(days, profile, tab) {
 }
 const A = {
   /* shell */
-  tab: v => { S.tab = v; render(); window.scrollTo({top: 0}); },
+  tab: v => { S.tab = v === 'today' && !S.workout ? 'diary' : v; render(); window.scrollTo({top: 0}); },
+  'diary-today': () => { selectDiaryDate(); S.tab = 'diary'; render(); window.scrollTo({top:0}); },
+  'resume-workout': () => { if (!S.workout) return; closeSheet(); S.tab = 'today'; render(); window.scrollTo({top:0}); },
+  'plan-day': v => togglePlan(v),
+  'plan-remove': v => removePlan(v),
   'video-select':()=>chooseCameraVideo(),
   'video-history':()=>videoHistorySheet(),
   'today-menu':()=>todayMenu(),
@@ -64,7 +68,7 @@ const A = {
     const p = demoProgram(), d = demoDiary(p); d.forEach(w => { w.demo = true; });
     S.demoReturn = previous;
     S.program = p; S.diary = d.sort((a, b) => b.date - a.date); S.next = p.days[0].id; S.demo = true;
-    S.workout = null; S.rest = null;
+    S.workout = null; S.rest = null; S.schedule = [];
     S.stage = 'app'; S.tab = 'today'; S.pick = null; closeSheet(); render(); window.scrollTo({top: 0});
     toast('Пример: 2 дня программы и 5 недель дневника');
   },
@@ -176,8 +180,8 @@ const A = {
   'wx-swap': v => { closeSheet(); catSheet('wo-swap', null, v); },
   'wx-add': () => catSheet('wo-add'),
   finish: () => finishSheet(),
-  'save-wo': () => { closeSheet(); saveWorkout(); },
-  discard: () => { S.workout = null; S.rest = null; closeSheet(); render(); },
+  'save-wo': () => saveWorkout(),
+  discard: () => { S.workout = null; S.rest = null; closeSheet(); A['diary-today'](); },
   'go-diary': () => { closeSheet(); S.tab = 'diary'; S.dtab = 'hist'; if (S.diary[0]) S.open[S.diary[0].id] = true; render(); window.scrollTo({top: 0}); },
   'rest-add': () => { if (S.rest) { S.rest.end = Math.max(Date.now(), S.rest.end) + 15000; S.rest.buzz = 0; renderRest(); save(); } },
   'rest-skip': () => { S.rest = null; renderRest(); save(); },
@@ -299,8 +303,8 @@ const A = {
 
   /* diary */
   dtab: v => { S.dtab = v; render(); },
-  'cal-m': v => { let [y, m] = S.calM; m += +v; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } S.calM = [y, m]; render(); },
-  'cal-go': v => { const [y, m, d] = v.split('-').map(Number), w = S.diary.find(x => sameDay(x.date, new Date(y, m, d))); if (w) { S.open[w.id] = true; render(); const el = $('#log-' + w.id); el && el.scrollIntoView({behavior: 'smooth', block: 'start'}); } },
+  'cal-m': v => { const [y,m] = S.calM, d = new Date(y, m + Number(v), 1, 12); selectDiaryDate(dateKey(d)); S.calExpanded = true; render(); },
+  'cal-go': v => { if (!selectDiaryDate(v)) return; S.calExpanded = false; for (const w of S.diary.filter(x => dateKey(x.date) === v)) S.open[w.id] = true; render(); },
   'log-toggle': v => { S.open[v] = !S.open[v]; render(); },
   'set-edit': v => { const [w, e, s] = v.split(':'); setSheet(w, +e, +s); },
   'set-add': v => { const [w, e] = v.split(':'); setSheet(w, +e, null); },
@@ -360,6 +364,7 @@ const A = {
   'restore-go': () => {
     const d = RESTORE; if (!d) return;
     for (const k of BACKUP_KEYS) if (k in d && d[k] != null) S[k] = d[k];
+    S.schedule = d.schedule || [];
     S.workout = null; S.rest = null; S.pick = null; S.open = {}; S.stage = S.user ? 'app' : S.stage; S.tab = 'today'; S.demo = false; delete S.demoReturn;
     RESTORE = null; closeSheet(); render(); window.scrollTo({top: 0}); toast('Данные восстановлены из копии');
   },
