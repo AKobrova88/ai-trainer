@@ -43,7 +43,7 @@ function setExercise(key, keepVideo = false) {
     if (!state.on) try { const p = el.howto.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* autoplay blocked */ }
   }
   state.fallback = false; barReset();
-  if (state.on && !state.file && !state.recOnly) { Rec.drop(); startPreparation(); }
+  if (state.on && !state.file && !state.recOnly) { Rec.drop(); startPreparation(false); }
   el.note.hidden = !isFree() || state.on;
   loadSets();
   newAnalyzer(!keepVideo);

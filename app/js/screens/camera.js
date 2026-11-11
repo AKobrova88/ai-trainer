@@ -90,7 +90,7 @@ function processInbox() {
   render();
   if (msgs.length > 1) {
     const ok = box.filter(m => m && Array.isArray(m.sets) && m.sets.some(x => x && x.r > 0));
-    toast('Из камеры: ' + ok.map(m => `${(m.name || 'упражнение').length > 22 ? m.name.slice(0, 21) + '…' : m.name} — ${m.sets.filter(x => x && x.r > 0).length}`).join(', '));
+    toast('Из камеры: ' + ok.map(m => `${(m.name || 'упражнение').length > 22 ? m.name.slice(0, 21) + '…' : m.name} — ${m.sets.filter(x => x && x.r > 0).length}`).join(', ') + '. ' + CoachText.praise(ok.reduce((n,m)=>n+m.sets.filter(s=>s && s.r>0).length,0)));
   } else if (msgs.length) toast(msgs[0]);
 }
 function applyCamResult(m) {
@@ -103,11 +103,11 @@ function applyCamResult(m) {
   const partial = sets.some(s => s.partial);
   const v = {id: nid('v'), at: m.at || Date.now(), ex: m.ex, pos: Number.isInteger(m.pos) ? m.pos : null, name, mode: m.mode || 'live', sets, reps: sets.reduce((a, s) => a + (s.n || s.r), 0), n: sets.reduce((a, s) => a + s.n, 0), c: sets.reduce((a, s) => a + s.c, 0), g: partial ? [] : sets.flatMap(s => s.g), faults: Object.values(faults).sort((a, b) => b.n - a.n), partial, logged: false};
   S.videoLog.unshift(v); S.videoLog = S.videoLog.slice(0, 30);
-  if (m.mode === 'video' && !S.workout) return partial ? `3D-разбор готов: ${v.reps} повторов, предварительные подсказки` : v.n ? `Разбор видео готов: чисто ${v.c} из ${v.n}` : `Посчитано повторов: ${v.reps}, без оценки техники`;
+  if (m.mode === 'video' && !S.workout) return (partial ? `3D-разбор готов: ${v.reps} повторов, предварительные подсказки` : v.n ? `Разбор видео готов: чисто ${v.c} из ${v.n}` : `Посчитано повторов: ${v.reps}, без оценки техники`) + '. ' + CoachText.praise(sets.length);
   return logCamSets(v);
 }
 function logCamSets(v) {
-  const sets = v.sets.map(s => ({w: s.w, r: s.r, c: s.c, n: s.n, partial: !!s.partial, analysisMode: s.analysisMode, note: s.note || ''}));
+  const sets = v.sets.map(s => ({w: s.w, r: s.r, c: s.c, n: s.n, partial: !!s.partial, analysisMode: s.analysisMode, note: s.note || '', cue:s.cue || '', ft:s.ft || []}));
   v.logged = true;
   if (S.workout) {
     const W = S.workout, at = v.pos != null && W.items[v.pos], same = at && (norm(at.name) === norm(v.name) || (v.ex && at.base === v.ex));
@@ -117,7 +117,7 @@ function logCamSets(v) {
       let k = 0;
       for (const s of sets) { const slot = it.sets.find(x => !x.done); if (slot) Object.assign(slot, {...s, w: s.w || slot.w, done: true}); else it.sets.push({...s, w: s.w || (it.sets[0] && it.sets[0].w) || 0, done: true}); k++; }
       W.active = i; S.tab = 'today';
-      return `Из камеры: ${k} ${plural(k, 'подход', 'подхода', 'подходов')} — «${it.name}»`;
+      return `Из камеры: ${k} ${plural(k, 'подход', 'подхода', 'подходов')} — «${it.name}». ${CoachText.praise(k)}`;
     }
   }
   const today = S.diary.find(w => w.camOnly && sameDay(w.date, Date.now()));
@@ -125,13 +125,14 @@ function logCamSets(v) {
   if (!today) S.diary.unshift(entry);
   const e = entry.items.find(x => norm(x.name) === norm(v.name));
   if (e) e.sets.push(...sets); else entry.items.push({name: v.name, base: CAT[v.ex] ? v.ex : null, sets});
-  return `Записала в дневник: ${sets.length} ${plural(sets.length, 'подход', 'подхода', 'подходов')} — «${v.name}»`;
+  return `Записала в дневник: ${sets.length} ${plural(sets.length, 'подход', 'подхода', 'подходов')} — «${v.name}». ${CoachText.praise(sets.length)}`;
 }
 function videoSheet(id) {
   const v = S.videoLog.find(x => x.id === id); if (!v) return;
   const partial = v.partial || v.sets.some(s => s.partial);
   const g = partial ? [] : v.g.length ? v.g : v.sets.flatMap(s => Array.from({length: s.n}, (_, i) => i < s.c ? 0 : 1));
   sheet(v.name, `<div class="hint">${ruDate(v.at, {day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'})} · ${v.mode === 'video' ? 'разбор видео' : 'камера онлайн'}</div>
+    <p class="coach up">${esc(CoachText.summary(v.sets,{analysis:true}).text)}</p>
     <div class="kpis"><div class="stat"><b>${v.reps}</b><span>повторов</span></div>${v.n && !partial ? `<div class="stat"><b>${v.c}</b><span>чистых</span></div>` : '<div class="stat"><b>—</b><span>без общей оценки</span></div>'}<div class="stat"><b>${v.sets.length}</b><span>${plural(v.sets.length, 'подход', 'подхода', 'подходов')}</span></div></div>
     ${partial ? '<p class="hint">3D: предварительные подсказки по видимым суставам. Скрытые части тела и контакт с полом не проверены.</p>' : ''}
     ${g.length ? `<div class="card pad"><div class="eyebrow" style="margin-bottom:8px">Повторы по порядку</div><div class="stripe" role="img" aria-label="${g.filter(x => !x).length} чистых из ${g.length}">${g.map(x => `<i class="${x === 2 ? 'b' : x === 1 ? 'w' : ''}"></i>`).join('')}</div><div class="legend" style="margin-top:8px"><span><i style="background:var(--good-strong)"></i>чисто</span><span><i style="background:var(--warn)"></i>поправить</span><span><i style="background:var(--bad)"></i>грубая ошибка</span></div></div>` : ''}

@@ -23,11 +23,16 @@ function recordSet() {
   state.sets.push(set); state.view = A.view || state.view; saveSets();
   if (!state.file) { Rec.restart(); attemptT0 = performance.now(); helperAt = 25000; }
   state.flash = { cls: set.c / set.n >= 0.8 ? 'good' : 'info', text: 'Подход ' + state.sets.length + ' · ' + set.note, until: performance.now() + 6000 };
-  Voice.say('Подход ' + state.sets.length + '. ' + set.note, 'set', true);
+  Coaching.completed(set);
   renderSets(); renderMain();
   afterSet();
 }
 function qClass(s) { if (!s.n) return 'none'; const q = s.c / s.n; return q >= 0.8 ? 'good' : q >= 0.5 ? 'fair' : 'bad'; }
+function renderExerciseSummary() {
+  const result = CoachText.summary(state.sets, {hold:isHold(),analysis:true}), box = $('#exerciseSummary');
+  box.hidden = !result.sets;
+  if (box.textContent !== result.text) box.textContent = result.text;
+}
 function renderSets() {
   const hold = isHold(), w = weighted();
   el.setsBox.hidden = !state.sets.length && !state.fromBot;

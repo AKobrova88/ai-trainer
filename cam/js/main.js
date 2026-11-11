@@ -34,7 +34,7 @@ $('#moreBtn').addEventListener('click', () => {
   $('#setupBar').hidden = !ready || state.recOnly || isHold();
   $('#facingOption').hidden = !idle;
   $('#voiceOption').hidden = !('speechSynthesis' in window);
-  renderSetup(); if ('speechSynthesis' in window) renderVoices(); openSheet(optionsSheet);
+  renderSetup(); renderCoachMode(); if ('speechSynthesis' in window) renderVoices(); openSheet(optionsSheet);
 });
 el.voice.addEventListener('change', () => {
   if (!('speechSynthesis' in window)) return;

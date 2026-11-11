@@ -68,6 +68,13 @@ Voice.on = 'speechSynthesis' in window && (prefs.voice != null ? !!prefs.voice :
 /* The phone's voices differ a lot: neural and «enhanced» voices put the stress right far more often. The best one is picked, the person can change it. */
 const VOICE_KEY = 'aitrainer.voice';
 Voice.rate = pickOpt(store.get('aitrainer.voice-rate', 1), [.85, 1, 1.15], 1);
+Coaching.mode = pickOpt(store.get('aitrainer.coach-mode', 'calm'), ['calm','every','summary'], 'calm');
+function renderCoachMode() {
+  $('#coachMode').value = Coaching.mode;
+  $('#coachModeHelp').textContent = Coaching.mode === 'summary' ? 'Без счёта и замечаний во время движения. Подсказка начала и итог остаются.'
+    : Coaching.mode === 'every' ? 'Каждый повтор вслух. До двух разных замечаний на упражнение — в паузах, остальные в итог.'
+    : 'Счёт 2, 4, 6… До трёх разных замечаний на упражнение. Подбадривания и редкие шутки — в паузах.';
+}
 const ruVoices = () => { try { return speechSynthesis.getVoices().filter(v => /^ru([-_]|$)/i.test(v.lang || '')).filter((v,i,list) => list.findIndex(x => (x.voiceURI || x.name) === (v.voiceURI || v.name) && x.lang === v.lang) === i); } catch (e) { return []; } };
 const voiceRank = v => { const n = v.name || ''; return (/natural|neural|нейро/i.test(n) ? 60 : 0) + (/enhanced|premium|улучш|высок/i.test(n) ? 50 : 0) + (/online/i.test(n) ? 20 : 0) + (/google/i.test(n) ? 30 : 0) + (/milena|милена|svetlana|светлана|dariya|дарья|alena|алёна|алена/i.test(n) ? 10 : 0) + (/compact|eloquence|novelty|whisper/i.test(n) ? -40 : 0); };
 function pickVoice() {

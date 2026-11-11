@@ -27,7 +27,7 @@ function afterSet() {
   if (st.p === p) return;
   const say = st.done ? 'Готово: ' + doneOf(p.k) + ' ' + plural(doneOf(p.k), 'подход', 'подхода', 'подходов') + '. Отдыхай. Дальше — ' + spoken(st.p)
     : st.rest ? 'Круг готов. Отдых, потом ' + spoken(st.p) : 'Дальше — ' + spoken(st.p) + ', без отдыха';
-  setTimeout(() => { if (state.ex === from) { switchTo(st.p.k, false); Voice.queue(say); } }, 1500);
+  setTimeout(() => { if (state.ex === from) { switchTo(st.p.k, false); Voice.queue(say); } }, 2200);
 }
 function renderPlan() {
   const box = $('#planBox');
@@ -85,6 +85,7 @@ function resultHandoff() {
   return canSend() && state.sets.some(s => s.r > 0) ? 'bot' : '';
 }
 function renderSend() {
+  renderExerciseSummary();
   const ok = state.sets.filter(s => s.r > 0);
   el.sendBox.innerHTML = '';
   if (ok.length && (RET || canSend())) {

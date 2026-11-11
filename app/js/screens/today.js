@@ -105,7 +105,8 @@ function finishSheet() {
 }
 function saveWorkout() {
   const W = S.workout;
-  const items = W.items.map(it => ({name: it.name, base: it.base, sec: it.sec || undefined, sets: it.sets.filter(s => s.done).map(s => ({w: s.w, r: s.r, ...(s.c != null ? {c: s.c, n: s.n} : {})}))})).filter(e => e.sets.length);
+  const items = W.items.map(it => ({name: it.name, base: it.base, sec: it.sec || undefined, sets: it.sets.filter(s => s.done).map(s => ({w: s.w, r: s.r, ...(s.c != null ? {c: s.c, n: s.n} : {}),
+    ...(s.partial ? {partial:true} : {}), ...(s.analysisMode ? {analysisMode:s.analysisMode} : {}), ...(s.note ? {note:s.note} : {}), ...(s.cue ? {cue:s.cue} : {}), ...(s.ft ? {ft:s.ft} : {})}))})).filter(e => e.sets.length);
   const entry = {id: nid('w'), date: Date.now(), title: W.title, dur: Math.max(1, Math.round((Date.now() - W.start) / 60000)), items};
   const recs = items.filter(e => { const b = bestE1(e.name); return b && Math.max(...e.sets.map(e1)) > b + .01; }).map(e => e.name);
   const ups = W.items.filter(it => it.up && it.sets.some(s => s.done)).map(it => it.name);
@@ -117,9 +118,11 @@ function saveWorkout() {
   S.workout = null; S.rest = null; S.pick = null;
   render();
   sheet('Тренировка записана', `
+    <p class="coach up">${esc(CoachText.praise(items.reduce((n,e)=>n+e.sets.length,0)))}</p>
     <div class="kpis"><div class="stat"><b>${entry.dur} мин</b><span>время</span></div><div class="stat"><b>${items.reduce((a, e) => a + e.sets.length, 0)}</b><span>подходов</span></div><div class="stat"><b>${fmt(vol / 1000)} т</b><span>поднято</span></div></div>
     ${recs.length ? `<div class="card pad"><div class="eyebrow">Рекорды</div><p style="margin:.4em 0 0">${recs.map(esc).join(', ')}</p></div>` : ''}
     ${cam.length ? `<div class="card pad"><div class="eyebrow">Камера</div><p style="margin:.4em 0 0">Чистых повторов: <b>${cam.reduce((a, s) => a + s.c, 0)} из ${cam.reduce((a, s) => a + s.n, 0)}</b></p></div>` : ''}
+    <div class="card pad">${items.map(e=>`<div class="log-ex"><b>${esc(e.name)}</b><p class="hint" style="margin:.4em 0 0">${esc(CoachText.summary(e.sets,{hold:!!e.sec}).text)}</p></div>`).join('')}</div>
     <p class="coach up">${ups.length ? `Ты прибавила вес в ${ups.length} ${plural(ups.length, 'упражнении', 'упражнениях', 'упражнениях')} — отличная работа.` : 'Хорошая работа.'} Следующая тренировка — «${esc(nextDay().title.replace(/^День \d+ · /, ''))}».</p>`,
     `<button class="btn" data-act="go-diary">В дневник</button><button class="btn primary" data-act="close">Готово</button>`);
 }

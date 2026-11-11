@@ -76,7 +76,7 @@ function handleSnap(snap) { state.snap = snap; processEvents(state.analyzer.drai
 function processEvents(evts) {
   const A = state.analyzer;
   for (const e of evts) {
-    if (e.type === 'cue') { if (!state.file) Voice.say(A.meta(e.id).cue, e.id); }
+    if (e.type === 'cue') { if (!state.file) Coaching.correction(e.id, A.meta(e.id)); }
     else if (e.type === 'rep') {
       const r = e.rep, now = performance.now();
       if (isHold()) continue;
@@ -85,13 +85,14 @@ function processEvents(evts) {
         ? { cls: r.grade === 'bad' ? 'bad' : 'warn', text: 'Повтор ' + r.n + ': ' + A.meta(r.faultList[0]).cue.toLowerCase(), until: now + 1800 }
         : r.partial ? { cls: 'info', text: 'Повтор ' + r.n + ' · 3D: в доступных проверках замечаний нет', until: now + 1800 }
         : { cls: 'good', text: 'Повтор ' + r.n + ' — ' + (Math.random() < 0.3 ? pick(T.praise).toLowerCase() : 'чисто'), until: now + 1400 };
-      if (!state.file) Voice.say(String(r.n), 'rep' + r.n, false, true);
+      if (!state.file) Coaching.count(r.n);
     } else if (e.type === 'setEnd') {
       recordSet();
       if (state.on && !state.file && !state.recOnly) startPreparation(false);
     }
     else if (e.type === 'newSet') renderMain();
   }
+  Coaching.flush();
   if (evts.length) renderMain();
 }
 
