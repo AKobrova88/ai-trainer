@@ -138,7 +138,7 @@ function renderLive() {
     ? '2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
     : '3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
   const analysisInfo = $('#analysisInfo');
-  const versionedAnalysis = 'Версия 2.8.8 · ' + analysisText;
+  const versionedAnalysis = 'Версия 2.8.9 · ' + analysisText;
   if (analysisInfo.textContent !== versionedAnalysis) analysisInfo.textContent = versionedAnalysis;
   el.hud.hidden = !state.on || !!state.recOnly || state.preflight;
   if (snap) {
@@ -161,6 +161,7 @@ function cameraAction() {
   return MODE_VIDEO ? ['pick', 'Выбрать видео'] : ['start', state.sets.length ? 'Следующий подход' : 'Начать с камерой'];
 }
 function renderMain() {
+  if(typeof syncCameraTelegramChrome==='function')syncCameraTelegramChrome();
   const [action, label, style] = cameraAction(), b = el.main;
   b.disabled = false;
   b.className = 'main-btn' + (style ? ' ' + style : '');

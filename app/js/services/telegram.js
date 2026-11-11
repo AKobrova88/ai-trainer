@@ -6,7 +6,7 @@ const TG = (() => {
   let initData = '';
   try {
     const p = new URLSearchParams(location.hash.slice(1));
-    initData = p.get('tgWebAppData') || sessionStorage.getItem('trener.tg') || '';
+    initData = p.get('tgWebAppData') || window.Telegram?.WebApp?.initData || sessionStorage.getItem('trener.tg') || '';
     if (initData) sessionStorage.setItem('trener.tg', initData);
   } catch (e) { /* no storage: the address is enough */ }
   /* every Telegram account on this phone keeps its own data: the storage keys carry the account's Telegram ID */
@@ -35,4 +35,4 @@ const TG = (() => {
     user: () => { try { return JSON.parse(new URLSearchParams(data()).get('user') || 'null'); } catch (e) { return null; } }};
 })();
 
-const telegramBridge = Startup.telegram(/tgWebApp/.test(location.hash) || window.TelegramWebviewProxy || TG.inside());
+const telegramBridge = Startup.telegram(/tgWebApp/.test(location.hash) || /[?&]tg=1/.test(location.search) || window.TelegramWebviewProxy || TG.inside());

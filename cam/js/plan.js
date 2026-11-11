@@ -125,9 +125,14 @@ function queueAppResults() {
   state.sets = [];
   return true;
 }
-function toApp() {
-  if (!queueAppResults()) return;
-  Clips.leave(()=>{location.href=RET;});
+let returningToApp=false;
+async function toApp() {
+  if(returningToApp)return;
+  returningToApp=true;
+  try {
+    if (!queueAppResults()) return;
+    await Clips.leave(()=>{location.href=RET;});
+  }finally{returningToApp=false;}
 }
 function commitResults() {
   const destination = resultHandoff();

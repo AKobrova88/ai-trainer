@@ -1,4 +1,23 @@
 'use strict';
+let cameraTelegram = null, cameraBackBound=false, cameraCloseConfirm=null;
+function returnToDay() { stopCamera();return toApp(); }
+function syncCameraTelegramChrome() {
+  const W=cameraTelegram;if(!W)return;
+  try {
+    if(RET && W.BackButton){
+      if(!cameraBackBound){
+        cameraBackBound=true;
+        W.BackButton.onClick(()=>{
+          const dialog=[$('#recordingsDialog'),$('#exerciseFinder'),optionsSheet].find(d=>d?.open);
+          if(dialog)closeSheet(dialog);else returnToDay();
+        });
+      }
+      W.BackButton.show();
+    }
+    const protect=!!WORKOUT_CONTEXT || !!state.on || !!state.cameraRequest || !!resultHandoff() || Rec.pending.size>0 || Clips.items.some(c=>!c.persistent && !c.shared);
+    if(protect!==cameraCloseConfirm){cameraCloseConfirm=protect;W[protect?'enableClosingConfirmation':'disableClosingConfirmation']?.();}
+  }catch(e){/* Older Telegram versions keep the in-page return button. */}
+}
 function openSheet(sheet) {
   if (sheet.open) return;
   if (sheet.showModal) sheet.showModal(); else sheet.setAttribute('open', '');
@@ -46,9 +65,8 @@ back.hidden = !RET;
 if (RET) {
   back.setAttribute('href', RET);
   back.setAttribute('aria-label', WORKOUT_CONTEXT ? 'Вернуться к тренировке' : 'Вернуться на Сегодня');
-  back.addEventListener('click', e => { e.preventDefault();stopCamera();toApp(); });
+  back.addEventListener('click', e => { e.preventDefault();returnToDay(); });
 }
-let cameraTelegram = null;
 if (cameraColorScheme.addEventListener) cameraColorScheme.addEventListener('change', () => syncCameraTheme(cameraTelegram));
 new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
@@ -105,6 +123,7 @@ telegramBridge.then(W => {
     if (atLeast('7.10')) call('setBottomBarColor', cssv('--bg'));
   };
   call('ready'); call('expand');
+  syncCameraTelegramChrome();
   if (atLeast('7.7')) call('disableVerticalSwipes');
   theme(); renderSets();
   try { W.onEvent('themeChanged', theme); } catch (e) { /* no theme events */ }
