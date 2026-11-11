@@ -26,7 +26,8 @@ function camLink(it, mode = 'live') {
     u.searchParams.set('ex', mine ? mine[0] : it.base || 'own_' + hash(it.name));
     u.searchParams.set('n', it.name.slice(0, 60));
     u.searchParams.set('u', it.sec ? 'time' : stepOf(it) ? 'w' : 'bw');
-    const w = it.sets && it.sets[0] ? it.sets[0].w : it.w;
+    const nextSet=it.sets && (it.sets.find(s=>!s.done) || it.sets[0]);
+    const w = nextSet ? nextSet.w : it.w;
     if (w) u.searchParams.set('w', String(w));
   }
   if (plan.length > 1) u.searchParams.set('plan', b64u(JSON.stringify(plan)));
@@ -48,9 +49,27 @@ function camChoices() {
   return out;
 }
 function currentCamEx() {
+  if(S.workout && S.workout.items[S.workout.active])return S.workout.items[S.workout.active];
   if (S.camEx) return S.camEx;
   const ch = camChoices();
   return ch.find(x => x.cam) || ch[0] || {name: CAT.bw_squat.n, base: 'bw_squat', w: 0, inc: 'bw'};
+}
+let openingCameraVideo=false;
+function chooseCameraVideo() {
+  if(openingCameraVideo)return;
+  if(!canCamera())return paywallSheet('Разбор видео — в подписке.');
+  if(!SAME_SITE){location.href=camLink(currentCamEx(),'video');return;}
+  $('#cameraFileInput').click();
+}
+async function openCameraVideo(file) {
+  if(!file || openingCameraVideo)return;
+  openingCameraVideo=true;
+  const button=$('[data-act="video-select"]');if(button){button.disabled=true;const title=button.querySelector('b');if(title)title.textContent='Открываю видео…';}
+  const url=new URL(camLink(currentCamEx(),'video')),account=TG.slot();
+  toast('Открываю выбранное видео…');
+  try {const id=await VideoInput.put(file,account);url.searchParams.set('input',id);}
+  catch(e){url.searchParams.set('input-error','1');}
+  location.href=url.href;
 }
 function viewCamera() {
   if (!canCamera()) return ['Камера', `
@@ -58,22 +77,23 @@ function viewCamera() {
       <p style="margin:0">Камера онлайн и разбор видео без лимитов — ${rub(PRICING.sub.price)} в месяц. Своя программа, дневник и прогресс работают и без подписки.</p>
       <button class="btn primary big" data-act="paywall" data-v="cam">Подписка и промокод</button></section>`];
   const it = currentCamEx();
-  const vlog = S.videoLog.slice(0, 6);
-  const q = v => { const r = v.n ? v.c / v.n : 0; return r >= .8 ? 'good' : r >= .5 ? 'fair' : 'bad'; };
   return ['Камера', `
     <section class="cam-entry" aria-label="Камера и видео">
       <a class="cam-entry-row" href="${esc(camLink(it))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go">
         <span class="cam-entry-icon">${I.camera}</span><span class="grow"><b>Камера</b><small>${esc(it.name)}</small></span>${CHEV}
       </a>
-      <a class="cam-entry-row" href="${esc(camLink(it, 'video'))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go">
-        <span class="cam-entry-icon">${I.video}</span><span class="grow"><b>Разбор видео</b><small>Из галереи</small></span>${CHEV}
-      </a>
-      <a class="cam-entry-row" href="${esc(camLink(it, 'recordings'))}" ${SAME_SITE ? '' : 'target="_blank" rel="noopener"'} data-act="cam-go">
-        <span class="cam-entry-icon">${I.video}</span><span class="grow"><b>Видео подходов</b><small>Сохранить или разобрать повторно</small></span>${CHEV}
-      </a>
+      <button class="cam-entry-row" type="button" data-act="video-select" ${openingCameraVideo?'disabled':''}>
+        <span class="cam-entry-icon">${I.video}</span><span class="grow"><b>${openingCameraVideo?'Открываю видео…':'Разобрать видео'}</b><small>Выбрать из галереи</small></span>${CHEV}
+      </button>
     </section>
     ${SAME_SITE ? '' : `<div class="note blue">${I.info}<span>Здесь, в предпросмотре, камера откроется в новой вкладке, и подходы оттуда нужно будет записать вручную. В установленной версии они вернутся сюда сами.</span></div>`}
-    ${vlog.length ? `<div class="eyebrow">Недавние разборы</div><div class="vlog">${vlog.map(v => `<button class="vrow" data-act="vres" data-v="${v.id}"><span class="grow"><b>${esc(v.name)}</b><small>${ruDate(v.at)} · ${v.reps} ${plural(v.reps, 'повтор', 'повтора', 'повторов')}${v.mode === 'video' ? ' · видео' : ''}${v.partial ? ' · 3D, предварительно' : ''}</small></span>${v.n && !v.partial ? `<span class="q ${q(v)}">чисто ${v.c} из ${v.n}</span>` : ''}</button>`).join('')}</div>` : ''}`];
+    `,`<button class="icon-btn" data-act="camera-menu" aria-label="Ещё о камере">${DOTS}</button>`];
+}
+function cameraMenu() {
+  sheet('Камера',`<div class="menu"><a class="menu-link" href="${esc(camLink(currentCamEx(),'recordings'))}">${I.video}<span>Мои записи камеры</span></a>${mi('video-history','',I.diary,'История разборов')}</div>`);
+}
+function videoHistorySheet() {
+  sheet('История разборов',`<div class="vlog">${S.videoLog.map(v=>`<button class="vrow" data-act="vres" data-v="${v.id}"><span class="grow"><b>${esc(v.name)}</b><small>${ruDate(v.at)} · ${v.reps} ${plural(v.reps,'повтор','повтора','повторов')}</small></span>${CHEV}</button>`).join('') || '<p class="hint">Здесь появятся результаты разборов.</p>'}</div>`);
 }
 function camPickSheet() {
   const ch = camChoices();

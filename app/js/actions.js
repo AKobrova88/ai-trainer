@@ -15,6 +15,9 @@ function useProgram(days, profile, tab) {
 const A = {
   /* shell */
   tab: v => { S.tab = v; render(); window.scrollTo({top: 0}); },
+  'video-select':()=>chooseCameraVideo(),
+  'video-history':()=>videoHistorySheet(),
+  'camera-menu':()=>cameraMenu(),
   close: () => closeSheet(),
   'close-top': () => closeTop(),
   undo: () => { $('#toast-root').innerHTML = ''; undo(); },
@@ -159,7 +162,7 @@ const A = {
   addset: v => { const it = S.workout.items[+v], l = it.sets[it.sets.length - 1] || {w: it.w, r: it.lo}; it.sets.push({w: l.w, r: l.r, done: false}); render(); },
   'wx-menu': v => {
     const it = S.workout.items[+v];
-    sheet(it.name, `<div class="menu">${mi('wx-swap', v, I.swap, 'Заменить на сегодня')}${mi('wx-last', v, I.last, 'Сделать в конце')}${mi('wx-skip', v, I.skip, 'Пропустить сегодня')}</div><p class="hint">Программа не меняется — только сегодняшняя тренировка.</p>`);
+    sheet(it.name, `<div class="menu">${mi('rmset',v,I.trash,'Убрать последний подход',it.sets.length<=1?'disabled':'')}${mi('wx-swap', v, I.swap, 'Заменить на сегодня')}${mi('wx-last', v, I.last, 'Сделать в конце')}${mi('wx-skip', v, I.skip, 'Пропустить сегодня')}</div><p class="hint">Программа не меняется — только сегодняшняя тренировка.</p>`);
   },
   'wx-skip': v => { const W = S.workout; W.items[+v].sets = []; W.active = Math.min(+v + 1, W.items.length - 1); closeSheet(); render(); toast('Пропустили — в дневник не попадёт'); },
   'wx-last': v => { const W = S.workout, G = groupOf(W.items, +v); W.items.push(...W.items.splice(G[0], G.length)); W.active = G[0]; closeSheet(); render(); },
@@ -220,6 +223,7 @@ const A = {
   /* own program by photo or text */
   import: () => importSheet(),
   'program-organize': () => organizeProgram(),
+  'program-menu':()=>programMenu(),
   'imp-new': () => { delete S.importDraft; save(); IMP = newImportSession(); renderImport(); scrollSheet(); },
   'imp-undo': () => { const previous = IMP.undo.pop(); if (!previous) return; Object.assign(IMP, JSON.parse(previous)); renderImport(); },
   'imp-confirm-days': () => { if (importDayCount() && IMP.days.length === importDayCount()) { IMP.countConfirmed = importDayCount(); renderImport(); } },
@@ -386,6 +390,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
+  if(t.id==='cameraFileInput'){const file=t.files?.[0];t.value='';openCameraVideo(file);}
   if (t.id === 'restore-file' && t.files && t.files[0]) { restoreFile(t.files[0]); t.value = ''; }
 });
 document.addEventListener('focusout', e => {

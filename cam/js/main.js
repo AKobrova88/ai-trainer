@@ -17,19 +17,16 @@ const goCamera = () => { state.recOnly = false; startCamera(); };
 option('#cameraOption', goCamera);
 option('#galleryOption', () => pickVideo());
 option('#saveOption', commitResults);
-option('#recBtn', startRecordMode);
-option('#recordedOption', analyzeLive);
+option('#recordingsOption',()=>Clips.open());
 option('#manualOption', () => { stopCamera(); manualSet(); });
 option('#setupCount', () => beginPreparedSet(true));
 option('#setupBar', () => state.file ? barPick('file') : state.on ? barPick('live') : pickVideo(true));
-$('#vidBtn').addEventListener('click', () => pickVideo());
 $('#facingOption').addEventListener('click', () => setFacing(state.facing === 'user' ? 'environment' : 'user'));
 $('#moreBtn').addEventListener('click', () => {
   const [action] = cameraAction(), idle = !state.on && !state.file && !state.cameraRequest, ready = !state.analyzing && !action.startsWith('cancel');
   $('#cameraOption').hidden = !(idle && action !== 'start');
-  $('#galleryOption').hidden = !ready || (!state.file && (!idle || action !== 'save'));
-  $('#recBtn').hidden = !idle || !Rec.ok();
-  $('#recordedOption').hidden = !ready || !state.on || !!state.file || state.recOnly || Rec.secs() < 4;
+  $('#galleryOption').hidden = !MODE_VIDEO || !ready || !state.file;
+  $('#recordingsOption').hidden=!Clips.items.length;
   $('#saveOption').hidden = !ready || action === 'save' || !resultHandoff();
   $('#setupBar').hidden = !ready || state.recOnly || isHold();
   $('#facingOption').hidden = !idle;
@@ -54,7 +51,7 @@ new MutationObserver(readColors).observe(document.documentElement, { attributes:
 fillSelect(); setAspect(1, 1); resize(); setExercise(state.ex); renderFacing(); renderPlan();
 el.voice.checked = Voice.on;
 Clips.init().then(()=>{if(qp.get('mode')==='recordings')Clips.open();});
-$('#recordingsBtn').addEventListener('click',()=>Clips.open());
+$('#recordingsBtn').addEventListener('click',()=>{const clip=Clips.latest();if(clip)Clips.export(clip.id);});
 $('#clipSave').addEventListener('click',()=>Clips.export(Clips.selected));
 $('#clipRetry').addEventListener('click',()=>Clips.retry(Clips.selected));
 $('#clipDelete').addEventListener('click',()=>Clips.remove(Clips.selected));
@@ -68,6 +65,25 @@ function preserveRecordingVisibility() {
 document.addEventListener('visibilitychange',preserveRecordingVisibility);
 requestAnimationFrame(loop);
 if (MODE_LIVE) startCamera(true);
+async function startIncomingVideo() {
+  const id=qp.get('input');if(!MODE_VIDEO)return;
+  if(!id){if(qp.has('input-error')){state.flash={cls:'info',text:'Файл не передался. Выбери его здесь — оригинал остался в галерее.',until:Infinity};renderLive();}return;}
+  const token={};state.incomingVideoToken=token;
+  showMsg('Открываю видео','Подготавливаю выбранную запись.',[],true);
+  try {
+    const file=await VideoInput.read(id,TG_SLOT);
+    if(state.incomingVideoToken!==token)return;
+    if(!file)throw Error('Video missing');
+    await analyzeVideo(file,'upload');
+  } catch(e) {
+    if(state.incomingVideoToken!==token)return;
+    state.flash={cls:'info',text:'Временная копия недоступна. Выбери видео ещё раз — оригинал остался в галерее.',until:Infinity};hideMsg();renderLive();
+  } finally {
+    VideoInput.remove(id,TG_SLOT).catch(()=>{});
+    if(state.incomingVideoToken===token)state.incomingVideoToken=null;
+  }
+}
+startIncomingVideo();
 
 if (window.AI_TRAINER_STANDALONE) {
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

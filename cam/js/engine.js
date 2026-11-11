@@ -398,6 +398,7 @@ function stopStream() {
   stop();
 }
 function stopCamera() {
+  state.incomingVideoToken=null;
   Voice.cancel(); state.prepareUntil = null;
   state.cameraRequest = null;
   hideMsg();

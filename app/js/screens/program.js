@@ -2,16 +2,24 @@
 /* ---------- program ---------- */
 function viewProgram() {
   const P = S.program, n = P.days.reduce((a, d) => a + d.items.length, 0);
+  const more=`<button class="icon-btn" data-act="program-menu" aria-label="Ещё о программе">${DOTS}</button>`;
   if (!P.days.length) return ['Программа', `
-    <section class="empty-card"><h2>Пусто</h2><p class="hint" style="margin:0">Подбери программу по пожеланиям, загрузи свою или собери из справочника.</p>
-      <div class="row" style="flex-wrap:wrap"><button class="btn primary" data-act="wish">${I.spark}Подобрать</button><button class="btn" data-act="import">${I.photo}По фото или тексту</button></div>
-      <button class="btn ghost" data-act="day-add">${I.plus}Собрать самой</button></section>`];
+    <section class="empty-card"><h2>Добавь свою программу</h2><p class="hint" style="margin:0">Подбери программу по пожеланиям, загрузи свою или собери из справочника.</p>
+      <div class="row" style="flex-wrap:wrap"><button class="btn primary" data-act="import">${I.photo}По фото или тексту</button><button class="btn" data-act="wish">${I.spark}Подобрать с тренером</button></div>
+      </section>`,more];
   return ['Программа', `
-    <div class="toolbar"><button class="btn" data-act="import">${I.photo}По фото</button><button class="btn" data-act="wish">${I.spark}Подобрать</button><button class="btn" data-act="day-add">${I.plus}День</button></div>
-    <button class="btn" data-act="program-organize">${I.sliders}Исправить распределение по дням</button>
     ${P.coachNotes && P.coachNotes.length ? `<details class="card pad"><summary>Заметки из программы</summary>${P.coachNotes.map(note => `<p class="hint">${esc(note)}</p>`).join('')}</details>` : ''}
     <p class="hint" style="margin:0">${P.days.length} ${plural(P.days.length, 'день', 'дня', 'дней')} · ${n} ${plural(n, 'упражнение', 'упражнения', 'упражнений')}. Держи за <span style="display:inline-flex;width:14px;vertical-align:-2px">${GRIP}</span> и перетаскивай — дни и упражнения меняются местами, упражнение можно перенести в другой день.</p>
-    <div class="days" id="days">${P.days.map(dayCard).join('')}</div>`];
+    <div class="days" id="days">${P.days.map(dayCard).join('')}</div>
+    <button class="btn" data-act="day-add">${I.plus}Добавить день</button>`,more];
+}
+function programMenu() {
+  sheet('Программа',`<div class="menu">
+    ${mi('import','',I.photo,'Добавить по фото или тексту')}
+    ${mi('day-add','',I.plus,'Добавить день вручную')}
+    ${S.program.days.length ? mi('program-organize','',I.sliders,'Изменить распределение по дням') : ''}
+    ${mi('wish','',I.spark,'Подобрать с тренером')}
+  </div>`);
 }
 function dayCard(d) {
   const closed = S.open[d.id] === false, editing = S.renaming === d.id;
@@ -59,7 +67,7 @@ function exMenu(dayId, itemId) {
 }
 function doseSheet(dayId, itemId) {
   const [, , it] = findItem(dayId, itemId), st = stepOf(it) || 1;
-  const stepper = (k, v, lab, s) => `<div class="field"><label for="dz-${k}">${lab}</label><div class="step" style="height:50px;grid-template-columns:46px 1fr 46px"><button data-act="dz-adj" data-v="${k}:-${s}" aria-label="меньше">−</button><input id="dz-${k}" inputmode="decimal" value="${k === 'w' ? fmt(v) : v}"><button data-act="dz-adj" data-v="${k}:${s}" aria-label="больше">+</button></div></div>`;
+  const stepper = (k, v, lab) => `<div class="field"><label for="dz-${k}">${lab}</label><input class="input" id="dz-${k}" inputmode="${k==='w'?'decimal':'numeric'}" value="${k === 'w' ? fmt(v) : v}"></div>`;
   sheet(it.name, `
     <div class="grid2">${stepper('s', it.s, 'Подходы', 1)}${stepper('w', it.w, stepOf(it) ? 'Вес, кг' : 'Доп. вес, кг', st)}</div>
     <div class="grid2">${stepper('lo', it.lo, it.sec ? 'Секунд от' : 'Повторов от', 1)}${stepper('hi', it.hi, 'до', 1)}</div>

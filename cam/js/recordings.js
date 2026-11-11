@@ -47,16 +47,17 @@ const Clips = {
     // No await before share(): iPhone requires the original user activation.
     try {
       const file=this.file(clip);
-      if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+      if (!this.downloadFallback && navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
         return navigator.share({files:[file],title:clip.name || 'Видео подхода'}).then(()=>{
           clip.shared=true;this.notice=clip.persistent ? 'Запись остаётся в приложении. Для обрезки открой сохранённое видео в «Фото».' : 'Видео передано выбранному приложению. Копию в памяти браузера сохранить не удалось.';this.render();
         }).catch(e=>{
           if (e?.name==='AbortError') return;
-          this.notice='Окно сохранения недоступно. Открой запись и нажми «Скачать файл».';this.render();this.open(clip.id);
+          this.downloadFallback=true;
+          this.notice='Системное окно недоступно. Нажми «Сохранить видео», чтобы скачать файл.';this.render();this.open(clip.id);
         });
       }
     } catch (e) { /* native sharing is optional; keep the original container */ }
-    this.open(clip.id); $('#clipDownload').click();
+    this.downloadFallback=true;this.open(clip.id); $('#clipDownload').click();
     this.notice='Начато сохранение файла. Проверь «Файлы» или «Загрузки». На iPhone можно открыть видео и выбрать «Поделиться → Сохранить видео».';this.render();
   },
   open(id) {
@@ -68,6 +69,7 @@ const Clips = {
       this.url=URL.createObjectURL(clip.blob);$('#clipPreview').src=this.url;
       $('#clipTitle').textContent=clip.name || 'Видео подхода';
       $('#clipDownload').href=this.url;$('#clipDownload').download=clip.filename;
+      $('#clipDownload').hidden=true; // One visible save action for both native sharing and download.
     }
     this.render();openSheet($('#recordingsDialog'));
   },
@@ -96,9 +98,11 @@ const Clips = {
   },
   render() {
     const strip=$('#recordingStrip'), recording=typeof Rec!=='undefined' && !!Rec.mr, finishing=typeof Rec!=='undefined' && Rec.pending.size>0;
-    strip.hidden=!recording && !this.items.length && !this.saving && !finishing && !this.notice;
-    $('#recordingStatus').textContent=recording ? '● Запись идёт независимо от анализа' : this.saving || finishing ? 'Сохраняю запись…' : this.items.length ? 'Видео подходов · '+this.items.length : '';
-    $('#recordingsBtn').hidden=!this.items.length;$('#recordingsBtn').textContent='Открыть записи';
+    strip.hidden=MODE_VIDEO || (!recording && !this.items.length && !this.saving && !finishing && !this.notice);
+    const latest=this.latest();
+    $('#recordingStatus').textContent=recording ? '● Камера записывает видео' : this.saving || finishing ? 'Сохраняю запись…' : '';
+    $('#lastRecordingText').hidden=!latest;$('#lastRecordingText').textContent=latest ? 'Последняя запись · '+Math.round(latest.seconds || 0)+' с' : '';
+    $('#recordingsBtn').hidden=!latest;$('#recordingsBtn').textContent='Сохранить видео';
     $('#recordingNotice').hidden=!this.notice;$('#recordingNotice').textContent=this.notice;
     $('#clipsHelp').textContent=this.notice || 'Записи хранятся на этом устройстве. Нажми «Сохранить видео», затем выбери сохранение в «Фото» или другой способ. Видео можно обрезать и разобрать повторно.';
     $('#recordingsList').innerHTML=this.items.filter(c=>c.account===TG_SLOT).map(c=>'<button type="button" data-clip="'+esc(c.id)+'"'+(c.id===this.selected?' aria-current="true"':'')+'><span>'+esc(c.name || 'Видео подхода')+'<small>'+esc(new Date(c.at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}))+' · '+Math.round(c.seconds || 0)+' с · '+(c.blob.size/1e6).toFixed(1).replace('.',',')+' МБ</small></span><span aria-hidden="true">'+(c.id===this.selected?'✓':'›')+'</span></button>').join('') || '<p>Сохранённые записи появятся здесь.</p>';

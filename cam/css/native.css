@@ -68,3 +68,7 @@ body{font-size:15px}
 .clip-delete{color:var(--muted)}
 #recordingsList small{display:block;font-size:12px;color:var(--muted);margin-top:3px}
 #recordingsList button>span:first-child{min-width:0;overflow-wrap:anywhere;color:var(--ink)}
+#recordingStatus{flex-basis:100%}
+#lastRecordingText{flex:1;color:var(--ink);font-size:13px}
+.recording-strip #recordingsBtn{min-height:44px;padding:8px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line);text-decoration:none;font-weight:600}
+.clip-more summary{min-height:44px;line-height:44px;text-align:center;font-size:13px;color:var(--muted)}

@@ -4,8 +4,8 @@ function viewToday() {
   if (S.workout) return viewWorkout();
   if (!S.program.days.length) return ['Сегодня', `
     <section class="empty-card"><h2>Программы пока нет</h2><p class="hint" style="margin:0">Подберу её по твоим пожеланиям или разберу твою из другого приложения.</p>
-      <div class="row" style="flex-wrap:wrap"><button class="btn primary" data-act="wish">${I.spark}Подобрать</button><button class="btn" data-act="import">${I.photo}Загрузить свою</button></div></section>
-    <button class="btn" data-act="tab" data-v="camera">${I.camera}Тренировка с камерой без программы</button>`];
+      <div class="row" style="flex-wrap:wrap"><button class="btn primary" data-act="import">${I.photo}Добавить программу</button><button class="btn" data-act="wish">${I.spark}Подобрать с тренером</button></div></section>
+`];
   const d = dayById(S.pick) || nextDay();
   const T0 = Date.now(), weekStart = (() => { const x = new Date(); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x.getTime(); })();
   const week = S.diary.filter(w => w.date >= weekStart && !w.camOnly).length, last = S.diary.find(w => !w.camOnly);
@@ -50,14 +50,14 @@ function viewWorkout() {
     const fin = it.sets.length && it.sets.every(s => s.done), open = i === W.active;
     const G = groupOf(W.items, i), ssHead = it.ss && G[0] === i ? `<div class="ss-h">Суперсет ${labs[G[0]]}–${labs[G[G.length - 1]]}: по подходу по очереди, отдых после круга</div>` : '';
     const sum = it.sets.filter(s => s.done).map(s => `${s.w ? fmt(s.w) + '×' : ''}${s.r}${it.sec ? ' с' : ''}`).join('  ');
-    const head = `<button class="wx-h" data-act="wx-open" data-v="${i}" aria-expanded="${open}"><span class="wx-n">${fin ? '✓' : labs[i]}</span><span class="wx-t"><b>${esc(it.name)}</b><span>${open || !sum ? dose(it) + (it.sets[0] && it.sets[0].w ? ' · ' + fmt(it.sets[0].w) + ' кг' : '') : sum}</span></span>${it.cam ? '<span class="badge cam">камера</span>' : ''}</button>`;
+    const head = `<button class="wx-h" data-act="wx-open" data-v="${i}" aria-expanded="${open}"><span class="wx-n">${fin ? '✓' : labs[i]}</span><span class="wx-t"><b>${esc(it.name)}</b><span>${open || !sum ? (it.sets.length ? dose({...it,s:it.sets.length}) : 'Без подходов') + (it.sets[0] && it.sets[0].w ? ' · ' + fmt(it.sets[0].w) + ' кг' : '') : sum}</span></span>${it.cam ? '<span class="badge cam">камера</span>' : ''}</button>`;
     if (!open) return `${ssHead}<article class="wx ${fin ? 'done' : ''} ${it.ss ? 'ss' : ''}">${head}</article>`;
     const wcol = !!stepOf(it) || it.sets.some(s => s.w);
     const rows = it.sets.map((s, k) => `
       <div class="set ${s.done ? 'done' : ''}">
         <span class="i">${k + 1}</span>
-        ${wcol ? `<div class="step"><button data-act="adj" data-v="${i}:${k}:w:-1" aria-label="меньше вес">−</button><input inputmode="decimal" aria-label="вес, кг" data-in="w" data-v="${i}:${k}" value="${fmt(s.w)}"><button data-act="adj" data-v="${i}:${k}:w:1" aria-label="больше вес">+</button></div>` : '<span class="hint" style="text-align:center">свой вес</span>'}
-        <div class="step"><button data-act="adj" data-v="${i}:${k}:r:-1" aria-label="меньше">−</button><input inputmode="numeric" aria-label="${it.sec ? 'секунды' : 'повторы'}" data-in="r" data-v="${i}:${k}" value="${s.r}"><button data-act="adj" data-v="${i}:${k}:r:1" aria-label="больше">+</button></div>
+        ${wcol ? `<input class="set-input" inputmode="decimal" aria-label="Вес в подходе ${k+1}, кг" data-in="w" data-v="${i}:${k}" value="${fmt(s.w)}">` : '<span class="hint" style="text-align:center">свой вес</span>'}
+        <input class="set-input" inputmode="numeric" aria-label="${it.sec ? 'Секунды' : 'Повторы'} в подходе ${k+1}" data-in="r" data-v="${i}:${k}" value="${s.r}">
         <button class="check" data-act="done" data-v="${i}:${k}" aria-label="подход сделан" aria-pressed="${s.done}">${CHECK}</button>
       </div>`).join('');
     return `${ssHead}<article class="wx open ${fin ? 'done' : ''} ${it.ss ? 'ss' : ''}">${head}<div class="wx-b">
@@ -65,7 +65,7 @@ function viewWorkout() {
       ${it.coachNotes && it.coachNotes.length ? `<p class="hint">Заметка тренера: ${it.coachNotes.map(esc).join(' · ')}</p>` : ''}
       ${it.base && CAT[it.base] && CAT[it.base].cue ? `<p class="hint" style="margin:-4px 2px 0">${esc(CAT[it.base].cue)}</p>` : ''}
       <div class="sets"><div class="set set-h"><span>#</span><span>${wcol ? 'кг' : ''}</span><span>${it.sec ? 'секунды' : 'повторы'}</span><span></span></div>${rows}</div>
-      <div class="wx-a"><div class="sets-n" role="group" aria-label="Подходы"><button data-act="rmset" data-v="${i}" aria-label="убрать подход" ${it.sets.length <= 1 ? 'disabled' : ''}>−</button><span>${it.sets.length} ${plural(it.sets.length, 'подход', 'подхода', 'подходов')}</span><button data-act="addset" data-v="${i}" aria-label="добавить подход">+</button></div>${camBtn(it, i)}<button class="icon-btn" data-act="wx-menu" data-v="${i}" aria-label="ещё">${DOTS}</button></div>
+      <div class="wx-a"><button class="btn sm" data-act="addset" data-v="${i}">${I.plus}Подход</button>${camBtn(it, i)}<button class="icon-btn" data-act="wx-menu" data-v="${i}" aria-label="ещё">${DOTS}</button></div>
     </div></article>`;
   }).join('');
   return [W.title.replace(/^День \d+ · /, ''), `
@@ -73,7 +73,7 @@ function viewWorkout() {
     ${cards}
     <button class="btn" data-act="wx-add">${I.plus}Добавить упражнение на сегодня</button>
     <button class="btn primary big" data-act="finish">Завершить тренировку</button>`,
-    '<button class="btn sm" data-act="finish">Финиш</button>'];
+    ''];
 }
 function renderRest() {
   const el = $('#restbar');
@@ -99,6 +99,7 @@ setInterval(() => {
 function finishSheet() {
   const W = S.workout, all = W.items.flatMap(i => i.sets), done = all.filter(s => s.done).length;
   if (!done) return sheet('Завершить тренировку?', `<p class="hint">Ни один подход не отмечен — в дневник ничего не попадёт.</p>`, `<button class="btn" data-act="close">Продолжить</button><button class="btn danger" data-act="discard">Завершить без записи</button>`);
+  if(done===all.length)return saveWorkout();
   const l = all.length - done;
   sheet('Завершить тренировку?', `<p style="margin:0">${done} из ${all.length} подходов отмечены.${l ? ` Неотмеченные ${l} ${plural(l, 'подход', 'подхода', 'подходов')} не попадут в дневник.` : ''}</p>`,
     `<button class="btn" data-act="close">Продолжить</button><button class="btn primary" data-act="save-wo">Завершить</button>`);
@@ -124,7 +125,7 @@ function saveWorkout() {
     ${cam.length ? `<div class="card pad"><div class="eyebrow">Камера</div><p style="margin:.4em 0 0">Чистых повторов: <b>${cam.reduce((a, s) => a + s.c, 0)} из ${cam.reduce((a, s) => a + s.n, 0)}</b></p></div>` : ''}
     <div class="card pad">${items.map(e=>`<div class="log-ex"><b>${esc(e.name)}</b><p class="hint" style="margin:.4em 0 0">${esc(CoachText.summary(e.sets,{hold:!!e.sec}).text)}</p></div>`).join('')}</div>
     <p class="coach up">${ups.length ? `Ты прибавила вес в ${ups.length} ${plural(ups.length, 'упражнении', 'упражнениях', 'упражнениях')} — отличная работа.` : 'Хорошая работа.'} Следующая тренировка — «${esc(nextDay().title.replace(/^День \d+ · /, ''))}».</p>`,
-    `<button class="btn" data-act="go-diary">В дневник</button><button class="btn primary" data-act="close">Готово</button>`);
+    `<button class="btn primary" data-act="go-diary">Готово</button>`);
 }
 function healthSheet(then) {
   HEALTH_THEN = then;

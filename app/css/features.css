@@ -237,3 +237,10 @@ body.onb-mode .tabs,body.onb-mode .top{display:none}
 .cam-entry-row > svg{width:16px;height:16px;flex:none;color:var(--muted)}
 .cam-entry-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;flex:none;background:var(--surface-2)}
 .cam-entry-icon svg{width:20px;height:20px}
+.cam-entry-row{width:100%;border:0;background:none;text-align:left;font:inherit}
+.set-input{width:100%;min-width:0;height:48px;border:1px solid var(--line);border-radius:11px;background:var(--surface-2);color:var(--ink);text-align:center;font:600 16px system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums;padding:6px}
+.set.done .set-input{background:var(--good-soft);border-color:transparent}
+.import-save .row>.btn:only-child{width:100%}
+.menu>.menu-link{display:flex;align-items:center;gap:12px;min-height:48px;padding:12px 14px;color:var(--ink);text-decoration:none;border-bottom:1px solid var(--line)}
+.menu>.menu-link svg{width:20px;height:20px;flex:none}
+.photo-selection summary{min-height:44px;line-height:1.4;padding:12px 0;color:var(--muted);font-size:14px}

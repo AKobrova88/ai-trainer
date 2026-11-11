@@ -53,7 +53,7 @@ function setImportDayCount(value) {
 }
 function readyImport() {
   const count = importDayCount();
-  return count > 0 && count === IMP.days.length && !IMP.days.some(d => d.items.some(it => it._needsDose)) && (IMP.expectedDays === 'auto' ? IMP.countConfirmed === count : +IMP.expectedDays === count);
+  return count > 0 && count === IMP.days.length && !IMP.days.some(d => d.items.some(it => it._needsDose)) && (IMP.expectedDays === 'auto' || +IMP.expectedDays === count);
 }
 function reviewImportLines(lines) {
   const report = {notes: [], warnings: []};
@@ -137,12 +137,12 @@ function renderImport() {
       <div class="field"><label for="imp-count">Сколько тренировочных дней в программе?</label><select class="input" id="imp-count">${dayOptions(IMP.expectedDays)}</select><span class="hint">Это число разных тренировок, а не количество фотографий. Один день может занимать несколько скриншотов.</span></div>
       ${IMP.mode === 'photo' ? `
       <label class="drop-zone" id="dz">${I.photo}<b>Выбери скриншоты</b><span class="hint">Добавь все фото в порядке упражнений. Границы дней ищу по заголовкам и новому началу нумерации. После распознавания их можно поправить.</span><span class="btn sm primary">Выбрать фото</span><input type="file" accept="image/*" multiple id="imp-file" hidden></label>
-      ${thumbs ? `<div class="thumbs">${thumbs}</div>` : ''}
+      ${thumbs ? `<details class="photo-selection"><summary>Выбрано фото: ${IMP.photos.length} · порядок и удаление</summary><div class="thumbs">${thumbs}</div></details>` : ''}
       <p class="hint" style="margin:0">Фото читаются прямо на телефоне и никуда не отправляются. ${access().unlimited ? 'Распознавание фото доступно без лимита.' : allowance().photo ? `Распознавание фото — ИИ-функция: осталось ${lft} из ${allowance().photo}.` : 'Распознавание фото — в подписке; текстом — бесплатно.'}</p>
-      <button class="btn ghost" data-act="imp-sample">Показать на примере скриншотов «Тренировка 4»</button>`
+      <details><summary class="hint">Посмотреть пример</summary><button class="btn ghost" data-act="imp-sample">Пример скриншотов «Тренировка 4»</button></details>`
       : `<div class="field"><label for="imp-text">Вставь программу — по строке на упражнение</label><textarea class="input" id="imp-text" placeholder="День 3 · Верх&#10;Жим гантелей на наклонной 3×10 12 кг&#10;Тяга верхнего блока 3×12 35 кг&#10;Планка 3×45 сек">${esc(IMP.text)}</textarea></div>
       <p class="hint" style="margin:0">Разбор текста бесплатный и без лимита.</p>`}`;
-    f.innerHTML = `<button class="btn" data-act="close">Отмена</button><button class="btn primary" data-act="imp-read" ${(IMP.mode === 'photo' ? IMP.photos.length : IMP.text.trim()) ? '' : 'disabled'}>Распознать</button>`;
+    f.innerHTML = `<button class="btn primary" data-act="imp-read" ${(IMP.mode === 'photo' ? IMP.photos.length : IMP.text.trim()) ? '' : 'disabled'}>${IMP.mode==='photo' ? 'Проверить программу' : 'Продолжить'}</button>`;
     const inp = $('#imp-file'); if (inp) inp.addEventListener('change', () => addPhotos(inp.files));
     $('#imp-count').addEventListener('change', e => { IMP.expectedDays = e.target.value; });
     const dz = $('#dz');
@@ -182,8 +182,7 @@ function renderImport() {
     <div class="card pad"><b>${IMP.existing ? 'Редактирование программы' : 'Результат распознавания'}: ${importDayCount()} ${plural(importDayCount(), 'день', 'дня', 'дней')}, ${n} ${plural(n, 'упражнение', 'упражнения', 'упражнений')}</b><div class="hint">${flagged ? `${flagged} ${plural(flagged, 'название требует', 'названия требуют', 'названий требуют')} проверки. ` : ''}Правки сохраняются в черновик на этом устройстве. Программа изменится после сохранения.</div></div>
     <section class="import-count card pad"><div class="field"><label for="imp-review-count">На сколько дней нужно разделить?</label><select class="input" id="imp-review-count">${dayOptions(IMP.expectedDays)}</select></div>
       <span class="hint">Фото не равны дням. Если заголовков и нумерации мало, разделю по смене скриншотов — проверь границы; если и этого не хватит, добавлю пустые дни для ручного переноса, а не разделю упражнения поровну.</span>
-      ${IMP.expectedDays === 'auto' ? `<button class="btn" data-act="imp-confirm-days" ${n && nd === importDayCount() ? '' : 'disabled'}>${IMP.countConfirmed === importDayCount() ? '✓ Подтверждено' : 'Верно'}: ${importDayCount()} ${plural(importDayCount(), 'день', 'дня', 'дней')}</button>` : ''}
-      <div class="row" style="flex-wrap:wrap"><button class="btn sm" data-act="imp-day-add">${I.plus}Добавить день</button><button class="btn sm" data-act="imp-undo" ${IMP.undo.length ? '' : 'disabled'}>Отменить правку</button></div></section>
+      <div class="row" style="flex-wrap:wrap"><button class="btn sm" data-act="imp-day-add">${I.plus}Добавить день</button>${IMP.undo.length ? '<button class="btn sm" data-act="imp-undo">Отменить правку</button>' : ''}</div></section>
     ${IMP.warnings.length ? `<div class="note warn">${I.info}<span>${IMP.warnings.map(esc).join('<br>')}</span></div>` : ''}
     ${P.length && !IMP.existing ? `<div class="eyebrow">Куда добавить</div>
     <div class="dest" role="radiogroup">
@@ -207,8 +206,8 @@ function renderImport() {
 function renderImportFoot() {
   const f = $('#imp-f'), n = IMP.days.reduce((a, d) => a + d.items.length, 0), into = IMP.dest === 'into' && dayById(IMP.toDay);
   const empty = IMP.days.length - importDayCount(), missingDose = IMP.days.flatMap(d => d.items).filter(it => it._needsDose).length;
-  const message = empty ? `Заполни или удали пустые дни: ${empty}.` : missingDose ? `Не прочитались подходы и повторы: ${missingDose}. Нажми на названия и проверь значения.` : !readyImport() ? IMP.expectedDays === 'auto' ? 'Сначала подтверди число дней выше.' : `Нужно ${IMP.expectedDays} ${plural(+IMP.expectedDays, 'день', 'дня', 'дней')}, сейчас заполнено ${importDayCount()}. Расставь границы или перенеси упражнения.` : `${importDayCount()} ${plural(importDayCount(), 'день', 'дня', 'дней')} · ${n} ${plural(n, 'упражнение', 'упражнения', 'упражнений')} — готово к сохранению`;
-  f.innerHTML = `<div class="import-save"><span class="hint" role="status">${message}</span><div class="row"><button class="btn" data-act="close">Закрыть</button><button class="btn primary" data-act="imp-save" ${readyImport() ? '' : 'disabled'}>${IMP.existing ? 'Сохранить исправления' : !S.program.days.length ? 'Сохранить программу' : IMP.dest === 'replace' ? 'Заменить программу' : into ? 'Дописать в день' : 'Добавить в программу'}</button></div></div>`;
+  const message = empty ? `Заполни или удали пустые дни: ${empty}.` : missingDose ? `Не прочитались подходы и повторы: ${missingDose}. Нажми на названия и проверь значения.` : !readyImport() ?  `Нужно ${IMP.expectedDays} ${plural(+IMP.expectedDays, 'день', 'дня', 'дней')}, сейчас заполнено ${importDayCount()}. Расставь границы или перенеси упражнения.` : `${importDayCount()} ${plural(importDayCount(), 'день', 'дня', 'дней')} · ${n} ${plural(n, 'упражнение', 'упражнения', 'упражнений')} — готово к сохранению`;
+  f.innerHTML = `<div class="import-save"><span class="hint" role="status">${message}</span><div class="row"><button class="btn primary" data-act="imp-save" ${readyImport() ? '' : 'disabled'}>${IMP.existing ? 'Сохранить исправления' : !S.program.days.length ? 'Сохранить программу' : IMP.dest === 'replace' ? 'Заменить программу' : into ? 'Дописать в день' : 'Добавить в программу'} · ${importDayCount()} ${plural(importDayCount(), 'день', 'дня', 'дней')}</button></div></div>`;
 }
 function addPhotos(files) {
   [...files].filter(f => f.type.startsWith('image/')).forEach(f => IMP.photos.push({url: URL.createObjectURL(f), name: f.name}));
