@@ -78,6 +78,42 @@
 .toolbar{display:flex;gap:8px;flex-wrap:wrap}
 .toolbar .btn{flex:1}
 
+/* Program library -> day overview -> deliberate editing. */
+.program-count{margin:0}
+.program-list{display:grid;gap:12px}
+.program-card{display:flex;align-items:center;gap:14px;text-align:left;padding:20px;min-height:100px;width:100%;color:var(--ink)}
+.program-card-symbol{display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex:none;border-radius:14px;background:var(--accent-soft);color:var(--accent)}
+.program-card-symbol svg{width:24px;height:24px}
+.program-card-title{display:block;font-size:18px;line-height:1.35;overflow-wrap:anywhere}
+.program-card-meta{display:block;font-size:13px;color:var(--muted);margin-top:5px;line-height:1.5}
+.program-card-arrow{display:flex;flex:none;color:var(--muted)}
+.program-card-arrow svg{width:20px;height:20px}
+.program-add{align-self:stretch}
+.program-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.program-back{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:14px;font-weight:600;min-height:48px;text-align:left}
+.program-back svg{width:20px;height:20px;flex:none}
+.program-edit-note{margin:0;padding:12px 14px;border-radius:14px;background:var(--accent-soft);font-size:13px;line-height:1.55}
+.day-t{display:flex;align-items:center;gap:12px}
+.day-t .day-heading{flex:1;min-width:0;display:block}
+.day-t .day-number{display:block;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);margin-bottom:5px}
+.day-t .day-count{display:block;margin-top:5px}
+.day-t .day-chevron{display:flex;align-items:center;flex:none;width:20px;height:20px;color:var(--muted);transition:transform .15s ease}
+.day-chevron svg{width:20px;height:20px}
+.day:not(.closed) .day-chevron{transform:rotate(90deg)}
+.days.is-reading .day-h{padding:0}
+.days.is-reading .day-t{padding:18px;min-height:88px}
+.days.is-reading .day-t b{font-size:18px}
+.days.is-reading .ex{gap:12px;padding:10px 16px;min-height:74px}
+.ex-number{flex:none;align-self:flex-start;width:26px;text-align:center;line-height:34px;font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.days .ex-m .dz{display:flex;flex-wrap:wrap;line-height:1.5}
+.day-content{border-radius:0 0 var(--r) var(--r);overflow:hidden}
+.day.closed .day-content,.day.compact .day-content{display:none}
+.day-h .title-input{min-width:0;flex:1}
+.days.is-editing .day{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.top h1{min-width:0;overflow-wrap:anywhere}
+@media(min-width:900px){.program-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){.day-chevron{transition:none}}
+
 /* sheet */
 .sheet-wrap{position:fixed;inset:0;z-index:60;background:var(--shade);display:flex;align-items:flex-end;justify-content:center;animation:fade .15s}
 @keyframes fade{from{opacity:0}}

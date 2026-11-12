@@ -1,40 +1,65 @@
 'use strict';
 /* ---------- program ---------- */
+/* Navigation and editing permission are temporary: a reload always opens the library in view mode. */
+let programViewId = null, programEditing = false;
+function programIsOpen() { return S.tab === 'program' && !!programViewId && programViewId === S.program.id; }
+function programEditable() { return programIsOpen() && programEditing; }
+function resetProgramScreen() {
+  if (drag) { drag.ghost.remove(); drag.el.classList.remove('placeholder'); drag = null; }
+  const toastRoot = $('#toast-root');
+  if (toastRoot?.querySelector?.('[data-act="undo"]')) toastRoot.innerHTML = '';
+  programViewId = null; programEditing = false; S.renaming = null; undoSnap = null;
+}
+function setProgramScreen(id, editing = false) {
+  programViewId = id; programEditing = editing; S.renaming = null; S.open = {};
+  if (editing && S.program.days[0]) S.open[S.program.days[0].id] = true;
+}
+function editProgram() {
+  if (!programIsOpen()) return;
+  programEditing = true;
+  if (!S.program.days.some(d => S.open[d.id] === true) && S.program.days[0]) S.open[S.program.days[0].id] = true;
+  closeSheet(); render();
+}
+function programSummary(p) {
+  const n = p.days.reduce((a, d) => a + d.items.length, 0);
+  return `${p.days.length} ${plural(p.days.length, 'день', 'дня', 'дней')} · ${n} ${plural(n, 'упражнение', 'упражнения', 'упражнений')}`;
+}
 function viewProgram() {
   const library = libraryPrograms();
-  const P = S.program, n = P.days.reduce((a, d) => a + d.items.length, 0);
-  const selector = library.length ? `<section class="card pad program-library"><div class="row"><div class="field grow"><label for="program-select">Мои программы · ${library.length} из 5</label><select class="input" id="program-select">${library.map(p => `<option value="${esc(p.id)}" ${p.id === P.id ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select></div><button class="icon-btn" data-act="program-add" aria-label="Добавить программу" ${library.length >= 5 ? 'disabled' : ''}>${I.plus}</button></div><p class="hint">${P.by === 'wish' ? 'Рекомендована ИИ' : P.by === 'manual' ? 'Создана вручную' : 'Своя программа'} · название можно изменить в меню ⋯</p></section>` : '';
-  const more=`<button class="icon-btn" data-act="program-menu" aria-label="Ещё о программе">${DOTS}</button>`;
-  if (!P.days.length) return ['Программа', `${selector}
-    <section class="empty-card"><h2>${P.id ? 'Добавь дни в программу' : 'Твои программы'}</h2><p class="hint" style="margin:0">${P.id ? 'Создай первый тренировочный день и добавь упражнения.' : 'До пяти программ: рекомендации ИИ, своя по фото или тексту, программа с нуля.'}</p>
-      <button class="btn primary" data-act="${P.id ? 'day-add' : 'program-add'}">${I.plus}${P.id ? 'Добавить день' : 'Добавить программу'}</button>
-      </section>`,more];
-  return ['Программа', `
-    ${selector}
+  if (!programIsOpen() || !library.some(p => p.id === programViewId)) {
+    resetProgramScreen();
+    if (!library.length) return ['Программы', `<section class="empty-card"><h2>Твои программы</h2><p class="hint" style="margin:0">Добавь свою по фото или тексту, создай вручную или подбери с тренером.</p><button class="btn primary" data-act="program-add">${I.plus}Добавить программу</button></section>`];
+    return ['Программы', `<p class="hint program-count">Мои программы · ${library.length} из 5</p>
+      <div class="program-list" aria-label="Мои программы">${library.map(p => `<button class="card program-card" data-act="program-open" data-v="${esc(p.id)}"><span class="program-card-symbol">${p.by === 'wish' ? I.spark : I.program}</span><span class="grow"><b class="program-card-title">${esc(p.title)}</b><span class="program-card-meta">${programSummary(p)}</span></span><span class="program-card-arrow">${CHEV}</span></button>`).join('')}</div>
+      <button class="btn primary program-add" data-act="program-add" ${library.length >= 5 ? 'disabled' : ''}>${I.plus}Добавить программу</button>
+      ${library.length >= 5 ? '<p class="hint program-count">Можно хранить до пяти программ. Управление каждой — внутри, в режиме редактирования.</p>' : ''}`];
+  }
+  const P = S.program, editing = programEditable();
+  const more = editing ? `<button class="icon-btn" data-act="program-menu" aria-label="Настройки программы">${DOTS}</button>` : '';
+  return [P.title, `<div class="program-nav"><button class="program-back" data-act="program-back">${I.back}<span>Все программы</span></button><button class="btn sm ${editing ? 'primary' : ''}" data-act="${editing ? 'program-done' : 'program-edit'}">${editing ? 'Готово' : 'Редактировать'}</button></div>
+    <p class="hint program-count">${P.by === 'wish' ? 'Рекомендована ИИ' : P.by === 'manual' ? 'Создана вручную' : 'Своя программа'} · ${programSummary(P)}</p>
+    ${editing ? '<p class="program-edit-note">Редактирование: нажми на упражнение, чтобы изменить нагрузку. Для перестановки используй маркеры слева.</p>' : ''}
     ${P.coachNotes && P.coachNotes.length ? `<details class="card pad"><summary>Заметки из программы</summary>${P.coachNotes.map(note => `<p class="hint">${esc(note)}</p>`).join('')}</details>` : ''}
-    <p class="hint" style="margin:0">${P.days.length} ${plural(P.days.length, 'день', 'дня', 'дней')} · ${n} ${plural(n, 'упражнение', 'упражнения', 'упражнений')}. Держи за <span style="display:inline-flex;width:14px;vertical-align:-2px">${GRIP}</span> и перетаскивай — дни и упражнения меняются местами, упражнение можно перенести в другой день.</p>
-    <div class="days" id="days">${P.days.map(dayCard).join('')}</div>
-    <button class="btn" data-act="day-add">${I.plus}Добавить день</button>`,more];
+    ${P.days.length ? `<div class="days ${editing ? 'is-editing' : 'is-reading'}" id="days">${P.days.map((d, index) => dayCard(d, index, editing)).join('')}</div>` : '<section class="empty-card"><h2>Дни пока не добавлены</h2><p class="hint">В режиме редактирования можно создать первый день и добавить упражнения.</p></section>'}
+    ${editing ? `<button class="btn" data-act="day-add">${I.plus}Добавить день</button>` : ''}`,more];
 }
 function programMenu() {
-  sheet('Программа',`<div class="menu">
+  if (!programEditable()) return;
+  sheet('Настройки программы',`<div class="menu">
     ${S.program.id ? mi('program-rename',S.program.id,I.edit,'Переименовать программу') : ''}
-    ${mi('program-add','',I.plus,'Добавить другую программу',libraryPrograms().length >= 5 ? 'disabled' : '')}
-    ${mi('import','',I.photo,'Добавить по фото или тексту')}
     ${mi('day-add','',I.plus,'Добавить день вручную')}
     ${S.program.days.length ? mi('program-organize','',I.sliders,'Изменить распределение по дням') : ''}
-    ${mi('wish','',I.spark,'Подобрать с тренером')}
     ${S.program.id ? mi('program-delete',S.program.id,I.trash,'Удалить программу','class="danger"') : ''}
   </div>`);
 }
 function programAddSheet() {
-  if (libraryPrograms().length >= 5) return toast('У тебя уже пять программ. Можно переименовать или удалить ненужную в меню ⋯');
+  if (libraryPrograms().length >= 5) return toast('У тебя уже пять программ. Открой ненужную: «Редактировать» → ⋯ → «Удалить программу»');
   sheet('Добавить программу', `<div class="menu">${mi('wish','',I.spark,'Рекомендованная ИИ')}${mi('program-import','',I.photo,'Загрузить по фото или тексту')}${mi('program-manual','',I.plus,'Создать вручную')}</div><p class="hint">Текущая программа останется в библиотеке.</p>`);
 }
 function selectProgram(id) {
   const p = programById(id); if (!p) return;
-  S.program = p; S.next = p.next || p.days[0]?.id || null; S.renaming = null; S.open = {}; undoSnap = null;
-  render();
+  resetProgramScreen(); S.program = p; S.next = p.next || p.days[0]?.id || null; setProgramScreen(id);
+  render(); window.scrollTo({top:0});
 }
 function renameProgramSheet(id) {
   const p = programById(id); if (!p) return;
@@ -45,22 +70,23 @@ function deleteProgram(id) {
   if (S.workout?.programId === id) return toast('Сначала заверши тренировку из этой программы');
   sheet('Удалить программу?', `<p>«${esc(p.title)}» исчезнет из списка. Выполненные тренировки останутся в дневнике.</p>`, `<button class="btn" data-act="close">Отмена</button><button class="btn danger" data-act="program-delete-confirm" data-v="${esc(id)}">Удалить программу</button>`);
 }
-function dayCard(d) {
-  const closed = S.open[d.id] === false, editing = S.renaming === d.id;
-  const title = editing ? `<input class="title-input" id="rename" data-day="${d.id}" value="${esc(d.title)}" maxlength="50" aria-label="название дня">`
-    : `<button class="day-t" data-act="day-toggle" data-v="${d.id}" aria-expanded="${!closed}"><b>${esc(d.title)}</b><span>${d.items.length} ${plural(d.items.length, 'упражнение', 'упражнения', 'упражнений')}${d.id === S.next ? ' · <span class="badge next">следующая</span>' : ''}</span></button>`;
+function dayCard(d, index = 0, editable = programEditable()) {
+  const closed = S.open[d.id] !== true, renaming = editable && S.renaming === d.id;
+  const name = d.title.replace(/^День\s+\d+(?:\s*[·:\-–—]\s*|\s*$)/i, '').trim();
+  const title = renaming ? `<input class="title-input" id="rename" data-day="${esc(d.id)}" value="${esc(d.title)}" maxlength="50" aria-label="название дня">`
+    : `<button class="day-t" data-act="day-toggle" data-v="${esc(d.id)}" aria-expanded="${!closed}" aria-controls="program-day-${esc(d.id)}"><span class="day-heading">${name ? `<span class="day-number">День ${index + 1}</span>` : ''}<b>${esc(name || `День ${index + 1}`)}</b><span class="day-count">${d.items.length} ${plural(d.items.length, 'упражнение', 'упражнения', 'упражнений')}</span></span><span class="day-chevron" aria-hidden="true">${CHEV}</span></button>`;
   const labs = blockLabels(d.items);
   const items = d.items.map((it, i) => { const g = it.ss, first = g && (!d.items[i - 1] || d.items[i - 1].ss !== g), last = g && (!d.items[i + 1] || d.items[i + 1].ss !== g); return `
     ${first ? `<div class="ss-h">Суперсет ${labs[i]}–${labs[groupOf(d.items, i).slice(-1)[0]]} · по очереди, отдых после круга</div>` : ''}
-    <div class="ex ${g ? 'ss' : ''} ${first ? 'ss-first' : ''} ${last ? 'ss-last' : ''}" data-item="${it.id}">
-      <span class="grip" data-drag="item" aria-label="перетащить">${GRIP}</span>
-      <button class="ex-m" data-act="ex-dose" data-v="${d.id}:${it.id}"><b>${g ? `<span class="ssl">${labs[i]}</span>` : ''}${esc(it.name)}</b><span class="dz"><u>${dose(it)}${it.w ? ' · ' + fmt(it.w) + ' кг' : ''}</u>${it.cam ? '<span class="badge cam">камера</span>' : ''}</span>${it.coachNotes && it.coachNotes.length ? `<span class="ex-coach-note">Заметка тренера: ${it.coachNotes.map(esc).join(' · ')}</span>` : ''}</button>
-      <button class="icon-btn" data-act="ex-menu" data-v="${d.id}:${it.id}" aria-label="действия">${DOTS}</button>
+    <div class="ex ${g ? 'ss' : ''} ${first ? 'ss-first' : ''} ${last ? 'ss-last' : ''}" data-item="${esc(it.id)}" role="listitem">
+      ${editable ? `<span class="grip" data-drag="item" aria-label="перетащить">${GRIP}</span>` : `<span class="ex-number" aria-hidden="true">${labs[i]}</span>`}
+      <${editable ? 'button' : 'div'} class="ex-m" ${editable ? `data-act="ex-dose" data-v="${esc(d.id)}:${esc(it.id)}"` : ''}><b>${editable && g ? `<span class="ssl">${labs[i]}</span>` : ''}${esc(it.name)}</b><span class="dz">${editable ? '<u>' : ''}${dose(it)}${it.w ? ' · ' + fmt(it.w) + ' кг' : ''}${editable ? '</u>' : ''}</span>${it.coachNotes && it.coachNotes.length ? `<span class="ex-coach-note">Заметка тренера: ${it.coachNotes.map(esc).join(' · ')}</span>` : ''}</${editable ? 'button' : 'div'}>
+      ${editable ? `<button class="icon-btn" data-act="ex-menu" data-v="${esc(d.id)}:${esc(it.id)}" aria-label="Действия с упражнением ${esc(it.name)}">${DOTS}</button>` : ''}
     </div>`; }).join('');
-  return `<section class="day ${closed ? 'closed' : ''} ${S.flash === d.id ? 'flash' : ''}" data-day="${d.id}">
-    <div class="day-h"><span class="grip" data-drag="day" aria-label="перетащить день">${GRIP}</span>${title}<button class="icon-btn" data-act="day-menu" data-v="${d.id}" aria-label="действия с днём">${DOTS}</button></div>
-    <div class="ex-list">${items || '<div class="hint" style="padding:12px 14px">Пусто — добавь упражнения или перетащи сюда</div>'}</div>
-    <div class="day-f"><button class="btn sm" data-act="cat" data-v="${d.id}">${I.plus}Упражнение</button></div>
+  return `<section class="day ${closed ? 'closed' : ''} ${S.flash === d.id ? 'flash' : ''}" data-day="${esc(d.id)}">
+    <div class="day-h">${editable ? `<span class="grip" data-drag="day" aria-label="перетащить день">${GRIP}</span>` : ''}${title}${editable ? `<button class="icon-btn" data-act="day-menu" data-v="${esc(d.id)}" aria-label="Действия с днём ${index + 1}">${DOTS}</button>` : ''}</div>
+    <div class="day-content" id="program-day-${esc(d.id)}"><div class="ex-list" role="list" aria-label="Упражнения дня ${index + 1}">${items || `<div class="hint" style="padding:12px 14px">${editable ? 'Добавь упражнения в этот день.' : 'Пока нет упражнений.'}</div>`}</div>
+    ${editable ? `<div class="day-f"><button class="btn sm" data-act="cat" data-v="${esc(d.id)}">${I.plus}Упражнение</button></div>` : ''}</div>
   </section>`;
 }
 let undoSnap = null;
@@ -145,6 +171,7 @@ function catAdd(key, own, btn) {
     }
     W.items.push(wi); W.active = W.items.length - 1; closeSheet(); render(); toast(`«${wi.name}» добавлено на сегодня`); return;
   }
+  if (!programEditable()) return;
   const d = dayById(C.dayId);
   snap();
   if (C.swapId) {
@@ -162,7 +189,7 @@ function catAdd(key, own, btn) {
 let drag = null;
 document.addEventListener('pointerdown', e => {
   const h = e.target.closest('[data-drag]');
-  if (!h || e.button > 0) return;
+  if (!h || e.button > 0 || !programEditable()) return;
   e.preventDefault();
   const kind = h.dataset.drag;
   if (kind === 'day') $$('#days .day').forEach(x => x.classList.add('compact'));
@@ -170,10 +197,14 @@ document.addEventListener('pointerdown', e => {
   ghost.classList.add('drag-ghost'); ghost.classList.remove('flash');
   Object.assign(ghost.style, {width: r.width + 'px', left: r.left + 'px', top: r.top + 'px'});
   document.body.appendChild(ghost); el.classList.add('placeholder');
-  drag = {kind, el, ghost, dx:e.clientX-r.left,dy: e.clientY - r.top, x:e.clientX,y:e.clientY, from: el.closest('.day').dataset.day, moved: false};
-  snap(); requestAnimationFrame(autoScroll);
+  drag = {kind, el, ghost, dx:e.clientX-r.left,dy: e.clientY - r.top, x:e.clientX,y:e.clientY, startX:e.clientX,startY:e.clientY,programId:S.program.id, from: el.closest('.day').dataset.day, moved: false};
 });
-document.addEventListener('pointermove', e => { if (!drag) return; e.preventDefault(); drag.x=e.clientX;drag.y = e.clientY; drag.moved = true; dragTo(); }, {passive: false});
+document.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (!programEditable() || drag.programId !== S.program.id) return cancelDrag();
+  if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < 8) return;
+  e.preventDefault(); if (!drag.moved) { snap(); requestAnimationFrame(autoScroll); } drag.x=e.clientX;drag.y=e.clientY;drag.moved=true;dragTo();
+}, {passive: false});
 function dragTo() {
   const {ghost, kind, el} = drag;
   ghost.style.top = (drag.y - drag.dy) + 'px';
@@ -195,7 +226,7 @@ function dragTo() {
   $$('.hint', list).forEach(x => x.remove());
 }
 function autoScroll() {
-  if (!drag) return;
+  if (!drag || !drag.moved) return;
   const edge = 90, vh = innerHeight;
   if (drag.y < edge) { scrollBy(0, -Math.ceil((edge - drag.y) / 6)); dragTo(); }
   else if (drag.y > vh - edge - 64) { scrollBy(0, Math.ceil((drag.y - (vh - edge - 64)) / 6)); dragTo(); }
@@ -203,6 +234,7 @@ function autoScroll() {
 }
 function endDrag() {
   if (!drag) return;
+  if (!programEditable() || drag.programId !== S.program.id) return cancelDrag();
   const {kind, el, ghost, from} = drag;
   ghost.remove(); el.classList.remove('placeholder');
   const moved = drag.moved; drag = null;

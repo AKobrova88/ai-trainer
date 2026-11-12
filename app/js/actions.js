@@ -24,11 +24,12 @@ function useProgram(days, profile, tab, meta = {}) {
   if (profile) { const {found, ...values} = profile; S.profile = {...blankProfile(), ...values, filled:true}; S.wishRulesStamp = wishProfileStamp(S.profile); }
   if (!save()) { S = original; toast('Не удалось сохранить программу — освободи место и повтори.'); return false; }
   undoSnap = null;
+  if (tab === 'program') setProgramScreen(p.id, by === 'manual'); else resetProgramScreen();
   return true;
 }
 const A = {
   /* shell */
-  tab: v => { if (v !== 'profile') stopProfileVoice(); S.tab = v === 'today' && !S.workout ? 'diary' : v; render(); window.scrollTo({top: 0}); },
+  tab: v => { if (v !== 'profile') stopProfileVoice(); resetProgramScreen(); S.tab = v === 'today' && !S.workout ? 'diary' : v; render(); window.scrollTo({top: 0}); },
   'voice-preview': () => previewProfileVoice(),
   'diary-today': () => { selectDiaryDate(); S.tab = 'diary'; render(); window.scrollTo({top:0}); },
   'resume-workout': () => { if (!S.workout) return; closeSheet(); S.tab = 'today'; render(); window.scrollTo({top:0}); },
@@ -209,6 +210,10 @@ const A = {
   'rest-skip': () => { S.rest = null; renderRest(); save(); },
 
   /* program library */
+  'program-open': v => selectProgram(v),
+  'program-back': () => { resetProgramScreen(); render(); window.scrollTo({top:0}); },
+  'program-edit': () => editProgram(),
+  'program-done': () => { if (!programIsOpen()) return; programEditing = false; S.renaming = null; if (drag) { drag.ghost.remove(); drag.el.classList.remove('placeholder'); drag = null; } render(); },
   'program-add': () => programAddSheet(),
   'program-import': () => { if (libraryPrograms().length >= 5) return toast('У тебя уже пять программ'); importSheet(true); },
   'program-manual': () => { if (!useProgram([{id:nid('d'), title:'День 1', items:[]}], null, 'program', {by:'manual'})) return; closeSheet(); render(); },
@@ -231,14 +236,14 @@ const A = {
   },
 
   /* program */
-  'day-toggle': v => { S.open[v] = S.open[v] === false; render(); },
+  'day-toggle': v => { S.open[v] = S.open[v] !== true; render(); },
   'day-menu': v => dayMenu(v),
   'day-rename': v => { closeSheet(); S.renaming = v; S.open[v] = true; render(); const i = $('#rename'); if (i) { i.focus(); i.select(); } },
   'day-move': v => { const [id, d] = v.split(':'), a = S.program.days, i = a.findIndex(x => x.id === id), j = i + (+d); if (j < 0 || j >= a.length) return; snap(); [a[i], a[j]] = [a[j], a[i]]; renumber(); closeSheet(); S.flash = id; render(); S.flash = null; toast(`«${dayById(id).title}» теперь день ${j + 1}`, true); },
   'day-next': v => { S.next = v; S.pick = null; closeSheet(); render(); toast(`Следующая тренировка — «${dayById(v).title}»`); },
   'day-dup': v => { snap(); const d = dayById(v), c = JSON.parse(JSON.stringify(d)); c.id = nid('d'); c.title = d.title + ' (копия)'; c.items.forEach(i => { i.id = nid('i'); }); S.program.days.splice(S.program.days.indexOf(d) + 1, 0, c); renumber(); closeSheet(); S.flash = c.id; render(); S.flash = null; toast('День скопирован', true); },
   'day-del': v => { snap(); const a = S.program.days, d = dayById(v); a.splice(a.indexOf(d), 1); if (S.next === v) S.next = a[0] ? a[0].id : null; if (S.pick === v) S.pick = null; renumber(); closeSheet(); render(); toast(`«${d.title}» удалён`, true); },
-  'day-add': () => { snap(); const d = {id: nid('d'), title: `День ${S.program.days.length + 1}`, items: []}; S.program.days.push(d); if (!S.next) S.next = d.id; S.stage = 'app'; S.tab = 'program'; S.renaming = d.id; render(); const i = $('#rename'); if (i) { i.focus(); i.select(); i.scrollIntoView({block: 'center'}); } },
+  'day-add': () => { snap(); const d = {id: nid('d'), title: `День ${S.program.days.length + 1}`, items: []}; S.program.days.push(d); if (!S.next) S.next = d.id; S.stage = 'app'; S.tab = 'program'; S.open[d.id] = true; S.renaming = d.id; render(); const i = $('#rename'); if (i) { i.focus(); i.select(); i.scrollIntoView({block: 'center'}); } },
   'ex-menu': v => { const [d, i] = v.split(':'); exMenu(d, i); },
   'ex-dose': v => { const [d, i] = v.split(':'); doseSheet(d, i); },
   'ex-del': v => { const [d, i] = v.split(':'), [day, idx, it] = findItem(d, i); snap(); day.items.splice(idx, 1); closeSheet(); render(); toast(`«${it.name}» убрано`, true); },
@@ -424,6 +429,14 @@ const A = {
   },
 };
 
+/* Stale buttons or delayed pointer events cannot edit a program after leaving its editor. */
+for (const action of ['program-rename', 'program-rename-save', 'program-delete', 'program-delete-confirm', 'program-organize',
+  'day-menu', 'day-rename', 'day-move', 'day-next', 'day-dup', 'day-del', 'day-add',
+  'ex-menu', 'ex-dose', 'ex-del', 'ss-join', 'ss-split', 'ex-move', 'ex-moveto', 'ex-swap', 'dz-adj', 'dz-rest', 'dz-save', 'cat']) {
+  const edit = A[action];
+  A[action] = (...args) => programEditable() ? edit(...args) : toast('Сначала нажми «Редактировать» в программе');
+}
+
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true') return;
@@ -456,14 +469,13 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'profile-voice') saveProfileVoice({voiceId:t.value});
   if (t.id === 'profile-voice-rate') saveProfileVoice({rate:Number(t.value)});
-  if (t.id === 'program-select') selectProgram(t.value);
   if (t.id === 'diary-program') { S.diaryProgram = t.value; S.diaryPick = null; render(); }
   if(t.id==='cameraFileInput'){const file=t.files?.[0];t.value='';openCameraVideo(file);}
   if (t.id === 'restore-file' && t.files && t.files[0]) { restoreFile(t.files[0]); t.value = ''; }
 });
 document.addEventListener('focusout', e => {
   const t = e.target;
-  if (t.id === 'rename') { const d = dayById(t.dataset.day); if (d) d.title = t.value.trim() || d.title; S.renaming = null; setTimeout(render, 0); }
+  if (t.id === 'rename' && programEditable()) { const d = dayById(t.dataset.day); if (d) d.title = t.value.trim() || d.title; S.renaming = null; setTimeout(render, 0); }
 });
 document.addEventListener('keydown', e => {
   const id = e.target.id;
@@ -477,6 +489,9 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && id === 'rename') e.target.blur();
   if (e.key === 'Enter' && id === 'reg-email') A['reg-go']();
   if (e.key === 'Enter' && id === 'promo') A['promo-go']();
-  if (e.key === 'Escape' && $('#sheets').children.length) closeTop();
+  if (e.key === 'Escape') {
+    if ($('#sheets').children.length) closeTop();
+    else if (programIsOpen()) { e.preventDefault(); programEditable() ? A['program-done']() : A['program-back'](); }
+  }
 });
 

@@ -8,6 +8,7 @@ function render() {
   normalizeLibrary(S);
   if (S.tab === 'camera') S.tab = 'today';
   if (S.tab === 'today' && !S.workout) S.tab = 'diary';
+  if (S.tab !== 'program' || S.stage !== 'app') resetProgramScreen();
   applyTheme();
   const camOf = it => { if (it.base && CAT[it.base]) it.cam = CAT[it.base].cam; };   // the camera learns new exercises: old programs follow
   for (const p of S.programs) for (const d of p.days) { normSS(d.items); d.items.forEach(camOf); }

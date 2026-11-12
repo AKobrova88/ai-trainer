@@ -21,8 +21,8 @@ const TG = (() => {
     const W = app(); if (!W) return;
     const back = W.BackButton;
     if (back) {
-      if (!backBound) { backBound = true; back.onClick(() => { if (typeof sheetTop === 'function' && sheetTop()) closeTop(); else if (S.stage === 'app' && S.tab === 'today') A['diary-today'](); }); }
-      const need = !!(($('#sheets') || {}).children || []).length || (S.stage === 'app' && S.tab === 'today');
+      if (!backBound) { backBound = true; back.onClick(() => { if (typeof sheetTop === 'function' && sheetTop()) closeTop(); else if (S.stage === 'app' && S.tab === 'today') A['diary-today'](); else if (typeof programIsOpen === 'function' && programIsOpen()) A['program-back'](); }); }
+      const need = !!(($('#sheets') || {}).children || []).length || (S.stage === 'app' && S.tab === 'today') || (typeof programIsOpen === 'function' && programIsOpen());
       try { need ? back.show() : back.hide(); } catch (e) { /* older Telegram */ }
     }
     call(S.workout ? 'enableClosingConfirmation' : 'disableClosingConfirmation');   // a workout in progress: ask before closing

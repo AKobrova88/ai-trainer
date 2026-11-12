@@ -30,7 +30,7 @@ const Startup = (() => {
     const boot=scripts.find(s=>/\/(?:core\/config|cam\/js\/main)\.js(?:\?|$)/.test(s.src));
     const current=boot && new URL(boot.src).searchParams.get('v');
     if(!/^\d+\.\d+\.\d+$/.test(current || ''))return;
-    const pending=()=>!!document.activeElement?.matches?.('input,textarea,[contenteditable="true"]') || !!document.querySelector('dialog[open]') || typeof state!=='undefined' && (state.on || state.cameraRequest || state.file || state.sets?.length || typeof Rec!=='undefined' && (Rec.mr || Rec.pending.size)) || typeof S!=='undefined' && (S.wiz || S.renaming || (typeof IMP!=='undefined' && IMP) || document.querySelector('#sheets>.sheet-wrap'));
+    const pending=()=>!!document.activeElement?.matches?.('input,textarea,[contenteditable="true"]') || !!document.querySelector('dialog[open]') || typeof state!=='undefined' && (state.on || state.cameraRequest || state.file || state.sets?.length || typeof Rec!=='undefined' && (Rec.mr || Rec.pending.size)) || typeof S!=='undefined' && (S.wiz || S.renaming || (typeof programEditable==='function' && programEditable()) || (typeof IMP!=='undefined' && IMP) || document.querySelector('#sheets>.sheet-wrap'));
     if(pending())return;
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5000);
     try {
