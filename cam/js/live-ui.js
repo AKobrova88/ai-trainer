@@ -138,7 +138,7 @@ function renderLive() {
     ? '2D-режим: модель не вернула 3D-точки. Для этого упражнения нужен ракурс ' + viewWord() + '.'
     : '3D-анализ на устройстве. Оценка предварительная; скрытые суставы не проверены.';
   const analysisInfo = $('#analysisInfo');
-  const versionedAnalysis = 'Версия 2.9.0 · ' + analysisText;
+  const versionedAnalysis = 'Версия 2.9.1 · ' + analysisText;
   if (analysisInfo.textContent !== versionedAnalysis) analysisInfo.textContent = versionedAnalysis;
   el.hud.hidden = !state.on || !!state.recOnly || state.preflight;
   if (snap) {
@@ -204,8 +204,5 @@ function beginPreparedSet(countOnly = false) {
   state.flash = {cls:'info', text:'Начинаю отсчёт' + (state.fallback || isFree() ? ' · без оценки техники' : ''), until:performance.now()+2600};
   lastStatus = ''; lastStatusSay = performance.now(); renderMain(); renderLive();
 }
-$('#voiceSel').addEventListener('change', e => { Voice.cancel(); store.set(VOICE_KEY, e.target.value); pickVoice(); });
-$('#voiceRate').addEventListener('change', e => { Voice.rate = pickOpt(Number(e.target.value), [.85,1,1.15], 1); store.set('aitrainer.voice-rate', Voice.rate); });
 $('#coachMode').addEventListener('change', e => { Coaching.mode = pickOpt(e.target.value, ['calm','every','summary'], 'calm'); store.set('aitrainer.coach-mode',Coaching.mode); renderCoachMode(); });
-$('#voiceTest').addEventListener('click', () => { const was = Voice.on; Voice.on = true; Voice.say('Замри на секунду. Начинаю отсчёт. Записано двенадцать повторов.', 'test', true); Voice.on = was; });
 

@@ -49,6 +49,7 @@ function viewProfile() {
   const row = (label, val, act = 'wish') => `<button class="prow" data-act="${act}"><span>${label}</span><span class="val">${val || '—'}</span><span style="width:18px;flex:none;color:var(--muted)">${CHEV}</span></button>`;
   const th = (k, name, sub, cols) => `<button class="th ${k}" data-act="theme" data-v="${k}" aria-pressed="${S.theme === k}"><span class="mini" aria-hidden="true">${cols.map((c, i) => `<i style="background:${c};width:${[70, 100, 55][i]}%"></i>`).join('')}</span><b>${S.theme === k ? '✓ ' : ''}${name}</b><small>${sub}</small></button>`;
   return ['Личный кабинет', `
+    ${profileVoiceCard()}
     ${subCard()}
     ${addonCards()}
     <button class="card pad help-card" data-act="support"><span class="hc-ico">${I.tg}</span><span><b>Поддержка</b><small>Что-то не работает или непонятно — напиши, ответим в Telegram</small></span><span style="width:18px;flex:none;color:var(--muted)">${CHEV}</span></button>
@@ -79,6 +80,62 @@ function viewProfile() {
     ${S.demo ? '<button class="btn ghost" data-act="demo-off">Убрать пример и начать со своей программы</button>' : '<button class="btn ghost" data-act="demo">Показать на примере программы и дневника</button>'}
     <p class="hint" style="text-align:center">ИИ Тренер · версия ${APP_VERSION}</p>`];
 }
+function profileVoiceOptions() {
+  const prefs = VoicePrefs.resolve(S.voiceSettings), voices = VoicePrefs.systemVoices();
+  const options = [['remote:anna','Анна · женский'],['remote:aleksandr','Александр · мужской'], ...voices.map(v => [v.voiceURI || v.name, v.name + ' · устройство'])];
+  if (!options.some(([id]) => id === prefs.voiceId)) options.push([prefs.voiceId,'Сохранённый голос устройства']);
+  return options.map(([id,name]) => `<option value="${esc(id)}" ${id === prefs.voiceId ? 'selected' : ''}>${esc(name)}</option>`).join('');
+}
+function profileVoiceCard() {
+  const prefs = VoicePrefs.resolve(S.voiceSettings);
+  return `<section class="card pad profile-voice" aria-labelledby="profile-voice-title"><h2 id="profile-voice-title">Голос тренера</h2><p class="hint">Один выбор для всех тренировок. Сохраняется сразу.</p>
+    <label class="eyebrow" for="profile-voice">Мужской или женский голос</label><div class="row"><select class="input grow" id="profile-voice">${profileVoiceOptions()}</select><button class="icon-btn voice-preview" id="profileVoicePreview" data-act="voice-preview" aria-label="Прослушать выбранный голос">${I.play}</button></div>
+    <p class="hint" id="voiceHelp" role="status">Анна и Александр — бесплатные онлайн-голоса. Для них нужен интернет.</p>
+    <details><summary>Темп речи</summary><label class="field" for="profile-voice-rate"><span class="hint">Во всех тренировках</span><select class="input" id="profile-voice-rate">${[[.85,'Медленнее'],[1,'Обычный'],[1.15,'Быстрее']].map(([v,name]) => `<option value="${v}" ${v === prefs.rate ? 'selected' : ''}>${name}</option>`).join('')}</select></label></details>
+  </section>`;
+}
+function saveProfileVoice(patch) {
+  stopProfileVoice();
+  const prefs = {...VoicePrefs.resolve(S.voiceSettings), ...patch};
+  if (!VoicePrefs.valid(prefs)) return;
+  const previous = S;
+  S = {...S, voiceSettings:prefs};
+  if (S.demoReturn) { try { const real = JSON.parse(S.demoReturn); real.voiceSettings = prefs; S.demoReturn = JSON.stringify(real); } catch (e) { /* keep the current demo */ } }
+  if (!save()) { S = previous; render(); return toast('Не удалось сохранить выбор голоса. Попробуй ещё раз.'); }
+  const status = $('#voiceHelp'); if (status) status.textContent = 'Сохранено для всех тренировок: ' + VoicePrefs.name(prefs.voiceId) + '.';
+}
+let profileVoiceGeneration = 0;
+function stopProfileVoice() {
+  profileVoiceGeneration++; RemoteVoice.cancel();
+  try { window.speechSynthesis?.cancel(); } catch (e) { /* no system voice */ }
+  const button = $('#profileVoicePreview');
+  if (button) { button.disabled = false; button.removeAttribute('aria-busy'); button.innerHTML = I.play; }
+}
+async function previewProfileVoice() {
+  stopProfileVoice();
+  const generation = profileVoiceGeneration, prefs = VoicePrefs.resolve(S.voiceSettings), button = $('#profileVoicePreview');
+  const text = russianSpeech('Замри на секунду. Начинаю отсчёт. Записано двенадцать повторов.');
+  if (button) { button.disabled = true; button.setAttribute('aria-busy','true'); button.textContent = '…'; }
+  try {
+    if (/^remote:(anna|aleksandr)$/.test(prefs.voiceId)) {
+      if (!RemoteVoice.available()) throw new Error('audio unavailable');
+      RemoteVoice.play(text, prefs.voiceId.split(':')[1], prefs.rate);
+      await RemoteVoice.chain;
+    } else {
+      const voice = VoicePrefs.systemVoices().find(v => (v.voiceURI || v.name) === prefs.voiceId);
+      if (!voice) throw new Error('voice unavailable');
+      const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'ru-RU'; utterance.rate = prefs.rate; utterance.voice = voice;
+      await new Promise((resolve,reject) => { const timer = setTimeout(resolve,15000); utterance.onend = () => { clearTimeout(timer); resolve(); }; utterance.onerror = () => { clearTimeout(timer); reject(new Error('speech failed')); }; window.speechSynthesis.speak(utterance); });
+    }
+  } catch (e) {
+    if (generation === profileVoiceGeneration) { const status = $('#voiceHelp'); if (status) status.textContent = 'Не удалось прослушать голос. Проверь интернет или выбери другой.'; }
+  } finally {
+    if (generation === profileVoiceGeneration && button) { button.disabled = false; button.removeAttribute('aria-busy'); button.innerHTML = I.play; }
+  }
+}
+if (window.speechSynthesis?.addEventListener) window.speechSynthesis.addEventListener('voiceschanged', () => {
+  const select = $('#profile-voice'); if (select && document.activeElement !== select) select.innerHTML = profileVoiceOptions();
+});
 /* support: for now through the Telegram bot (it passes the question on, the answer comes back there); later — straight to the server */
 const SUPPORT_BOT = 'ii_trener_ak_bot';
 const SUPPORT_URL = `https://t.me/${SUPPORT_BOT}?start=support`;

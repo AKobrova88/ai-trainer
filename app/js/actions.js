@@ -28,7 +28,8 @@ function useProgram(days, profile, tab, meta = {}) {
 }
 const A = {
   /* shell */
-  tab: v => { S.tab = v === 'today' && !S.workout ? 'diary' : v; render(); window.scrollTo({top: 0}); },
+  tab: v => { if (v !== 'profile') stopProfileVoice(); S.tab = v === 'today' && !S.workout ? 'diary' : v; render(); window.scrollTo({top: 0}); },
+  'voice-preview': () => previewProfileVoice(),
   'diary-today': () => { selectDiaryDate(); S.tab = 'diary'; render(); window.scrollTo({top:0}); },
   'resume-workout': () => { if (!S.workout) return; closeSheet(); S.tab = 'today'; render(); window.scrollTo({top:0}); },
   'plan-day': v => togglePlan(v),
@@ -453,6 +454,8 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.id === 'profile-voice') saveProfileVoice({voiceId:t.value});
+  if (t.id === 'profile-voice-rate') saveProfileVoice({rate:Number(t.value)});
   if (t.id === 'program-select') selectProgram(t.value);
   if (t.id === 'diary-program') { S.diaryProgram = t.value; S.diaryPick = null; render(); }
   if(t.id==='cameraFileInput'){const file=t.files?.[0];t.value='';openCameraVideo(file);}

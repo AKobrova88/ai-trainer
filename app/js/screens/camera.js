@@ -21,6 +21,7 @@ const workoutContext = W => W ? 'w' + hash(W.dayId || W.title || 'day') + '_' + 
 function camLink(it, mode = 'live', {standalone = false} = {}) {
   const u = new URL(CAM_URL), plan = standalone ? [] : camPlan();
   u.searchParams.set('rev', CAMERA_REV);
+  if (!SAME_SITE) { const voice = VoicePrefs.resolve(S.voiceSettings); u.searchParams.set('voice',voice.voiceId); u.searchParams.set('voiceRate',String(voice.rate)); }
   if (it) {
     const W = S.workout, pos = W ? W.items.findIndex(x => x === it || norm(x.name) === norm(it.name)) : -1, mine = plan.find(p => p[4] === pos);
     /* the camera knows technique for its own keys; anything else it still counts by name */

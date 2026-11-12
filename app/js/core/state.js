@@ -12,6 +12,7 @@ function fresh() {
 }
 /* S.program remains the editor's current program. The library owns all programs, by stable ID. */
 function normalizeLibrary(s) {
+  s.voiceSettings = VoicePrefs.resolve(s.voiceSettings);
   if (!Array.isArray(s.programs)) s.programs = [];
   let p = s.program;
   if (p && Array.isArray(p.days) && (p.id || p.days.length)) {
@@ -57,6 +58,7 @@ function save() {
   catch (e) { if (!saveFailed) { saveFailed = true; setTimeout(() => toast('Не получается сохранить на телефоне — освободи место или выйди из режима «инкогнито»'), 300); } return false; }
 }
 S = load();
+S.voiceSettings = VoicePrefs.resolve(S.voiceSettings);
 if (S.tab === 'camera') S.tab = 'today';
 if (S.tab === 'today' && !S.workout) S.tab = 'diary';
 if (!Array.isArray(S.schedule)) S.schedule = [];

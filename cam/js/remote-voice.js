@@ -41,7 +41,7 @@ const RemoteVoice = {
         const buffer = await this.context.decodeAudioData(bytes.slice(0));
         if (generation !== this.generation) return;
         if (this.context.state !== 'running') {
-          const hint = $('#voiceHelp'); if (hint) hint.textContent = 'Нажми ▶ в настройках голоса, чтобы разрешить звук на телефоне.';
+          const hint = $('#voiceHelp'); if (hint) hint.textContent = $('#profileVoicePreview') ? 'Нажми ▶, чтобы включить звук.' : 'Коснись экрана, чтобы включить голос.';
           return;
         }
         const source = this.context.createBufferSource(); source.buffer = buffer; source.playbackRate.value = rate;
@@ -49,7 +49,7 @@ const RemoteVoice = {
         await new Promise(resolve => { source.onended = resolve; source.start(); });
       } catch (e) {
         if (generation === this.generation) {
-          const hint = $('#voiceHelp'); if (hint) hint.textContent = 'Голос временно недоступен. Проверь интернет и нажми ▶ для повторной проверки.';
+          const hint = $('#voiceHelp'); if (hint) hint.textContent = 'Голос временно недоступен. Проверь интернет и повтори прослушивание в личном кабинете.';
         }
       } finally {
         clearTimeout(timer); this.requests.delete(controller);

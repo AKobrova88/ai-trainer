@@ -69,7 +69,11 @@ const urlW = () => { const p = PLAN.find(x => x.k === state.ex); if (p && p.w) r
 Voice.on = Voice.supported() && (prefs.voice != null ? !!prefs.voice : (!!RET || qp.get('src') === 'app' || state.facing === 'environment'));
 /* The phone's voices differ a lot: neural and «enhanced» voices put the stress right far more often. The best one is picked, the person can change it. */
 const VOICE_KEY = 'aitrainer.voice';
-Voice.rate = pickOpt(store.get('aitrainer.voice-rate', 1), [.85, 1, 1.15], 1);
+function cameraVoiceSettings() {
+  const id = qp.get('voice'), rate = pickOpt(Number(qp.get('voiceRate') || 1), [.85,1,1.15], 1);
+  return id && VoicePrefs.valid({voiceId:id,rate}) ? {voiceId:id,rate} : VoicePrefs.read(TG_SLOT);
+}
+Voice.rate = cameraVoiceSettings().rate;
 Coaching.mode = pickOpt(store.get('aitrainer.coach-mode', 'calm'), ['calm','every','summary'], 'calm');
 function renderCoachMode() {
   $('#coachMode').value = Coaching.mode;
@@ -77,27 +81,30 @@ function renderCoachMode() {
     : Coaching.mode === 'every' ? 'Каждый повтор вслух. До двух разных замечаний на упражнение — в паузах, остальные в итог.'
     : 'Счёт 2, 4, 6… До трёх разных замечаний на упражнение. Подбадривания и редкие шутки — в паузах.';
 }
-const ruVoices = () => { try { return speechSynthesis.getVoices().filter(v => /^ru([-_]|$)/i.test(v.lang || '')).filter((v,i,list) => list.findIndex(x => (x.voiceURI || x.name) === (v.voiceURI || v.name) && x.lang === v.lang) === i); } catch (e) { return []; } };
+const ruVoices = () => VoicePrefs.systemVoices();
 const voiceRank = v => { const n = v.name || ''; return (/natural|neural|нейро/i.test(n) ? 60 : 0) + (/enhanced|premium|улучш|высок/i.test(n) ? 50 : 0) + (/online/i.test(n) ? 20 : 0) + (/google/i.test(n) ? 30 : 0) + (/milena|милена|svetlana|светлана|dariya|дарья|alena|алёна|алена/i.test(n) ? 10 : 0) + (/compact|eloquence|novelty|whisper/i.test(n) ? -40 : 0); };
 function pickVoice() {
   const list = ruVoices(), remote = RemoteVoice.available();
-  const saved = store.get(VOICE_KEY, remote ? 'remote:anna' : '');
+  const settings = cameraVoiceSettings(), saved = settings.voiceId; Voice.rate = settings.rate;
   Voice.remoteVoice = remote && /^(remote:anna|remote:aleksandr)$/.test(saved) ? saved.split(':')[1] : null;
   Voice.voice = list.find(v => (v.voiceURI || v.name) === saved || v.name === saved) || list.slice().sort((a,b) => voiceRank(b)-voiceRank(a))[0] || null;
   if (remote && !Voice.remoteVoice && !Voice.voice) Voice.remoteVoice = 'anna';
   return list;
 }
 function renderVoices() {
-  const list = pickVoice(), row = $('#voiceRow'); if (!row) return;
-  row.hidden = false;
-  const sorted = list.slice().sort((a,b) => voiceRank(b)-voiceRank(a));
-  const select = $('#voiceSel'), remote = RemoteVoice.available();
-  select.disabled = !remote && list.length < 2;
-  const server = remote ? [['anna','Анна · женский'],['aleksandr','Александр · мужской']].map(([id,name]) => '<option value="remote:'+id+'"'+(Voice.remoteVoice === id ? ' selected' : '')+'>'+name+' · онлайн</option>').join('') : '';
-  select.innerHTML = server + (sorted.length ? sorted.map(v => '<option value="'+esc(v.voiceURI || v.name)+'"'+(!Voice.remoteVoice && Voice.voice === v ? ' selected' : '')+'>'+esc(v.name.replace(/^Microsoft |^Google /,'').replace(/ - Russian.*$| \(Russia\)/i,''))+' · устройство</option>').join('') : remote ? '' : '<option>Системный голос · русский</option>');
-  $('#voiceHelp').textContent = remote ? 'Анна и Александр — бесплатные голоса. Для них нужен интернет. Нажми ▶, чтобы послушать.' : list.length < 2 ? 'Браузер предоставляет один русский голос. Здесь появятся дополнительные голоса, когда они станут доступны приложению.' : 'Выбери голос и прослушай произношение.';
-  $('#voiceRate').value = String(Voice.rate);
+  pickVoice();
+  const help = $('#voiceHelp');
+  if (help) help.textContent = 'Голос: ' + (Voice.remoteVoice ? VoicePrefs.name('remote:'+Voice.remoteVoice) : Voice.voice?.name || 'Голос устройства') + '. Выбран в личном кабинете.';
 }
+function refreshProfileVoice() {
+  const before = [Voice.remoteVoice,(Voice.voice?.voiceURI || Voice.voice?.name),Voice.rate].join('|');
+  pickVoice();
+  if (before !== [Voice.remoteVoice,(Voice.voice?.voiceURI || Voice.voice?.name),Voice.rate].join('|')) Voice.cancel();
+  renderVoices();
+}
+window.addEventListener('storage', e => { if (e.key === VoicePrefs.appKey(TG_SLOT)) refreshProfileVoice(); });
+window.addEventListener('pageshow', refreshProfileVoice);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshProfileVoice(); });
 if (Voice.supported()) { pickVoice(); renderVoicesSoon(); }
 if (window.speechSynthesis) { try { speechSynthesis.addEventListener('voiceschanged', renderVoices); } catch (e) { speechSynthesis.onvoiceschanged = renderVoices; } }
 function renderVoicesSoon() { setTimeout(renderVoices, 0); setTimeout(renderVoices, 800); }
