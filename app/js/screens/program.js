@@ -72,9 +72,11 @@ function deleteProgram(id) {
 }
 function dayCard(d, index = 0, editable = programEditable()) {
   const closed = S.open[d.id] !== true, renaming = editable && S.renaming === d.id;
-  const name = d.title.replace(/^День\s+\d+(?:\s*[·:\-–—]\s*|\s*$)/i, '').trim();
+  const prefix = d.title.match(/^День\s*(\d+)(?:\s*[·.:\-–—]\s*|\s+|$)/i);
+  const name = (prefix ? d.title.slice(prefix[0].length) : d.title).trim();
+  const dayLabel = `День ${prefix ? prefix[1] : index + 1}`;
   const title = renaming ? `<input class="title-input" id="rename" data-day="${esc(d.id)}" value="${esc(d.title)}" maxlength="50" aria-label="название дня">`
-    : `<button class="day-t" data-act="day-toggle" data-v="${esc(d.id)}" aria-expanded="${!closed}" aria-controls="program-day-${esc(d.id)}"><span class="day-heading">${name ? `<span class="day-number">День ${index + 1}</span>` : ''}<b>${esc(name || `День ${index + 1}`)}</b><span class="day-count">${d.items.length} ${plural(d.items.length, 'упражнение', 'упражнения', 'упражнений')}</span></span><span class="day-chevron" aria-hidden="true">${CHEV}</span></button>`;
+    : `<button class="day-t" data-act="day-toggle" data-v="${esc(d.id)}" aria-expanded="${!closed}" aria-controls="program-day-${esc(d.id)}"><span class="day-heading">${name ? `<span class="day-number">${esc(dayLabel)}</span>` : ''}<b>${esc(name || dayLabel)}</b><span class="day-count">${d.items.length} ${plural(d.items.length, 'упражнение', 'упражнения', 'упражнений')}</span></span><span class="day-chevron" aria-hidden="true">${CHEV}</span></button>`;
   const labs = blockLabels(d.items);
   const items = d.items.map((it, i) => { const g = it.ss, first = g && (!d.items[i - 1] || d.items[i - 1].ss !== g), last = g && (!d.items[i + 1] || d.items[i + 1].ss !== g); return `
     ${first ? `<div class="ss-h">Суперсет ${labs[i]}–${labs[groupOf(d.items, i).slice(-1)[0]]} · по очереди, отдых после круга</div>` : ''}
@@ -84,8 +86,8 @@ function dayCard(d, index = 0, editable = programEditable()) {
       ${editable ? `<button class="icon-btn" data-act="ex-menu" data-v="${esc(d.id)}:${esc(it.id)}" aria-label="Действия с упражнением ${esc(it.name)}">${DOTS}</button>` : ''}
     </div>`; }).join('');
   return `<section class="day ${closed ? 'closed' : ''} ${S.flash === d.id ? 'flash' : ''}" data-day="${esc(d.id)}">
-    <div class="day-h">${editable ? `<span class="grip" data-drag="day" aria-label="перетащить день">${GRIP}</span>` : ''}${title}${editable ? `<button class="icon-btn" data-act="day-menu" data-v="${esc(d.id)}" aria-label="Действия с днём ${index + 1}">${DOTS}</button>` : ''}</div>
-    <div class="day-content" id="program-day-${esc(d.id)}"><div class="ex-list" role="list" aria-label="Упражнения дня ${index + 1}">${items || `<div class="hint" style="padding:12px 14px">${editable ? 'Добавь упражнения в этот день.' : 'Пока нет упражнений.'}</div>`}</div>
+    <div class="day-h">${editable ? `<span class="grip" data-drag="day" aria-label="перетащить день">${GRIP}</span>` : ''}${title}${editable ? `<button class="icon-btn" data-act="day-menu" data-v="${esc(d.id)}" aria-label="Действия: ${esc(dayLabel)}">${DOTS}</button>` : ''}</div>
+    <div class="day-content" id="program-day-${esc(d.id)}"><div class="ex-list" role="list" aria-label="${esc(dayLabel)}: упражнения">${items || `<div class="hint" style="padding:12px 14px">${editable ? 'Добавь упражнения в этот день.' : 'Пока нет упражнений.'}</div>`}</div>
     ${editable ? `<div class="day-f"><button class="btn sm" data-act="cat" data-v="${esc(d.id)}">${I.plus}Упражнение</button></div>` : ''}</div>
   </section>`;
 }
