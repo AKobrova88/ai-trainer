@@ -42,7 +42,7 @@ function validBackup(d) {
   const item = x => x && text(x.id) && text(x.name) && dose(x.s) && dose(x.lo) && dose(x.hi) && x.hi >= x.lo && num(x.w) && num(x.rest);
   if (!d || d.app !== 'ii-trener' || d.v !== 1 || !d.program || !Array.isArray(d.program.days) || !Array.isArray(d.diary)) return false;
   if (!d.program.days.every(day => day && text(day.id) && text(day.title) && Array.isArray(day.items) && day.items.every(item))) return false;
-  if (d.programs && (!Array.isArray(d.programs) || d.programs.length > 5 || new Set(d.programs.map(p => p?.id)).size !== d.programs.length || !d.programs.every(p => p && text(p.id) && text(p.title) && Array.isArray(p.days) && p.days.every(day => day && text(day.id) && text(day.title) && Array.isArray(day.items) && day.items.every(item))))) return false;
+  if (d.programs && (!Array.isArray(d.programs) || d.programs.length > 100 || new Set(d.programs.map(p => p?.id)).size !== d.programs.length || !d.programs.every(p => p && text(p.id) && text(p.title) && Array.isArray(p.days) && p.days.every(day => day && text(day.id) && text(day.title) && Array.isArray(day.items) && day.items.every(item))))) return false;
   if (!d.diary.every(w => w && text(w.id) && text(w.title) && num(w.date) && Array.isArray(w.items) && w.items.every(e => e && text(e.name) && Array.isArray(e.sets) && e.sets.every(s => s && num(s.w) && dose(s.r))))) return false;
   if (d.profile && (!Array.isArray(d.profile.limits) || !d.profile.limits.every(text) || !Array.isArray(d.profile.other) || !d.profile.other.every(text) || !d.profile.focus || typeof d.profile.focus !== 'object')) return false;
   if (d.voiceSettings != null && !VoicePrefs.valid(d.voiceSettings)) return false;

@@ -4,14 +4,15 @@
    inside Telegram they are unreliable. Every answer is {ok, status, data, error: {code, message}}. */
 const API = (() => {
   const AUTH = 'trener.auth' + TG.slot();   // one session per Telegram account on this phone
-  let access = '', accessExp = 0, refreshing = null;
+  let access = '', accessExp = 0, refreshing = null, epoch = 0;
   const load = () => { try { return JSON.parse(localStorage.getItem(AUTH) || 'null'); } catch (e) { return null; } };
   const store = v => { try { v ? localStorage.setItem(AUTH, JSON.stringify(v)) : localStorage.removeItem(AUTH); } catch (e) { /* private mode */ } };
   function setTokens(t) {
+    epoch++;
     access = t.access_token; accessExp = t.access_expires_at || Date.now() + 10 * 60000;
     store({refresh: t.refresh_token, at: Date.now()});
   }
-  function clear() { access = ''; accessExp = 0; store(null); }
+  function clear() { epoch++; access = ''; accessExp = 0; store(null); }
   const hasSession = () => !!(access || (load() || {}).refresh);
   async function raw(path, {method = 'GET', body, token, timeout = 15000} = {}) {
     const ctl = typeof AbortController === 'function' ? new AbortController() : null;
@@ -30,14 +31,20 @@ const API = (() => {
     } finally { if (timer) clearTimeout(timer); }
   }
   async function refresh() {
-    const saved = load();
-    if (!saved || !saved.refresh) return false;
-    if (!refreshing) refreshing = raw('/v1/auth/refresh', {method: 'POST', body: {refresh_token: saved.refresh}}).then(r => {
-      refreshing = null;
-      if (r.ok) { setTokens(r.data); return true; }
-      if (r.status === 401) clear();   // the session ended (logout elsewhere, account deleted, stolen token)
-      return r.status === 0 ? null : false;
-    });
+    if (!refreshing) {
+      const perform = async () => {
+        const saved = load(), started = epoch;
+        if (!saved || !saved.refresh) return false;
+        const r = await raw('/v1/auth/refresh', {method: 'POST', body: {refresh_token: saved.refresh}});
+        if (started !== epoch) return hasSession(); // A different sign-in happened while this request was in flight.
+        if (r.ok) { setTokens(r.data); return true; }
+        if (r.status === 401) clear();
+        return r.status === 0 ? null : false;
+      };
+      // A refresh token is single-use. Two browser tabs must read it only after acquiring the shared lock.
+      const task = navigator.locks?.request ? navigator.locks.request(AUTH + '.refresh', perform) : perform();
+      refreshing = task.finally(() => { refreshing = null; });
+    }
     return refreshing;
   }
   /* a request with the session: refresh the access token when it is old, retry once after 401 */

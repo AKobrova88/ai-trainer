@@ -35,6 +35,7 @@ const Account = (() => {
   function finishSignIn(data) {
     const id = data.me.user.id;
     if (S.ownerId && S.ownerId !== id) startClean();
+    if (S.ownerId !== id) { S.ownerId = id; Sync.reset(); }
     API.setTokens(data); applyMe(data.me); tgPending = null; S.ownerId = id;
     if (S.stage === 'welcome') S.stage = S.program.days.length ? 'app' : 'start';
     saveLocal(); closeSheet(); render(); window.scrollTo({top: 0});
@@ -107,7 +108,25 @@ const Account = (() => {
       `<button class="btn" data-act="close">Отмена</button><button class="btn primary" id="acc-go" data-act="acc-email-go" data-v="${add ? 'add' : 'login'}">Получить код</button>`, '', true);
     setTimeout(() => { const i = $('#acc-email'); i && i.focus(); }, 60);
   }
-  function loginSheet() { emailSheet('login'); }
+  function loginSheet() {
+    if (TRENER.emailLogin) return emailSheet('login');
+    sheet('Войти в свой аккаунт', `<p class="hint" style="margin:0">Открой ИИ Тренер в Telegram → «Личный кабинет» → «Подключить браузер». Скопируй одноразовый код и введи его здесь. Программы и дневник с этого устройства добавятся в твой аккаунт.</p>
+      <a class="btn" href="https://t.me/${TRENER.bot}?startapp=account" target="_blank" rel="noopener">Открыть Telegram</a>
+      <div class="field"><label for="device-code">Одноразовый код</label><input class="input" id="device-code" inputmode="numeric" autocomplete="one-time-code" maxlength="18" placeholder="0000 0000 0000"></div>`,
+      '<button class="btn" data-act="close">Отмена</button><button class="btn primary" id="acc-go" data-act="acc-device-login">Войти</button>');
+  }
+  let deviceCode = '';
+  async function issueDeviceCode() {
+    const sync = await Sync.now();
+    if (!sync.ok) return toast(sync.error?.message || 'Сначала сохрани изменения в аккаунте, затем повтори.');
+    const r = await API.call('/v1/me/device-code', {method: 'POST'});
+    if (!r.ok) return toast(r.error.message);
+    deviceCode = r.data.code;
+    sheet('Подключить браузер', `<p class="hint" style="margin:0">На сайте trener-ii.ru открой «Личный кабинет» → «Войти через Telegram» и введи этот код. Он действует 5 минут и подходит только для одного входа.</p>
+      <p style="font:700 28px var(--f-mono);text-align:center;letter-spacing:3px" aria-label="Одноразовый код">${esc(deviceCode.match(/.{1,4}/g).join(' '))}</p>
+      <p class="hint" style="margin:0">Не передавай код другим людям: он открывает доступ к твоим программам и дневнику.</p>`,
+      '<button class="btn" data-act="close">Закрыть</button><button class="btn primary" data-act="acc-device-copy">Скопировать код</button>');
+  }
   function codeSheet(wait) {
     closeTop();
     sheet('Код из письма', `<p class="hint" style="margin:0">Отправили код на <b>${esc(pending.email)}</b>. Он действует 10 минут. Если письма нет — загляни в «Спам».</p>
@@ -175,15 +194,17 @@ const Account = (() => {
       <div class="prow"><span>Согласие дано</span><span class="val">${consent}</span></div></div>`;   // as in 2.6
     if (!signedIn()) {
       return `<div class="plist">${row('Почта', esc(S.user ? S.user.email || '—' : '—'))}${row('Согласие дано', consent)}
-        ${TG.inside() ? btn('acc-tg', 'Сохранять данные в аккаунте') : btn('acc-login', 'Войти или создать аккаунт по почте')}</div>
+        ${TG.inside() ? btn('acc-tg', 'Сохранять данные в аккаунте') : btn('acc-login', TRENER.emailLogin ? 'Войти или создать аккаунт по почте' : 'Войти через Telegram')}</div>
         <p class="hint" style="margin:-4px 2px 0">Аккаунт хранит программу и дневник на сервере в России — их не потерять при смене телефона.</p>`;
     }
     const a = S.acct, how = a.tg ? `Telegram${a.tg.username ? ' · @' + esc(a.tg.username) : a.tg.first_name ? ' · ' + esc(a.tg.first_name) : ''}` : 'почта и пароль';
-    const st = syncInfo.state === 'syncing' ? 'сохраняю…' : syncInfo.state === 'offline' ? 'нет связи — сохранено на телефоне'
+    const st = syncInfo.state === 'syncing' ? 'сохраняю…' : syncInfo.state === 'error' ? 'нужно повторить синхронизацию' : syncInfo.state === 'offline' ? 'нет связи — сохранено на телефоне'
       : Sync.lastAt() ? 'на сервере · ' + new Date(Sync.lastAt()).toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}) : 'на сервере';
-    return `<div class="plist">${row('Вход', how)}${row('Почта', esc(a.email || 'не указана'))}${row('Согласие дано', consent)}
+    return `<div class="plist">${row('Вход', how)}${TRENER.emailLogin || a.email ? row('Почта', esc(a.email || 'не указана')) : ''}${row('Согласие дано', consent)}
       <button class="prow" data-act="acc-sync"><span>Данные</span><span class="val">${st}</span></button>
-      ${a.email ? '' : btn('acc-cred', 'Добавить почту для входа из браузера')}
+      ${btn('acc-device-code', 'Подключить браузер')}
+      ${a.email || !TRENER.emailLogin ? '' : btn('acc-cred', 'Добавить почту для входа из браузера')}
+      ${Sync.hasBackup() ? btn('acc-local-backup', 'Копия до синхронизации') : ''}
       ${btn('acc-export', 'Выгрузить мои данные')}${btn('acc-logout', 'Выйти из аккаунта')}</div>`;
   }
 
@@ -209,7 +230,7 @@ const Account = (() => {
       '<button class="btn primary" id="reg-go" data-act="acc-reconsent-go" disabled>Подтвердить</button>');
   }
   function syncDone(r) {
-    syncInfo = {state: r && r.ok ? 'ok' : r && r.skipped ? 'idle' : 'offline', at: Date.now()};
+    syncInfo = {state: r && r.ok ? 'ok' : r && r.skipped ? 'idle' : r && r.status === 0 ? 'offline' : 'error', at: Date.now()};
     if (r && r.status === 401) { forget(); saveLocal(); render(); }
     const v = $('[data-act="acc-sync"] .val'); if (v && S.tab === 'profile') { const tmp = document.createElement('div'); tmp.innerHTML = section(); const nv = $('[data-act="acc-sync"] .val', tmp); if (nv) v.textContent = nv.textContent; }
   }
@@ -217,9 +238,22 @@ const Account = (() => {
   /* ---- buttons ---- */
   Object.assign(A, {
     'acc-login': () => loginSheet(),
+    'acc-device-code': () => issueDeviceCode(),
+    'acc-device-copy': async () => { try { await navigator.clipboard.writeText(deviceCode); toast('Код скопирован'); } catch (e) { toast('Выдели код и скопируй вручную'); } },
+    'acc-device-login': () => busy(async () => {
+      const code = field('#device-code').replace(/\s/g, '');
+      if (!/^\d{12}$/.test(code)) return toast('Введи все 12 цифр из личного кабинета Telegram');
+      const r = await API.raw('/v1/auth/device', {method: 'POST', body: {code}});
+      if (!r.ok) return toast(r.error.message);
+      finishSignIn(r.data); toast('Вход выполнен. Объединяю программы и дневник');
+    }),
+    'acc-local-backup': () => {
+      const data = Sync.backup(); if (!data) return toast('Копии ещё нет');
+      sheet('Копия до синхронизации', '<p class="hint">Исходные данные с этого устройства. Сохрани текст: его можно вставить в «Восстановить из копии».</p><textarea class="input" id="bk-text" readonly style="min-height:240px">' + esc(JSON.stringify(data)) + '</textarea>', '<button class="btn" data-act="close">Закрыть</button><button class="btn primary" data-act="bk-copy">Скопировать</button>');
+    },
     'acc-tg': () => tgSignIn(),
     'acc-cred': () => emailSheet('add'),
-    'acc-sync': async () => { syncInfo.state = 'syncing'; syncDone({ok: true}); const r = await Sync.now(); toast(r && r.ok ? 'Данные сохранены в аккаунте' : 'Нет связи с сервером — данные остаются на телефоне'); },
+    'acc-sync': async () => { syncInfo.state = 'syncing'; render(); const r = await Sync.now(); toast(r && r.ok ? 'Данные сохранены в аккаунте' : r?.error?.message || 'Данные остаются на телефоне — повтори синхронизацию'); },
     'acc-email-go': v => busy(async () => {
       const email = field('#acc-email');
       if (!EMAIL_RX.test(email)) return toast('Проверь почту — например, name@mail.ru');

@@ -29,10 +29,10 @@ function viewProgram() {
   if (!programIsOpen() || !library.some(p => p.id === programViewId)) {
     resetProgramScreen();
     if (!library.length) return ['Программы', `<section class="empty-card"><h2>Твои программы</h2><p class="hint" style="margin:0">Добавь свою по фото или тексту, создай вручную или подбери с тренером.</p><button class="btn primary" data-act="program-add">${I.plus}Добавить программу</button></section>`];
-    return ['Программы', `<p class="hint program-count">Мои программы · ${library.length} из 5</p>
+    return ['Программы', `<p class="hint program-count">Мои программы · ${library.length > 5 ? library.length + ' после объединения' : library.length + ' из 5'}</p>
       <div class="program-list" aria-label="Мои программы">${library.map(p => `<button class="card program-card" data-act="program-open" data-v="${esc(p.id)}"><span class="program-card-symbol">${p.by === 'wish' ? I.spark : I.program}</span><span class="grow"><b class="program-card-title">${esc(p.title)}</b><span class="program-card-meta">${programSummary(p)}</span></span><span class="program-card-arrow">${CHEV}</span></button>`).join('')}</div>
       <button class="btn primary program-add" data-act="program-add" ${library.length >= 5 ? 'disabled' : ''}>${I.plus}Добавить программу</button>
-      ${library.length >= 5 ? '<p class="hint program-count">Можно хранить до пяти программ. Управление каждой — внутри, в режиме редактирования.</p>' : ''}`];
+      ${library.length >= 5 ? `<p class="hint program-count">${library.length > 5 ? 'При объединении сохранены все версии. Чтобы добавлять новые, оставь до пяти программ.' : 'Можно хранить до пяти программ.'} Управление каждой — внутри, в режиме редактирования.</p>` : ''}`];
   }
   const P = S.program, editing = programEditable();
   const more = editing ? `<button class="icon-btn" data-act="program-menu" aria-label="Настройки программы">${DOTS}</button>` : '';

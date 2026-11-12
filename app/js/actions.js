@@ -68,6 +68,12 @@ const A = {
       if (!REG.pd || !REG.terms) return toast('Отметь согласие и соглашение — без них регистрация недоступна');
       return Account.tgSignIn({pd: true, terms: true, marketing: REG.news}, pc);
     }
+    if (!TRENER.emailLogin) {
+      if (!REG.pd || !REG.terms) return toast('Отметь согласие и соглашение');
+      const at = Date.now();
+      S.user = {email:'', at, consent:{pd:{v:CONSENT_V,at},terms:{v:CONSENT_V,at},news:false}};
+      S.stage = 'start'; render(); window.scrollTo({top:0}); return;
+    }
     const e = $('#reg-email'), email = (e ? e.value : '').trim();
     REG.email = email;
     if (!EMAIL_RX.test(email)) { toast('Проверь почту — например, name@mail.ru'); e && e.focus(); return; }

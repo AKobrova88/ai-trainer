@@ -2,6 +2,8 @@
 /* results from the camera: on start, when coming back to this tab, and when another tab writes them */
 window.addEventListener('pageshow', processInbox);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { processInbox(); if (Account.signedIn()) Sync.schedule(300); } else if (Account.signedIn()) Sync.now(); });
+window.addEventListener('online', () => { if (Account.signedIn()) Sync.schedule(300); });
+setInterval(() => { if (document.visibilityState === 'visible' && Account.signedIn()) Sync.schedule(100); }, 15000);
 window.addEventListener('focus', processInbox);
 window.addEventListener('storage', e => { if (e.key === INBOX && e.newValue) processInbox(); else if (e.key === KEY && e.newValue && !S.workout) { S = load(); render(); } });
 
