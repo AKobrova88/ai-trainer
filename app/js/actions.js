@@ -4,13 +4,27 @@ const sheetTop = () => $('#sheets').lastElementChild;
 const closeTop = () => { const t = sheetTop(); if (!t) return; if (t.querySelector('#wiz')) { if (REC) stopMic(true); S.wiz = null; } if (t.querySelector('#imp')) IMP = null; const returnTo = t._returnFocus; t.remove(); syncSheets(returnTo); };
 const scrollSheet = () => { const b = $('.sheet-b', sheetTop() || document); if (b) b.scrollTop = 0; };
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-function useProgram(days, profile, tab) {
-  if (S.program.days.length) snap();
-  if (S.demo && S.user) { S.diary = S.demoReturn ? JSON.parse(S.demoReturn).diary : S.diary.filter(w => !w.demo); S.demo = false; delete S.demoReturn; S.workout = null; S.rest = null; }
-  else if (S.demo) { S.diary = []; S.workout = null; S.rest = null; }
-  S.program = {days, at: Date.now(), by: profile ? 'wish' : 'other'}; S.next = days[0] ? days[0].id : null; S.pick = null;
-  if (profile) { const {found, ...p} = profile; S.profile = {...blankProfile(), ...p, filled: true}; S.wishRulesStamp = wishProfileStamp(S.profile); }
-  S.stage = 'app'; S.tab = tab; S.open = {};
+function useProgram(days, profile, tab, meta = {}) {
+  const original = S, guestPreview = S.demo && !S.user;
+  if (guestPreview) {
+    S = {...S, program:{days:[]}, programs:[], diary:[], workout:null, rest:null};
+  } else if (S.demo) {
+    if (S.demoReturn) { const theme = S.theme; S = {...JSON.parse(S.demoReturn), theme}; }
+    else { S.program = {days:[]}; S.programs = []; S.diary = []; S.workout = null; S.rest = null; }
+    S.demo = false; delete S.demoReturn;
+  }
+  const library = libraryPrograms();
+  if (library.length >= 5) { S = original; toast('У тебя уже пять программ. Удали ненужную, чтобы добавить новую.'); return false; }
+  const by = meta.by || (profile ? 'wish' : 'other');
+  const baseTitle = meta.title || (profile ? 'Рекомендация ИИ' : 'Моя программа');
+  let title = baseTitle, suffix = 2;
+  while (library.some(p => p.title === title)) title = baseTitle + ' ' + suffix++;
+  const p = {id:nid('p'), title, days, at:Date.now(), by, next:days[0]?.id || null, ...(meta.coachNotes?.length ? {coachNotes:meta.coachNotes} : {})};
+  S = {...S, program:p, programs:[...library,p], next:p.next, pick:null, diaryPick:null, diaryProgram:p.id, stage:'app', tab, open:{}};
+  if (profile) { const {found, ...values} = profile; S.profile = {...blankProfile(), ...values, filled:true}; S.wishRulesStamp = wishProfileStamp(S.profile); }
+  if (!save()) { S = original; toast('Не удалось сохранить программу — освободи место и повтори.'); return false; }
+  undoSnap = null;
+  return true;
 }
 const A = {
   /* shell */
@@ -18,6 +32,10 @@ const A = {
   'diary-today': () => { selectDiaryDate(); S.tab = 'diary'; render(); window.scrollTo({top:0}); },
   'resume-workout': () => { if (!S.workout) return; closeSheet(); S.tab = 'today'; render(); window.scrollTo({top:0}); },
   'plan-day': v => togglePlan(v),
+  'diary-pick': v => pickDiaryDay(v),
+  'plan-pick': v => pickPlannedWorkout(v),
+  'plan-selected': () => planSelectedWorkout(),
+  'start-selected': () => startSelectedWorkout(),
   'plan-remove': v => removePlan(v),
   'video-select':()=>chooseCameraVideo(),
   'video-history':()=>videoHistorySheet(),
@@ -67,7 +85,7 @@ const A = {
     undoSnap = null;
     const p = demoProgram(), d = demoDiary(p); d.forEach(w => { w.demo = true; });
     S.demoReturn = previous;
-    S.program = p; S.diary = d.sort((a, b) => b.date - a.date); S.next = p.days[0].id; S.demo = true;
+    S.programs = []; S.diaryPick = null; S.program = p; S.diary = d.sort((a, b) => b.date - a.date); S.next = p.days[0].id; S.demo = true;
     S.workout = null; S.rest = null; S.schedule = [];
     S.stage = 'app'; S.tab = 'today'; S.pick = null; closeSheet(); render(); window.scrollTo({top: 0});
     toast('Пример: 2 дня программы и 5 недель дневника');
@@ -75,14 +93,14 @@ const A = {
   'demo-off': () => {
     const theme = S.theme, acct = S.acct, server = S.server;
     if (S.demoReturn) { S = JSON.parse(S.demoReturn); S.theme = theme; if (acct) { S.acct = acct; S.server = server; } }
-    else { S.diary = S.diary.filter(w => !w.demo); S.program = {days: []}; S.next = null; S.demo = false; S.workout = null; S.rest = null; S.tab = 'today'; }
+    else { S.diary = S.diary.filter(w => !w.demo); S.program = {days: []}; S.programs = []; S.next = null; S.demo = false; S.workout = null; S.rest = null; S.tab = 'today'; }
     if (!S.user) S.stage = 'welcome';
     undoSnap = null;
     closeSheet(); render(); window.scrollTo({top: 0}); toast('Пример закрыт — твои данные на месте');
   },
 
   /* wishes → program */
-  wish: () => openWizard(),
+  wish: () => { if (libraryPrograms().length >= 5 && !S.demo) return toast('У тебя уже пять программ. Удали ненужную в меню программы.'); openWizard(); },
   mic: () => toggleMic(),
   'wiz-next': async () => {
     const W = S.wiz; if (!W) return;
@@ -115,14 +133,14 @@ const A = {
   'wiz-accept': v => {
     const W = S.wiz; if (!W || !W.res) return;
     const had = S.program.days.length;
-    useProgram(W.res.days, W.res.profile, v === 'program' ? 'program' : 'today');
+    if (!useProgram(W.res.days, W.res.profile, v === 'program' ? 'program' : 'diary')) return;
     closeSheet(); render(); window.scrollTo({top: 0});
-    toast(had ? 'Новая программа сохранена' : 'Программа готова', had);
+    toast(had ? 'Новая программа добавлена. Предыдущая осталась в библиотеке.' : 'Программа готова');
   },
 
   /* today & workout */
   pick: v => { S.pick = v; render(); },
-  start: v => startWorkout(v),
+  start: v => pickDiaryDay(v),
   'health-ok': () => { S.healthOk = true; closeSheet(); const t = HEALTH_THEN; HEALTH_THEN = null; if (t) t(); else render(); },
   'wx-open': v => { S.workout.active = S.workout.active === +v ? -1 : +v; render(); },
   adj: v => {
@@ -180,11 +198,36 @@ const A = {
   'wx-swap': v => { closeSheet(); catSheet('wo-swap', null, v); },
   'wx-add': () => catSheet('wo-add'),
   finish: () => finishSheet(),
+  break: () => breakSheet(),
+  'break-start': v => startBreak(Number(v)),
+  'break-custom': () => startBreak(inputNumber($('#break-seconds'),5,true)),
   'save-wo': () => saveWorkout(),
   discard: () => { S.workout = null; S.rest = null; closeSheet(); A['diary-today'](); },
   'go-diary': () => { closeSheet(); S.tab = 'diary'; S.dtab = 'hist'; if (S.diary[0]) S.open[S.diary[0].id] = true; render(); window.scrollTo({top: 0}); },
   'rest-add': () => { if (S.rest) { S.rest.end = Math.max(Date.now(), S.rest.end) + 15000; S.rest.buzz = 0; renderRest(); save(); } },
   'rest-skip': () => { S.rest = null; renderRest(); save(); },
+
+  /* program library */
+  'program-add': () => programAddSheet(),
+  'program-import': () => { if (libraryPrograms().length >= 5) return toast('У тебя уже пять программ'); importSheet(true); },
+  'program-manual': () => { if (!useProgram([{id:nid('d'), title:'День 1', items:[]}], null, 'program', {by:'manual'})) return; closeSheet(); render(); },
+  'program-rename': v => renameProgramSheet(v),
+  'program-rename-save': v => {
+    const p = programById(v), title = ($('#program-title')?.value || '').trim().slice(0,80);
+    if (!p || !title) return toast('Укажи название программы');
+    const before = p.title; p.title = title;
+    if (!save()) { p.title = before; return toast('Не удалось сохранить название'); }
+    closeSheet(); render();
+  },
+  'program-delete': v => deleteProgram(v),
+  'program-delete-confirm': v => {
+    if (S.workout?.programId === v) return toast('Сначала заверши текущую тренировку');
+    const before = S, programs = libraryPrograms().filter(p => p.id !== v);
+    const program = S.program.id === v ? (programs[0] || {days:[]}) : S.program;
+    S = {...S, programs, program, next:program.next || program.days[0]?.id || null, diaryPick:null};
+    if (!save()) { S = before; return toast('Не удалось сохранить изменение'); }
+    undoSnap = null; closeSheet(); render();
+  },
 
   /* program */
   'day-toggle': v => { S.open[v] = S.open[v] === false; render(); },
@@ -364,7 +407,7 @@ const A = {
   'restore-go': () => {
     const d = RESTORE; if (!d) return;
     for (const k of BACKUP_KEYS) if (k in d && d[k] != null) S[k] = d[k];
-    S.schedule = d.schedule || [];
+    S.programs = d.programs || []; S.schedule = d.schedule || []; S.diaryPick = null; normalizeLibrary(S);
     S.workout = null; S.rest = null; S.pick = null; S.open = {}; S.stage = S.user ? 'app' : S.stage; S.tab = 'today'; S.demo = false; delete S.demoReturn;
     RESTORE = null; closeSheet(); render(); window.scrollTo({top: 0}); toast('Данные восстановлены из копии');
   },
@@ -410,6 +453,8 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.id === 'program-select') selectProgram(t.value);
+  if (t.id === 'diary-program') { S.diaryProgram = t.value; S.diaryPick = null; render(); }
   if(t.id==='cameraFileInput'){const file=t.files?.[0];t.value='';openCameraVideo(file);}
   if (t.id === 'restore-file' && t.files && t.files[0]) { restoreFile(t.files[0]); t.value = ''; }
 });

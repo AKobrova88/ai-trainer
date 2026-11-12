@@ -6,7 +6,7 @@
    leave the phone), workout/<id> (one diary entry), video/<id> (one video check result, never the video). */
 const Sync = (() => {
   const KEY = 'trener.sync' + TG.slot();
-  const STATE_KEYS = ['program', 'next', 'schedule', 'theme', 'healthOk'];
+  const STATE_KEYS = ['program', 'programs', 'next', 'schedule', 'theme', 'healthOk'];
   const PROFILE_LOCAL = ['limits', 'other', 'text'];   // health and free text stay on the phone
   let timer = 0, running = null, again = false, applying = false;
   let meta = (() => { try { return JSON.parse(localStorage.getItem(KEY) || 'null') || {since: 0, known: {}}; } catch (e) { return {since: 0, known: {}}; } })();
@@ -14,6 +14,7 @@ const Sync = (() => {
   const hash = o => { const s = JSON.stringify(o); let h = 5381; for (let i = 0; i < s.length; i++) h = (h * 33 ^ s.charCodeAt(i)) >>> 0; return h.toString(36) + ':' + s.length; };
   const clean = o => JSON.parse(JSON.stringify(o));
   function records() {
+    normalizeLibrary(S);
     const out = {};
     const st = {}; for (const k of STATE_KEYS) st[k] = S[k] === undefined ? null : S[k];
     out['state/main'] = st;

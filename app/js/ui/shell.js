@@ -5,11 +5,12 @@ function renderTabs() {
   $('#tabs').innerHTML = TABS.map(([k, l]) => `<button class="tab" data-act="tab" data-v="${k}" ${active === k ? 'aria-current="page"' : ''}>${I[k]}<span>${l}</span>${k === 'diary' && S.workout ? '<i class="dot"></i>' : ''}</button>`).join('');
 }
 function render() {
+  normalizeLibrary(S);
   if (S.tab === 'camera') S.tab = 'today';
   if (S.tab === 'today' && !S.workout) S.tab = 'diary';
   applyTheme();
   const camOf = it => { if (it.base && CAT[it.base]) it.cam = CAT[it.base].cam; };   // the camera learns new exercises: old programs follow
-  for (const d of S.program.days) { normSS(d.items); d.items.forEach(camOf); }
+  for (const p of S.programs) for (const d of p.days) { normSS(d.items); d.items.forEach(camOf); }
   if (S.workout) { normSS(S.workout.items); S.workout.items.forEach(camOf); }
   const onb = S.stage !== 'app';
   document.body.classList.toggle('onb-mode', onb);

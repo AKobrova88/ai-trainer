@@ -31,7 +31,7 @@ for (const dialog of [optionsSheet, $('#exerciseFinder'), $('#recordingsDialog')
     if (e.target === dialog || e.target.closest('[data-dismiss]')) closeSheet(dialog);
   });
 }
-const option = (id, run) => $(id).addEventListener('click', () => { closeSheet(optionsSheet); run(); });
+const option = (id, run) => $(id).addEventListener('click', () => { optionsSheet._skipPrepare = true; closeSheet(optionsSheet); run(); });
 const goCamera = () => { state.recOnly = false; startCamera(); };
 option('#cameraOption', goCamera);
 option('#galleryOption', () => pickVideo());
@@ -42,6 +42,7 @@ option('#setupCount', () => beginPreparedSet(true));
 option('#setupBar', () => state.file ? barPick('file') : state.on ? barPick('live') : pickVideo(true));
 $('#facingOption').addEventListener('click', () => setFacing(state.facing === 'user' ? 'environment' : 'user'));
 $('#moreBtn').addEventListener('click', () => {
+  Voice.cancel();
   const [action] = cameraAction(), idle = !state.on && !state.file && !state.cameraRequest, ready = !state.analyzing && !action.startsWith('cancel');
   $('#cameraOption').hidden = !(idle && action !== 'start');
   $('#galleryOption').hidden = !MODE_VIDEO || !ready || !state.file;
@@ -50,15 +51,16 @@ $('#moreBtn').addEventListener('click', () => {
   $('#setupBar').hidden = !ready || state.recOnly || isHold();
   $('#facingOption').hidden = !idle || !canFlipCamera();
   refreshCameraDevices();
-  $('#voiceOption').hidden = !('speechSynthesis' in window);
-  renderSetup(); renderCoachMode(); if ('speechSynthesis' in window) renderVoices(); openSheet(optionsSheet);
+  $('#voiceOption').hidden = !Voice.supported();
+  renderSetup(); renderCoachMode(); if (Voice.supported()) renderVoices(); openSheet(optionsSheet);
 });
 $('#cameraDevice').addEventListener('change',e=>selectCameraDevice(e.target.value));
 if(navigator.mediaDevices?.addEventListener)navigator.mediaDevices.addEventListener('devicechange',refreshCameraDevices);
+$('#cameraOptions').addEventListener('close', () => { Voice.cancel(); const skip = optionsSheet._skipPrepare; optionsSheet._skipPrepare = false; if (!skip && state.on && !state.file && !state.recOnly) startPreparation(); });
 el.voice.addEventListener('change', () => {
-  if (!('speechSynthesis' in window)) return;
+  if (!Voice.supported()) return;
   Voice.on = el.voice.checked; store.set('aitrainer.v2', Object.assign(prefs, { voice: Voice.on }));
-  if (Voice.on) Voice.say('Голос включён', 'on', true); else speechSynthesis.cancel();
+  if (Voice.on) Voice.say('Голос включён', 'on', true); else Voice.cancel();
 });
 const back = $('#navBack');
 back.hidden = !RET;
@@ -72,6 +74,7 @@ new MutationObserver(readColors).observe(document.documentElement, { attributes:
 
 fillSelect(); setAspect(1, 1); resize(); setExercise(state.ex); renderFacing(); renderPlan();
 el.voice.checked = Voice.on;
+document.addEventListener('pointerdown', () => { if (Voice.on && Voice.remoteVoice) RemoteVoice.unlock(); }, {passive:true});
 Clips.init().then(()=>{if(qp.get('mode')==='recordings')Clips.open();});
 $('#recordingsBtn').addEventListener('click',()=>{const clip=Clips.latest();if(clip)Clips.export(clip.id);});
 $('#clipSave').addEventListener('click',()=>Clips.export(Clips.selected));

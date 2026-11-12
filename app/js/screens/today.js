@@ -3,19 +3,21 @@
 function viewToday() {
   return S.workout ? viewWorkout() : viewDiary();
 }
-function startWorkout(dayId) {
+function startWorkout(dayId, programId, planId) {
+  libraryPrograms();
+  const p = programById(programId || S.program.id);
   if (S.workout) {
-    if (S.workout.dayId === dayId) { closeSheet(); S.tab = 'today'; render(); window.scrollTo({top:0}); return; }
+    if (S.workout.dayId === dayId && S.workout.programId === p?.id) { closeSheet(); S.tab = 'today'; render(); window.scrollTo({top:0}); return; }
     return sheet('Сначала заверши текущую тренировку', `<p class="hint">«${esc(S.workout.title)}» ещё не завершена. Подходы сохранены. Заверши её, чтобы начать другой день.</p>`, '<button class="btn" data-act="close">В дневник</button><button class="btn primary" data-act="resume-workout">Продолжить тренировку</button>');
   }
-  const d = dayById(dayId);
+  const d = p?.days.find(x => x.id === dayId);
   if (!d || !d.items.length) return toast('В этом дне пока нет упражнений');
-  if (!S.healthOk) return healthSheet(() => startWorkout(dayId));
-  S.workout = {dayId, title: d.title, start: Date.now(), active: 0, items: d.items.map(it => {
+  if (!S.healthOk) return healthSheet(() => startWorkout(dayId, p.id, planId));
+  S.workout = {dayId, programId:p.id, programTitle:p.title, title: d.title, start: Date.now(), active: 0, items: d.items.map(it => {
     const sg = suggest(it), last = lastSets(it);
     return {...JSON.parse(JSON.stringify(it)), hint: sg.text, up: !!sg.up, sets: Array.from({length: it.s}, (_, k) => ({w: sg.w, r: sg.up ? it.lo : (last && last.sets[k] ? Math.min(it.hi, last.sets[k].r + (last.sets[k].r < it.hi ? 1 : 0)) : it.lo), done: false}))};
   })};
-  const plan = (S.schedule || []).find(p => p.dayId === dayId && p.date === dateKey());
+  const plan = (S.schedule || []).find(x => x.programId === p.id && x.dayId === dayId && x.date === dateKey() && (!planId || x.id === planId));
   if (plan) S.workout.planId = plan.id;
   S.rest = null; S.tab = 'today'; S.justFinished = null;
   render(); window.scrollTo({top: 0});
@@ -51,7 +53,7 @@ function viewWorkout() {
     </div></article>`;
   }).join('');
   return [W.title.replace(/^День \d+ · /, ''), `
-    <div class="wo-head"><div class="row"><span class="grow hint">${done} из ${all.length} подходов</span><span class="clock" id="clock">${clock(Date.now() - W.start)}</span></div><div class="bar"><i style="width:${all.length ? done / all.length * 100 : 0}%"></i></div></div>
+    <div class="wo-head"><div class="row"><span class="grow hint">${done} из ${all.length} подходов</span><span class="clock" id="clock" role="timer" aria-label="Длительность тренировки">${clock(Date.now() - W.start)}</span><button class="btn sm" data-act="break">Перерыв</button></div><div class="bar"><i style="width:${all.length ? done / all.length * 100 : 0}%"></i></div></div>
     ${cards}
     <button class="btn" data-act="wx-add">${I.plus}Добавить упражнение на сегодня</button>
     <div class="workout-dock"><button class="btn primary big" data-act="finish">Завершить тренировку</button></div>`,
@@ -68,6 +70,15 @@ function renderRest() {
   const label = lft > 0 ? 'Отдых' : 'Пора, следующий подход';
   if ($('.l', el).textContent !== label) $('.l', el).textContent = label;
   $('[data-act="rest-skip"]', el).textContent = lft > 0 ? 'Дальше' : 'Скрыть';
+}
+function breakSheet() {
+  if (!S.workout) return;
+  sheet('Перерыв', `<p class="hint">Общее время тренировки продолжает идти.</p><div class="break-options">${[30,60,90,120].map(n => `<button class="btn" data-act="break-start" data-v="${n}">${n === 90 ? '1 мин 30 с' : n < 60 ? n + ' секунд' : n / 60 + ' мин'}</button>`).join('')}</div><div class="field"><label for="break-seconds">Своё время, секунд</label><input class="input" id="break-seconds" inputmode="numeric" type="number" min="5" max="3600" value="60"></div>`, '<button class="btn" data-act="close">Отмена</button><button class="btn primary" data-act="break-custom">Включить таймер</button>');
+}
+function startBreak(seconds) {
+  if (!S.workout || !Number.isInteger(seconds) || seconds < 5 || seconds > 3600) return toast('Укажи от 5 до 3600 секунд');
+  S.rest = {end:Date.now() + seconds * 1000, total:seconds, manual:true};
+  closeSheet(); renderRest(); save();
 }
 setInterval(() => {
   if (S.workout) { const c = $('#clock'); if (c) c.textContent = clock(Date.now() - S.workout.start); }
@@ -88,15 +99,19 @@ function finishSheet() {
     `<button class="btn" data-act="close">Продолжить</button><button class="btn primary" data-act="save-wo">Завершить</button>`);
 }
 function saveWorkout() {
+  libraryPrograms();
   const W = S.workout; if (!W) return false;
   const items = W.items.map(it => ({name: it.name, base: it.base, sec: it.sec || undefined, sets: it.sets.filter(s => s.done).map(s => ({w: s.w, r: s.r, ...(s.c != null ? {c: s.c, n: s.n} : {}),
     ...(s.partial ? {partial:true} : {}), ...(s.analysisMode ? {analysisMode:s.analysisMode} : {}), ...(s.note ? {note:s.note} : {}), ...(s.cue ? {cue:s.cue} : {}), ...(s.ft ? {ft:s.ft} : {})}))})).filter(e => e.sets.length);
   if (!items.length) return false;
-  const entry = {id:nid('w'), dayId:W.dayId, date:W.start, title:W.title, dur:Math.max(1, Math.round((Date.now() - W.start) / 60000)), items};
-  const previous = S, idx = S.program.days.findIndex(d => d.id === W.dayId);
+  const elapsed = Math.max(0, Date.now() - W.start);
+  const entry = {id:nid('w'), dayId:W.dayId, programId:W.programId, programTitle:W.programTitle, date:W.start, title:W.title, durMs:elapsed, dur:Math.max(1, Math.round(elapsed / 60000)), items};
+  const previous = S, p = programById(W.programId), idx = p?.days.findIndex(d => d.id === W.dayId) ?? -1;
+  const programs = S.programs.map(x => x.id === p?.id && idx >= 0 ? {...x, next:p.days[(idx + 1) % p.days.length].id} : x);
+  const program = programs.find(x => x.id === S.program.id) || S.program;
   /* Commit diary, next day and the consumed plan together; a full device must not erase the workout. */
   S = {...S, diary:[entry, ...S.diary], schedule:(S.schedule || []).filter(p => p.id !== W.planId),
-    next:idx >= 0 ? S.program.days[(idx + 1) % S.program.days.length].id : S.next,
+    program, programs, next:program.next || null, diaryPick:null,
     workout:null, rest:null, pick:null, tab:'diary', dtab:'hist', open:{...S.open, [entry.id]:true}, justFinished:entry.id};
   selectDiaryDate(dateKey(entry.date));
   if (!save()) {

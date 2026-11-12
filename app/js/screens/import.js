@@ -2,12 +2,12 @@
 /* ---------- own program by photo or text ---------- */
 let IMP = null;
 function newImportSession() {
-  return {step: 'pick', photos: [], text: '', mode: 'photo', days: [], notes: [], warnings: [], undo: [], expectedDays: 'auto', countConfirmed: null, dest: 'add', toDay: S.program.days.length ? S.program.days[S.program.days.length - 1].id : null, prog: ''};
+  return {step: 'pick', photos: [], text: '', mode: 'photo', days: [], notes: [], warnings: [], undo: [], expectedDays: 'auto', countConfirmed: null, dest: 'new', programId:S.program.id || null, toDay: S.program.days.length ? S.program.days[S.program.days.length - 1].id : null, prog: ''};
 }
 const importDayCount = () => IMP.days.filter(d => d.items.length).length;
 function saveImportDraft() {
   if (!IMP || IMP.step !== 'review') return;
-  S.importDraft = JSON.parse(JSON.stringify({v: 1, days: IMP.days, notes: IMP.notes, warnings: IMP.warnings, expectedDays: IMP.expectedDays, countConfirmed: IMP.countConfirmed, dest: IMP.dest, toDay: IMP.toDay, mode: IMP.mode, existing: IMP.existing, sourceCount: IMP.photos.length || IMP.sourceCount || 0}));
+  S.importDraft = JSON.parse(JSON.stringify({v: 1, days: IMP.days, notes: IMP.notes, warnings: IMP.warnings, expectedDays: IMP.expectedDays, countConfirmed: IMP.countConfirmed, dest: IMP.dest, toDay: IMP.toDay, mode: IMP.mode, existing: IMP.existing, programId:IMP.programId, sourceCount: IMP.photos.length || IMP.sourceCount || 0}));
   save();
 }
 function snapImport() {
@@ -100,18 +100,21 @@ function restoreImportNote(id) {
   day.items.splice(Math.min(note.index == null ? day.items.length : note.index, day.items.length), 0, it);
 }
 function organizeProgram() {
+  libraryPrograms();
   IMP = newImportSession(); IMP.existing = true; IMP.dest = 'replace'; IMP.mode = 'text'; IMP.step = 'review';
   IMP.days = JSON.parse(JSON.stringify(S.program.days)).map(d => ({...d, items: d.items.map(it => ({...it, st: coachNote(it.name) ? 'check' : it.base ? 'ok' : 'new', raw: it.name}))}));
   IMP.expectedDays = 'auto'; IMP.countConfirmed = null;
   sheet('Исправить распределение по дням', '<div id="imp"></div>', '<div id="imp-f" style="display:flex;gap:8px;width:100%"></div>', 'full');
   renderImport();
 }
-function importSheet() {
-  IMP = newImportSession();
+function importSheet(asNew = false) {
+  libraryPrograms(); IMP = newImportSession();
   const draft = S.importDraft;
-  if (draft && draft.v === 1 && validBackup({app: 'ii-trener', v: 1, program: {days: draft.days}, diary: []})) {
+  const sameEditor = draft && (draft.programId === S.program.id || !draft.programId && S.programs.length === 1);
+  if (draft && (!draft.existing || !asNew && sameEditor) && draft.v === 1 && validBackup({app: 'ii-trener', v: 1, program: {days: draft.days}, diary: []})) {
     Object.assign(IMP, JSON.parse(JSON.stringify(draft)), {step: 'review', undo: []});
   }
+  if (asNew || (!IMP.existing && IMP.dest === 'replace')) IMP.dest = 'new';
   sheet('Своя программа', '<div id="imp"></div>', '<div id="imp-f" style="display:flex;gap:8px;width:100%"></div>', 'full');
   renderImport();
 }
@@ -186,10 +189,10 @@ function renderImport() {
     ${IMP.warnings.length ? `<div class="note warn">${I.info}<span>${IMP.warnings.map(esc).join('<br>')}</span></div>` : ''}
     ${P.length && !IMP.existing ? `<div class="eyebrow">Куда добавить</div>
     <div class="dest" role="radiogroup">
-      ${destOpt('add', 'Новым днём в мою программу', `${nd > 1 ? 'Станут днями' : 'Станет днём'} ${P.length + 1}${nd > 1 ? '–' + (P.length + nd) : ''}, остальное не изменится`)}
+      ${destOpt('new', 'Отдельная программа', 'Предыдущая программа останется в библиотеке')}
+      ${destOpt('add', 'Добавить дни в выбранную программу', `${nd > 1 ? 'Станут днями' : 'Станет днём'} ${P.length + 1}${nd > 1 ? '–' + (P.length + nd) : ''}, остальное не изменится`)}
       ${destOpt('into', 'Дописать в существующий день', 'Все распознанные дни объединятся в один выбранный день')}
       ${IMP.dest === 'into' ? `<select class="input" id="imp-day" aria-label="в какой день">${dayOpts}</select>` : ''}
-      ${destOpt('replace', 'Заменить всю программу', `Текущие ${P.length} ${plural(P.length, 'день', 'дня', 'дней')} уйдут`)}
     </div>` : ''}
     <div class="eyebrow">Что распознала</div>
     <p class="hint" style="margin:0">«Новый день отсюда» переносит это упражнение и все следующие в отдельный день. «Перенести» меняет день одного упражнения. Нажми на название для изменения веса и повторов, ⋯ — для удаления или переноса в заметки.</p>
@@ -207,7 +210,7 @@ function renderImportFoot() {
   const f = $('#imp-f'), n = IMP.days.reduce((a, d) => a + d.items.length, 0), into = IMP.dest === 'into' && dayById(IMP.toDay);
   const empty = IMP.days.length - importDayCount(), missingDose = IMP.days.flatMap(d => d.items).filter(it => it._needsDose).length;
   const message = empty ? `Заполни или удали пустые дни: ${empty}.` : missingDose ? `Не прочитались подходы и повторы: ${missingDose}. Нажми на названия и проверь значения.` : !readyImport() ?  `Нужно ${IMP.expectedDays} ${plural(+IMP.expectedDays, 'день', 'дня', 'дней')}, сейчас заполнено ${importDayCount()}. Расставь границы или перенеси упражнения.` : `${importDayCount()} ${plural(importDayCount(), 'день', 'дня', 'дней')} · ${n} ${plural(n, 'упражнение', 'упражнения', 'упражнений')} — готово к сохранению`;
-  f.innerHTML = `<div class="import-save"><span class="hint" role="status">${message}</span><div class="row"><button class="btn primary" data-act="imp-save" ${readyImport() ? '' : 'disabled'}>${IMP.existing ? 'Сохранить исправления' : !S.program.days.length ? 'Сохранить программу' : IMP.dest === 'replace' ? 'Заменить программу' : into ? 'Дописать в день' : 'Добавить в программу'} · ${importDayCount()} ${plural(importDayCount(), 'день', 'дня', 'дней')}</button></div></div>`;
+  f.innerHTML = `<div class="import-save"><span class="hint" role="status">${message}</span><div class="row"><button class="btn primary" data-act="imp-save" ${readyImport() ? '' : 'disabled'}>${IMP.existing ? 'Сохранить исправления' : !S.program.days.length ? 'Сохранить программу' : IMP.dest === 'new' || IMP.dest === 'replace' ? 'Добавить отдельную программу' : into ? 'Дописать в день' : 'Добавить в программу'} · ${importDayCount()} ${plural(importDayCount(), 'день', 'дня', 'дней')}</button></div></div>`;
 }
 function addPhotos(files) {
   [...files].filter(f => f.type.startsWith('image/')).forEach(f => IMP.photos.push({url: URL.createObjectURL(f), name: f.name}));
@@ -277,13 +280,19 @@ function importRowMenu(di, ii) {
 }
 function importSave() {
   if (!readyImport()) return toast('Сначала проверь число дней и распредели упражнения по ним');
-  const P = S.program;
+  libraryPrograms();
+  let P = S.program;
   const owners = new Set(IMP.days.flatMap(d => d.items.map(it => it.id)));
   const orphanNotes = IMP.notes.filter(note => !owners.has(note.ownerId)).map(note => note.text);
   const days = IMP.days.filter(d => d.items.length).map(d => ({id: IMP.existing ? d.id : nid('d'), title: d.title.trim() || 'День', ...(d.coachNotes ? {coachNotes: d.coachNotes} : {}), items: d.items.map(({st, raw, _number, _photos, _needsDose, _warn, ...it}) => ({...it, id: IMP.existing ? it.id : nid('i')}))}));
   snap();
   let msg, flashId;
-  if (!P.days.length || IMP.dest === 'replace') { if (!IMP.existing) { delete P.coachNotes; P.at = Date.now(); P.by = 'import'; } P.days = days; if (!IMP.existing || !days.some(d => d.id === S.next)) S.next = days[0].id; msg = `Программа сохранена: ${days.length} ${plural(days.length, 'день', 'дня', 'дней')}`; flashId = days[0].id; }
+  const newProgram = !IMP.existing && (IMP.dest === 'new' || IMP.dest === 'replace' || !P.id);
+  if (newProgram) {
+    if (!useProgram(days, null, 'program', {by:'import',coachNotes:orphanNotes})) return;
+    P = S.program; flashId = days[0].id; msg = 'Программа добавлена. Прежние программы остались в библиотеке.';
+  }
+  else if (!P.days.length || IMP.dest === 'replace') { if (!IMP.existing) { delete P.coachNotes; P.at = Date.now(); P.by = 'import'; } P.days = days; if (!IMP.existing || !days.some(d => d.id === S.next)) S.next = days[0].id; msg = `Программа сохранена: ${days.length} ${plural(days.length, 'день', 'дня', 'дней')}`; flashId = days[0].id; }
   else if (IMP.dest === 'into') { const d = dayById(IMP.toDay); d.items.push(...days.flatMap(x => x.items)); msg = `Дописала в «${d.title}»`; flashId = d.id; }
   else { P.days.push(...days); msg = days.length > 1 ? `Добавила ${days.length} дня в конец программы` : `«${days[0].title}» — теперь день ${P.days.length}`; flashId = days[0].id; }
   if (orphanNotes.length) P.coachNotes = [...new Set([...(P.coachNotes || []), ...orphanNotes])];
@@ -293,6 +302,6 @@ function importSave() {
   S.stage = 'app'; S.tab = 'program'; S.flash = flashId; S.open[flashId] = true;
   render(); S.flash = null;
   setTimeout(() => { const el = $(`[data-day="${flashId}"]`); el && el.scrollIntoView({behavior: 'smooth', block: 'center'}); }, 60);
-  toast(msg, true);
+  toast(msg, !newProgram);
 }
 

@@ -16,7 +16,10 @@ const RU_PRONUNCIATION = Object.freeze({
   'корпус':'ко́рпус', 'локти':'ло́кти', 'плечи':'пле́чи', 'колено':'коле́но',
   'колени':'коле́ни', 'лопатки':'лопа́тки', 'подход':'подхо́д', 'подходы':'подхо́ды',
   'повтор':'повто́р', 'повторы':'повто́ры', 'отсчет':'отсчёт', 'еще':'ещё',
-  'счет':'счёт', 'считаем':'счита́ем', 'молодец':'молоде́ц', 'записано':'за́писано',
+  'счет':'счёт', 'считаем':'счита́ем', 'молодец':'молоде́ц', 'записано':'запи́сано',
+  'записан':'запи́сан', 'записана':'запи́сана', 'записаны':'запи́саны',
+  'начинаю':'начина́ю', 'секунду':'секу́нду', 'секунды':'секу́нды', 'секунд':'секу́нд',
+  'замрите':'замри́те', 'начинай':'начина́й', 'дыши':'дыши́', 'выдох':'вы́дох',
   'повторов':'повто́ров', 'подходов':'подхо́дов', 'подхода':'подхо́да'
 });
 function russianSpeech(text) {
@@ -29,20 +32,27 @@ function russianSpeech(text) {
 }
 const Voice = {
   on: false, last: -Infinity, lastId: {}, guardUntil: 0, rate: 1,
+  supported() { return !!window.speechSynthesis || RemoteVoice.available(); },
   utterance(text) {
     const u = new SpeechSynthesisUtterance(russianSpeech(text));
     u.lang = 'ru-RU'; u.rate = this.rate; if (this.voice) u.voice = this.voice;
     return u;
   },
-  cancel() { try { speechSynthesis.cancel(); } catch (e) { /* no speech engine */ } this.guardUntil = 0; },
+  cancel() { RemoteVoice.cancel(); try { speechSynthesis.cancel(); } catch (e) { /* no speech engine */ } this.guardUntil = 0; },
   say(text, id, force, low) {
-    if (!this.on || !('speechSynthesis' in window)) return false;
+    if (!this.on || !this.supported()) return false;
+    if ($('#cameraOptions')?.open && id !== 'test' && id !== 'on') return false;
     const now = performance.now();
     if (!force && now < this.guardUntil) return false;
-    if (low && speechSynthesis.speaking) return false;
+    if (low && (this.remoteVoice ? RemoteVoice.busy : typeof speechSynthesis !== 'undefined' && speechSynthesis.speaking)) return false;
     if (!force && now - this.last < (id && /^rep\d+$/.test(id) ? 450 : 1600)) return false;
     if (!force && id && Number.isFinite(this.lastId[id]) && now - this.lastId[id] < 12000) return false;
     try {
+      if (this.remoteVoice) {
+        if (!low) this.cancel();
+        RemoteVoice.play(russianSpeech(text), this.remoteVoice, this.rate);
+        this.last = now; if (id) this.lastId[id] = now; return true;
+      }
       if (!low) speechSynthesis.cancel();
       speechSynthesis.speak(this.utterance(text)); this.last = now; if (id) this.lastId[id] = now;
       return true;
@@ -52,7 +62,9 @@ const Voice = {
     if (this.say('Начинаю отсчёт.', 'start', true)) this.guardUntil = performance.now() + 1500;
   },
   queue(text) {
-    if (!this.on || !('speechSynthesis' in window) || performance.now() < this.guardUntil) return;
+    if (!this.on || !this.supported() || performance.now() < this.guardUntil) return;
+    if ($('#cameraOptions')?.open) return;
+    if (this.remoteVoice) { RemoteVoice.play(russianSpeech(text), this.remoteVoice, this.rate, true); this.last = performance.now(); return; }
     try { speechSynthesis.speak(this.utterance(text)); this.last = performance.now(); } catch (e) { /* speech unavailable */ }
   }
 };

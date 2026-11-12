@@ -14,51 +14,97 @@ function calendarDate(key) {
 }
 function selectDiaryDate(key = dateKey()) {
   const d = calendarDate(key); if (!d) return false;
+  if (S.calDay !== key) S.diaryPick = null;
   S.calDay = key; S.calM = [d.getFullYear(), d.getMonth()]; S.dtab = 'hist';
   return true;
 }
-function workoutDay(w) {
+function workoutProgram(w) {
   if (w.camOnly) return null;
+  if (w.programId) return w.programId;
+  const owners = libraryPrograms().filter(p => (!p.at || w.date >= p.at) && p.days.some(d => w.dayId ? d.id === w.dayId : d.title === w.title));
+  return owners.length === 1 ? owners[0].id : null;
+}
+function workoutDay(w, programId) {
+  if (w.camOnly || workoutProgram(w) !== programId) return null;
   if (w.dayId) return w.dayId;
-  /* Old entries have only a title; infer it only when the current program is unambiguous. */
-  if (S.program.at && w.date < S.program.at) return null;
-  const days = S.program.days.filter(d => d.title === w.title);
+  const p = programById(programId), days = p?.days.filter(d => d.title === w.title) || [];
   return days.length === 1 ? days[0].id : null;
+}
+function diarySelection() {
+  const pick = S.diaryPick;
+  if (!pick || pick.date !== S.calDay) return null;
+  const program = programById(pick.programId), day = program?.days.find(d => d.id === pick.dayId);
+  return program && day ? {...pick, program, day} : null;
+}
+function pickDiaryDay(value) {
+  const [pid, did] = String(value || '').includes(':') ? value.split(':') : [S.program.id, value];
+  const p = programById(pid), day = p?.days.find(d => d.id === did);
+  if (!day) return;
+  if (!calendarDate(S.calDay)) selectDiaryDate();
+  S.diaryProgram = pid; S.diaryPick = {programId:pid, dayId:did, date:S.calDay}; render(); revealDiaryPreview();
+}
+function pickPlannedWorkout(id) {
+  const plan = (S.schedule || []).find(p => p.id === id), p = plan && programById(plan.programId);
+  if (!p?.days.some(d => d.id === plan.dayId)) return toast('Этого дня больше нет в программе. Убери план и выбери другой.');
+  selectDiaryDate(plan.date); S.diaryProgram = p.id;
+  S.diaryPick = {programId:p.id, dayId:plan.dayId, date:plan.date, planId:id}; render(); revealDiaryPreview();
+}
+function revealDiaryPreview() {
+  const preview = $('.diary-preview'); if (preview?.scrollIntoView) preview.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+function planSelectedWorkout() {
+  const pick = diarySelection();
+  if (!pick || !pick.day.items.length || pick.date < dateKey()) return;
+  if (pick.planId) return;
+  const before = S;
+  const plan = {id:nid('p'), date:pick.date, programId:pick.programId, programTitle:pick.program.title, dayId:pick.dayId, title:pick.day.title, at:Date.now()};
+  S = {...S, schedule:[...(S.schedule || []),plan], diaryPick:null};
+  if (!save()) { S = before; return toast('План не сохранён — освободи место и попробуй ещё раз'); }
+  render(); toast('Тренировка запланирована');
+}
+function startSelectedWorkout() {
+  const pick = diarySelection();
+  if (!pick || pick.date !== dateKey()) return toast('Начать тренировку можно на сегодняшнюю дату');
+  startWorkout(pick.dayId, pick.programId, pick.planId);
+}
+/* Old links may still ask to plan a day; they never start a workout. */
+function togglePlan(dayId) {
+  libraryPrograms();
+  const existing = (S.schedule || []).find(p => p.date === S.calDay && p.programId === S.program.id && p.dayId === dayId);
+  if (existing) return removePlan(existing.id);
+  pickDiaryDay(S.program.id + ':' + dayId); planSelectedWorkout();
+}
+function removePlan(id) {
+  const before = S;
+  S = {...S, schedule:(S.schedule || []).filter(p => p.id !== id), diaryPick:S.diaryPick?.planId === id ? null : S.diaryPick};
+  if (!save()) { S = before; return toast('Не удалось сохранить изменение плана'); }
+  render();
 }
 function diaryDayPanel(key, entries) {
   const today = dateKey(), isToday = key === today, future = key > today, date = calendarDate(key);
+  const programs = libraryPrograms(), selectedProgram = programById(S.diaryProgram) || S.program;
   const plans = (S.schedule || []).filter(p => p.date === key);
-  const finished = entries.filter(w => !w.camOnly), saved = entries.find(w => w.id === S.justFinished);
-  const W = S.workout;
-  const resume = isToday && W ? `<button class="btn primary big" data-act="resume-workout">Продолжить · ${esc(W.title)}</button><p class="hint">Подходы сохранены. Вернись к тренировке, когда будешь готова.</p>` : '';
-  const choices = isToday || future ? S.program.days.map(d => {
-    const completed = finished.filter(w => workoutDay(w) === d.id), plan = plans.find(p => p.dayId === d.id), active = isToday && W && W.dayId === d.id;
-    const label = future ? (plan ? 'Запланировано' : 'Запланировать') : active ? 'Продолжить' : completed.length ? 'Повторить' : 'Начать';
-    const status = [completed.length ? `✓ Выполнено${completed.length > 1 ? ' · ' + completed.length + ' раза' : ''}` : '', plan && !future ? 'По плану' : '', `${d.items.length} ${plural(d.items.length, 'упражнение', 'упражнения', 'упражнений')}`].filter(Boolean).join(' · ');
-    return `<button class="diary-choice ${completed.length ? 'completed' : ''} ${plan ? 'planned' : ''}" data-act="${future ? 'plan-day' : 'start'}" data-v="${esc(d.id)}" ${future ? `aria-pressed="${!!plan}"` : ''} ${d.items.length ? '' : 'disabled'}><span class="grow"><b>${esc(d.title)}</b><span class="hint">${esc(status)}</span></span><span class="diary-choice-action">${label}${future && plan ? ' ✓' : ''}</span></button>`;
+  const finished = entries.filter(w => !w.camOnly), saved = entries.find(w => w.id === S.justFinished), W = S.workout;
+  const resume = isToday && W ? `<button class="btn primary big" data-act="resume-workout">Продолжить · ${esc(W.title)}</button><p class="hint">${esc(W.programTitle || '')} · подходы сохранены.</p>` : '';
+  const planned = plans.length ? `<div class="diary-plans"><p class="eyebrow">Запланировано · ${plans.length}</p>${plans.map(plan => {
+    const p = programById(plan.programId), d = p?.days.find(x => x.id === plan.dayId), selected = S.diaryPick?.planId === plan.id;
+    return `<div class="diary-plan ${selected ? 'selected' : ''}"><button class="diary-plan-pick grow" data-act="plan-pick" data-v="${esc(plan.id)}" ${d?.items.length ? '' : 'disabled'} aria-pressed="${selected}"><b>${esc(d?.title || plan.title)}</b><span class="hint">${esc(p?.title || plan.programTitle || 'Программа')}${!d ? ' · день недоступен' : ''}</span></button><button class="icon-btn" data-act="plan-remove" data-v="${esc(plan.id)}" aria-label="Убрать ${esc(plan.title)} из плана">${I.trash}</button></div>`;
+  }).join('')}</div>` : '';
+  const choices = isToday || future ? selectedProgram.days.map(d => {
+    const completed = finished.filter(w => workoutDay(w, selectedProgram.id) === d.id), selected = S.diaryPick?.programId === selectedProgram.id && S.diaryPick?.dayId === d.id && S.diaryPick?.date === key;
+    return `<button class="diary-choice ${completed.length ? 'completed' : ''}" data-act="diary-pick" data-v="${esc(selectedProgram.id)}:${esc(d.id)}" aria-pressed="${selected}" ${d.items.length ? '' : 'disabled'}><span class="grow"><b>${esc(d.title)}</b><span class="hint">${completed.length ? '✓ Выполнено · ' : ''}${d.items.length} ${plural(d.items.length, 'упражнение', 'упражнения', 'упражнений')}</span></span><span class="diary-choice-action">${selected ? 'Выбрано ✓' : 'Выбрать'}</span></button>`;
   }).join('') : '';
-  const orphanPlans = plans.filter(p => !dayById(p.dayId)).map(p => `<div class="row"><span class="grow hint">${esc(p.title)} · дня больше нет в программе</span><button class="icon-btn" data-act="plan-remove" data-v="${esc(p.id)}" aria-label="Убрать из плана">${I.trash}</button></div>`).join('');
-  const noProgram = !S.program.days.length && (isToday || future) ? `<p class="hint">Добавь программу — её дни можно будет выбирать здесь.</p><button class="btn" data-act="tab" data-v="program">Добавить программу</button>` : '';
+  const pick = diarySelection();
+  const preview = pick && (isToday || future) ? `<section class="diary-preview"><p class="eyebrow">${esc(pick.program.title)}</p><h3>${esc(pick.day.title)}</h3><details class="diary-exercises"><summary>Состав тренировки · ${pick.day.items.length} упр.</summary><ul class="plan-list">${pick.day.items.map(it => `<li><span class="nm">${esc(it.name)}</span><span class="ds">${dose(it)}${it.w ? ' · ' + fmt(it.w) + ' кг' : ''}</span></li>`).join('')}</ul></details><div class="diary-start-actions">${isToday ? `<button class="btn primary big" data-act="start-selected" ${pick.day.items.length ? '' : 'disabled'}>${W?.programId === pick.programId && W.dayId === pick.dayId ? 'Продолжить тренировку' : 'Начать тренировку'}</button>` : ''}${!pick.planId ? `<button class="btn ${future ? 'primary big' : ''}" data-act="plan-selected" ${pick.day.items.length ? '' : 'disabled'}>${future ? 'Запланировать тренировку' : 'Добавить в план'}</button>` : '<p class="hint">Эта тренировка уже в плане.</p>'}</div></section>` : '';
   return `<section class="card pad diary-day" id="diary-day"><div class="row"><h2 class="grow">${isToday ? 'Сегодня' : esc(ruDate(date, {day:'numeric',month:'long'}))}</h2>${!isToday ? '<button class="btn ghost" data-act="diary-today">Сегодня</button>' : ''}</div>
     ${saved ? `<p class="diary-success" role="status">Тренировка сохранена. ${esc(CoachText.praise(saved.items.reduce((n,e) => n + e.sets.length, 0)))}</p>` : ''}
-    ${finished.length ? `<div class="diary-completed" aria-label="Выполнено за день">${finished.map(w => `<span class="badge next">✓ ${esc(w.title)}</span>`).join('')}</div>` : ''}
+    ${finished.length ? `<div class="diary-completed" aria-label="Выполнено за день">${finished.map(w => `<span class="badge next">✓ ${esc(w.programTitle || programById(workoutProgram(w))?.title || '')}${w.programTitle ? ' · ' : ' '}${esc(w.title)}</span>`).join('')}</div>` : ''}
     ${!entries.length && !future ? '<p class="hint">Пока нет записанных тренировок.</p>' : ''}
-    ${resume}${choices ? `<p class="eyebrow">${future ? 'План на этот день · нажми, чтобы выбрать или убрать' : W ? 'Дни программы' : 'Выбери день программы'}</p><div class="diary-choices">${choices}</div>` : ''}${noProgram}${orphanPlans}
+    ${resume}${planned}
+    ${programs.length && (isToday || future) ? `<div class="field"><label for="diary-program">Из какой программы?</label><select class="input" id="diary-program">${programs.map(p => `<option value="${esc(p.id)}" ${p.id === selectedProgram.id ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select></div>` : ''}
+    ${preview}${choices ? `<p class="eyebrow">Выбери день · тренировка начнётся по кнопке</p><div class="diary-choices">${choices}</div>` : ''}
+    ${!programs.length && (isToday || future) ? '<p class="hint">Добавь программу — её дни можно будет выбирать здесь.</p><button class="btn" data-act="tab" data-v="program">Добавить программу</button>' : ''}
   </section>`;
-}
-function togglePlan(dayId) {
-  const day = dayById(dayId), date = S.calDay;
-  if (!day || !day.items.length || !calendarDate(date) || date < dateKey()) return;
-  const before = S.schedule || [], existing = before.find(p => p.date === date && p.dayId === dayId);
-  S.schedule = existing ? before.filter(p => p.id !== existing.id) : [...before, {id:nid('p'), date, dayId, title:day.title, at:Date.now()}];
-  if (!save()) { S.schedule = before; return toast('План не сохранён — освободи место и попробуй ещё раз'); }
-  render();
-  toast(existing ? 'Убрано из плана' : 'Тренировка запланирована');
-}
-function removePlan(id) {
-  const before = S.schedule || []; S.schedule = before.filter(p => p.id !== id);
-  if (!save()) { S.schedule = before; return toast('Не удалось сохранить изменение плана'); }
-  render();
 }
 function viewDiary() {
   const seg = `<div class="seg"><button data-act="dtab" data-v="hist" aria-pressed="${S.dtab === 'hist'}">История</button><button data-act="dtab" data-v="prog" aria-pressed="${S.dtab === 'prog'}">Прогресс</button></div>`;
@@ -96,7 +142,7 @@ function logCard(w) {
       : cam.length ? `Камера: чисто ${cam.reduce((a, s) => a + s.c, 0)} из ${cam.reduce((a, s) => a + s.n, 0)}` : '';
     return `<div class="log-ex"><b>${esc(e.name)}</b><div class="sets-chips">${e.sets.map((s, si) => `<button class="sc" data-act="set-edit" data-v="${w.id}:${ei}:${si}">${s.w ? fmt(s.w) + ' × ' : ''}${s.r}${e.sec ? ' с' : ''}</button>`).join('')}<button class="sc add" data-act="set-add" data-v="${w.id}:${ei}">＋ подход</button></div><p class="hint" style="margin:8px 0 0">${esc(CoachText.summary(e.sets,{hold:!!e.sec}).text)}</p>${cameraNote ? `<div class="hint" style="margin-top:6px">${I.camera.replace('<svg', '<svg width="14" height="14" style="vertical-align:-2px"')} ${cameraNote}</div>` : ''}</div>`;
   }).join('')}</div>` : '';
-  return `<article class="log" id="log-${w.id}"><button class="log-h" data-act="log-toggle" data-v="${w.id}" aria-expanded="${!!open}"><span class="log-d"><b>${d.getDate()}</b><span>${WD[d.getDay()]}</span></span><span class="grow"><b style="display:block">${esc(w.title)}</b><span class="hint">${w.dur ? w.dur + ' мин · ' : ''}${w.items.length} ${plural(w.items.length, 'упражнение', 'упражнения', 'упражнений')} · ${nSets} ${plural(nSets, 'подход', 'подхода', 'подходов')}</span></span><span style="width:20px;color:var(--muted);transform:rotate(${open ? 90 : 0}deg);transition:transform .15s">${CHEV}</span></button>${body}</article>`;
+  return `<article class="log" id="log-${w.id}"><button class="log-h" data-act="log-toggle" data-v="${w.id}" aria-expanded="${!!open}"><span class="log-d"><b>${d.getDate()}</b><span>${WD[d.getDay()]}</span></span><span class="grow"><b style="display:block">${esc(w.title)}</b>${w.programTitle ? `<span class="hint log-program">${esc(w.programTitle)}</span>` : ''}<span class="hint">${w.durMs != null ? clock(w.durMs) + ' · ' : w.dur ? w.dur + ' мин · ' : ''}${w.items.length} ${plural(w.items.length, 'упражнение', 'упражнения', 'упражнений')} · ${nSets} ${plural(nSets, 'подход', 'подхода', 'подходов')}</span></span><span style="width:20px;color:var(--muted);transform:rotate(${open ? 90 : 0}deg);transition:transform .15s">${CHEV}</span></button>${body}</article>`;
 }
 function setSheet(wid, ei, si) {
   const w = S.diary.find(x => x.id === wid), e = w.items[ei], s = si == null ? null : e.sets[si], v = s || e.sets[e.sets.length - 1] || {w: 0, r: 10};

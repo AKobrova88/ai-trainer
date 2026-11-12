@@ -1,13 +1,16 @@
 'use strict';
 /* ---------- program ---------- */
 function viewProgram() {
+  const library = libraryPrograms();
   const P = S.program, n = P.days.reduce((a, d) => a + d.items.length, 0);
+  const selector = library.length ? `<section class="card pad program-library"><div class="row"><div class="field grow"><label for="program-select">Мои программы · ${library.length} из 5</label><select class="input" id="program-select">${library.map(p => `<option value="${esc(p.id)}" ${p.id === P.id ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select></div><button class="icon-btn" data-act="program-add" aria-label="Добавить программу" ${library.length >= 5 ? 'disabled' : ''}>${I.plus}</button></div><p class="hint">${P.by === 'wish' ? 'Рекомендована ИИ' : P.by === 'manual' ? 'Создана вручную' : 'Своя программа'} · название можно изменить в меню ⋯</p></section>` : '';
   const more=`<button class="icon-btn" data-act="program-menu" aria-label="Ещё о программе">${DOTS}</button>`;
-  if (!P.days.length) return ['Программа', `
-    <section class="empty-card"><h2>Добавь свою программу</h2><p class="hint" style="margin:0">Подбери программу по пожеланиям, загрузи свою или собери из справочника.</p>
-      <div class="row" style="flex-wrap:wrap"><button class="btn primary" data-act="import">${I.photo}По фото или тексту</button><button class="btn" data-act="wish">${I.spark}Подобрать с тренером</button></div>
+  if (!P.days.length) return ['Программа', `${selector}
+    <section class="empty-card"><h2>${P.id ? 'Добавь дни в программу' : 'Твои программы'}</h2><p class="hint" style="margin:0">${P.id ? 'Создай первый тренировочный день и добавь упражнения.' : 'До пяти программ: рекомендации ИИ, своя по фото или тексту, программа с нуля.'}</p>
+      <button class="btn primary" data-act="${P.id ? 'day-add' : 'program-add'}">${I.plus}${P.id ? 'Добавить день' : 'Добавить программу'}</button>
       </section>`,more];
   return ['Программа', `
+    ${selector}
     ${P.coachNotes && P.coachNotes.length ? `<details class="card pad"><summary>Заметки из программы</summary>${P.coachNotes.map(note => `<p class="hint">${esc(note)}</p>`).join('')}</details>` : ''}
     <p class="hint" style="margin:0">${P.days.length} ${plural(P.days.length, 'день', 'дня', 'дней')} · ${n} ${plural(n, 'упражнение', 'упражнения', 'упражнений')}. Держи за <span style="display:inline-flex;width:14px;vertical-align:-2px">${GRIP}</span> и перетаскивай — дни и упражнения меняются местами, упражнение можно перенести в другой день.</p>
     <div class="days" id="days">${P.days.map(dayCard).join('')}</div>
@@ -15,11 +18,32 @@ function viewProgram() {
 }
 function programMenu() {
   sheet('Программа',`<div class="menu">
+    ${S.program.id ? mi('program-rename',S.program.id,I.edit,'Переименовать программу') : ''}
+    ${mi('program-add','',I.plus,'Добавить другую программу',libraryPrograms().length >= 5 ? 'disabled' : '')}
     ${mi('import','',I.photo,'Добавить по фото или тексту')}
     ${mi('day-add','',I.plus,'Добавить день вручную')}
     ${S.program.days.length ? mi('program-organize','',I.sliders,'Изменить распределение по дням') : ''}
     ${mi('wish','',I.spark,'Подобрать с тренером')}
+    ${S.program.id ? mi('program-delete',S.program.id,I.trash,'Удалить программу','class="danger"') : ''}
   </div>`);
+}
+function programAddSheet() {
+  if (libraryPrograms().length >= 5) return toast('У тебя уже пять программ. Можно переименовать или удалить ненужную в меню ⋯');
+  sheet('Добавить программу', `<div class="menu">${mi('wish','',I.spark,'Рекомендованная ИИ')}${mi('program-import','',I.photo,'Загрузить по фото или тексту')}${mi('program-manual','',I.plus,'Создать вручную')}</div><p class="hint">Текущая программа останется в библиотеке.</p>`);
+}
+function selectProgram(id) {
+  const p = programById(id); if (!p) return;
+  S.program = p; S.next = p.next || p.days[0]?.id || null; S.renaming = null; S.open = {}; undoSnap = null;
+  render();
+}
+function renameProgramSheet(id) {
+  const p = programById(id); if (!p) return;
+  sheet('Название программы', `<div class="field"><label for="program-title">Как назвать?</label><input class="input" id="program-title" maxlength="80" value="${esc(p.title)}"></div>`, `<button class="btn" data-act="close">Отмена</button><button class="btn primary" data-act="program-rename-save" data-v="${esc(id)}">Сохранить</button>`);
+}
+function deleteProgram(id) {
+  const p = programById(id); if (!p) return;
+  if (S.workout?.programId === id) return toast('Сначала заверши тренировку из этой программы');
+  sheet('Удалить программу?', `<p>«${esc(p.title)}» исчезнет из списка. Выполненные тренировки останутся в дневнике.</p>`, `<button class="btn" data-act="close">Отмена</button><button class="btn danger" data-act="program-delete-confirm" data-v="${esc(id)}">Удалить программу</button>`);
 }
 function dayCard(d) {
   const closed = S.open[d.id] === false, editing = S.renaming === d.id;
@@ -40,7 +64,7 @@ function dayCard(d) {
   </section>`;
 }
 let undoSnap = null;
-function snap() { undoSnap = JSON.stringify({program: S.program, next: S.next}); }
+function snap() { libraryPrograms(); undoSnap = JSON.stringify({program: S.program, next: S.next}); }
 function undo() { if (!undoSnap) return; const u = JSON.parse(undoSnap); S.program = u.program; S.next = u.next; undoSnap = null; render(); toast('Вернула как было'); }
 function findItem(dayId, itemId) { const d = dayById(dayId); const i = d ? d.items.findIndex(x => x.id === itemId) : -1; return [d, i, d && d.items[i]]; }
 const mi = (act, v, icon, label, extra = '') => `<button data-act="${act}" data-v="${v}" ${extra}>${icon}<span>${label}</span></button>`;

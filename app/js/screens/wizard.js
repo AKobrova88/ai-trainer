@@ -91,7 +91,7 @@ function renderWizard() {
     <section class="fld"><span class="lab">Почему так</span><ul class="why">${explain(R).map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>
     <p class="hint">${P.weight ? 'Стартовые веса примерные — на первой тренировке уточним, дальше прибавлю сама.' : 'Веса подберёшь на первой тренировке — дальше прибавлю сама.'} Гантели — вес одной.</p>`;
   const had = S.program.days.length;
-  f.innerHTML = `<button class="btn" data-act="wiz-accept" data-v="program">Поправить</button><button class="btn primary" data-act="wiz-accept" data-v="today">${S.demo && !S.user ? 'Попробовать программу' : had ? 'Заменить мою программу' : 'Начать'}</button>`;
+  f.innerHTML = `<button class="btn" data-act="wiz-accept" data-v="program">Поправить</button><button class="btn primary" data-act="wiz-accept" data-v="today">${S.demo && !S.user ? 'Попробовать программу' : had ? 'Добавить программу' : 'Сохранить программу'}</button>`;
 }
 let REC = null;
 function micStatus(message, phase = '') {

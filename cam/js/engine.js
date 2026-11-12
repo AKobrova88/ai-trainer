@@ -459,7 +459,7 @@ function setFacing(f) {
   if (f === state.facing || state.cameraRequest) return;
   state.deviceId='';prefs.cameraDevice='';
   state.facing = f; store.set('aitrainer.v2', Object.assign(prefs, { facing: f }));
-  if (f === 'environment' && !Voice.on && 'speechSynthesis' in window) { Voice.on = true; el.voice.checked = true; Voice.say('Голос включён', 'on', true); }
+  if (f === 'environment' && !Voice.on && Voice.supported()) { Voice.on = true; el.voice.checked = true; Voice.say('Голос включён', 'on', true); }
   renderFacing();
   if (state.on && !state.file) startCamera();
 }
